@@ -22,6 +22,7 @@ import { Menu, MenuItem, Modal, Button, TextInput, Allow } from './ui';
 import { NotificationsMenu, MessagesMenu } from './topbar';
 import { CalculatorMenu } from './Calculator';
 import { api } from '../services/api';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { initials } from '../utils/format';
 
 interface NavEntry {
@@ -137,6 +138,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('ksf-rail') === '1');
   const [search, setSearch] = useState('');
+  /* A phone has room in the top bar for the word, not the sentence: cut to
+     "Sea", the sentence read as a broken field. */
+  const narrow = useMediaQuery('(max-width: 479px)');
   const [passwordOpen, setPasswordOpen] = useState(false);
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
@@ -342,7 +346,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={isPlatform ? 'Search pharmacies, cities, Admins…' : 'Search medicines, customers, invoices…'}
+              placeholder={narrow ? 'Search' : isPlatform ? 'Search pharmacies, cities, Admins…' : 'Search medicines, customers, invoices…'}
               aria-label="Search"
             />
             <kbd>/</kbd>
