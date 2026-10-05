@@ -1,0 +1,178 @@
+/* ==========================================================================
+   Configuration
+   --------------------------------------------------------------------------
+   `.env` is read once, here, before anything else, and every setting the
+   server uses is validated and typed in one place. A missing MongoDB URI or a
+   weak JWT secret stops the server at start-up with a message that says
+   which line to fix — not with a stack trace from deep inside a request.
+
+   Paths are anchored to the project root, so starting the server from the
+   root or from inside backend/ reads the same `.env` and serves the same
+   build.
+   ========================================================================== */
+
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
+import { z } from 'zod';
+
+/** The folder that holds the root package.json, `.env` and `frontend/`. */
+export const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+export const fromRoot = (path: string): string => resolve(PROJECT_ROOT, path);
+
+/* A variable already set by the shell, Docker or a test always wins. */
+const envFile = process.env.KSF_ENV_FILE ? resolve(process.env.KSF_ENV_FILE) : fromRoot('.env');
+if (existsSync(envFile)) dotenv.config({ path: envFile, override: false, quiet: true });
+
+const bool = (fallback: boolean) => z
+  .union([z.boolean(), z.string()])
+  .optional()
+  .transform((value) => (value === undefined || value === '' ? fallback : value === true || value === 'true'));
+
+const int = (fallback: number, min = 0) => z.coerce.number().int().min(min).default(fallback);
+
+const schema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: int(8790, 1),
+  PUBLIC_APP_URL: z.string().default('http://localhost:5180'),
+  PUBLIC_ALLOWED_ORIGINS: z.string().default('http://localhost:5180,http://localhost:4180'),
+  STATIC_DIR: z.string().default('frontend/dist'),
+
+  /* ------------------------------------------------------------ database */
+  MONGODB_URI: z.string()
+    .min(1, 'MONGODB_URI is empty. Put your MongoDB connection string in .env (see DATABASE_SETUP.md).')
+    .refine((value) => /^mongodb(\+srv)?:\/\//.test(value), 'MONGODB_URI must start with mongodb:// or mongodb+srv:// — paste the connection string from MongoDB Atlas (see DATABASE_SETUP.md).'),
+  MONGODB_DB: z.string().min(1).default('ksf_pharmacy'),
+
+  /* ----------------------------------------------------------------- JWT */
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters. Generate one with: npm run secrets'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters. Generate one with: npm run secrets'),
+  JWT_ISSUER: z.string().default('ksf-pharmacy'),
+  JWT_AUDIENCE: z.string().default('ksf-web'),
+  JWT_ACCESS_MINUTES: int(15, 1),
+  JWT_REFRESH_DAYS: int(7, 1),
+  REFRESH_COOKIE_NAME: z.string().default('ksf_refresh'),
+  DEVICE_COOKIE_NAME: z.string().default('ksf_device'),
+  COOKIE_SECURE: bool(false),
+
+  /* -------------------------------------------------------------- sessions */
+  SESSION_IDLE_MINUTES: int(45, 1),
+  SESSION_ABSOLUTE_HOURS: int(72, 1),
+  STEP_UP_MINUTES: int(10, 1),
+  DEVICE_LIMIT_DESKTOP: int(1, 0),
+  DEVICE_LIMIT_MOBILE: int(1, 0),
+  LOGIN_MAX_ATTEMPTS: int(5, 1),
+  LOGIN_LOCK_MINUTES: int(15, 1),
+  LOGIN_MAX_PER_IP: int(60, 1),
+
+  /* ------------------------------------------------------------- passwords */
+  PASSWORD_MIN_LENGTH: int(12, 8),
+  PASSWORD_SCRYPT_N: int(32768, 1024),
+  PASSWORD_SCRYPT_R: int(8, 1),
+  PASSWORD_SCRYPT_P: int(3, 1),
+
+  /* -------------------------------------------------------- platform owner */
+  SUPER_ADMIN_NAME: z.string().default('Super Admin'),
+  SUPER_ADMIN_EMAIL: z.string().default(''),
+  SUPER_ADMIN_PASSWORD: z.string().default(''),
+
+  /* -------------------------------------------------------------- mail */
+  MAIL_TRANSPORT: z.enum(['console', 'file', 'smtp', 'none']).optional(),
+  MAIL_FROM: z.string().default('no-reply@ksfpharmacy.pk'),
+  MAIL_FROM_NAME: z.string().default('KSF'),
+  MAIL_OUTBOX: z.string().default('.data/outbox'),
+  MAIL_HOST: z.string().default(''),
+  MAIL_PORT: int(587, 1),
+  MAIL_SECURE: bool(false),
+  MAIL_USER: z.string().default(''),
+  MAIL_PASSWORD: z.string().default(''),
+
+  /* ----------------------------------------------------- codes and signup */
+  OTP_EXPIRY_MINUTES: int(10, 1),
+  OTP_MAX_ATTEMPTS: int(5, 1),
+  OTP_MAX_SENDS: int(5, 1),
+  REFERRAL_TRIAL_DAYS: int(15, 0),
+  REFERRAL_MAX_USES: int(100, 1),
+  REFERRAL_MAX_PER_DAY: int(10, 1),
+  REFERRAL_MAX_PER_IP_PER_DAY: int(3, 1),
+  REGISTER_MAX_PER_IP: int(20, 1),
+
+  /* ------------------------------------------------------------- payments */
+  PAYMENT_PROVIDER: z.string().default('manual'),
+  PAYMENT_WEBHOOK_SECRET: z.string().default(''),
+
+  /* ---------------------------------------------------------- data import */
+  MIGRATION_MAX_ROWS: int(20000, 1),
+  MIGRATION_BACKUP_DIR: z.string().default('.data/backups'),
+
+  /* ------------------------------------------------------------ business */
+  BUSINESS_LEGAL_NAME: z.string().default(''),
+  BUSINESS_ADDRESS: z.string().default(''),
+  BUSINESS_CITY: z.string().default(''),
+  BUSINESS_COUNTRY: z.string().default(''),
+  BUSINESS_PHONE: z.string().default(''),
+  BUSINESS_WHATSAPP: z.string().default(''),
+  SUPPORT_EMAIL: z.string().default(''),
+  SALES_EMAIL: z.string().default(''),
+  BUSINESS_WEBSITE: z.string().default(''),
+  BUSINESS_NTN: z.string().default(''),
+  BUSINESS_STRN: z.string().default(''),
+  SUPPORT_HOURS: z.string().default('')
+});
+
+const parsed = schema.safeParse(process.env);
+if (!parsed.success) {
+  const lines = parsed.error.issues.map((issue) => `  - ${issue.path.join('.') || 'value'}: ${issue.message}`);
+  console.error(`\n[KSF] The server cannot start: .env needs attention.\n${lines.join('\n')}\n`);
+  console.error(`      Settings file: ${envFile}\n`);
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export const IS_PROD = env.NODE_ENV === 'production';
+export const IS_TEST = env.NODE_ENV === 'test';
+
+if (IS_PROD && env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
+  console.error('[KSF] JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different in production.');
+  process.exit(1);
+}
+
+/** The release number, typed once — in the root package.json. */
+export const VERSION: string = JSON.parse(readFileSync(fromRoot('package.json'), 'utf8')).version;
+
+export const STATIC_FOLDER = (): string => fromRoot(env.STATIC_DIR);
+export const OUTBOX_FOLDER = (): string => fromRoot(env.MAIL_OUTBOX);
+
+export const ALLOWED_ORIGINS = new Set(
+  env.PUBLIC_ALLOWED_ORIGINS.split(',').map((value) => value.trim()).filter(Boolean)
+);
+
+/**
+ * Is this Origin allowed to post to a public endpoint? In production the
+ * answer is the configured list; in development any localhost port is
+ * accepted too, because the dev launcher moves to the next free port.
+ */
+export function originAllowed(origin: string | undefined, host: string | undefined): boolean {
+  if (!origin) return true;
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  if (host && (origin === `http://${host}` || origin === `https://${host}`)) return true;
+  if (IS_PROD) return false;
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
+}
+
+/** Facts about whoever sells this installation. Every field is optional. */
+export const BUSINESS = {
+  legalName: env.BUSINESS_LEGAL_NAME,
+  address: env.BUSINESS_ADDRESS,
+  city: env.BUSINESS_CITY,
+  country: env.BUSINESS_COUNTRY,
+  phone: env.BUSINESS_PHONE,
+  whatsapp: env.BUSINESS_WHATSAPP,
+  supportEmail: env.SUPPORT_EMAIL,
+  salesEmail: env.SALES_EMAIL,
+  website: env.BUSINESS_WEBSITE,
+  ntn: env.BUSINESS_NTN,
+  strn: env.BUSINESS_STRN,
+  supportHours: env.SUPPORT_HOURS
+};

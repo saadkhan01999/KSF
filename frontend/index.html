@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en-PK">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0E7A50" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="description" content="KSF is a secure, role-based pharmacy management system for Pakistan: point of sale, batch and expiry control, purchasing, prescriptions, customers, expenses, reporting, internal messaging and a full audit trail." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- For the browsers that still do not take an SVG favicon. -->
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="KSF" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>KSF — Pharmacy Management System</title>
+    <!-- Runs before the first paint, so a dark-mode user never sees a white
+         flash and the stylesheet can declare the dark palette exactly once. -->
+    <script src="/theme.js"></script>
+  </head>
+  <body>
+    <noscript>KSF needs JavaScript enabled to run the till, stock and reporting screens.</noscript>
+    <div id="root"></div>
+    <!-- No inline script anywhere in this file: that is what lets the server
+         send a strict script-src 'self' Content-Security-Policy. -->
+    <script src="/boot.js"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "name": "@ksf/backend",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "description": "KSF Pharmacy API — Express 5, TypeScript and MongoDB, with short-lived JWT access tokens and rotating refresh tokens.",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:check": "tsx src/cli/check-database.ts",
+    "db:backup": "tsx src/cli/backup.ts",
+    "db:verify": "tsx src/cli/backup.ts --verify",
+    "db:restore": "tsx src/cli/restore.ts",
+    "db:reset": "tsx src/cli/reset-database.ts",
+    "secrets": "tsx src/cli/generate-secrets.ts"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.7.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.19.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.7.2"
+  }
+}

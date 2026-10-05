@@ -1,0 +1,381 @@
+/* ==========================================================================
+   Design tokens
+   --------------------------------------------------------------------------
+   One source of truth for colour, type, spacing, radius, elevation and motion.
+   Components never carry a colour literal: every surface, border, input,
+   hover and overlay has a name here, and the dark palette is declared once,
+   under [data-theme='dark'] (public/theme.js resolves "match my device" to a
+   real value before the first paint). The four extra brand themes live in
+   themes.css and only replace the brand ramp.
+
+   The nine everything else is built from:
+
+      primary background    --canvas
+      secondary background  --bg-soft
+      card background       --surface
+      text primary          --text
+      text secondary        --text-soft
+      border                --line
+      input background      --input-bg
+      hover state           --hover
+      accent                --brand-600, and --gold-600 for money
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* -- Brand: KSF Green, the default theme; printed receipts match it -- */
+  --brand-950: #041F14;
+  --brand-900: #06301F;
+  --brand-800: #08462F;
+  --brand-700: #0A5A3C;
+  --brand-600: #0E7A50;
+  --brand-500: #12996A;
+  --brand-400: #28C795;
+  --brand-300: #6FDDB8;
+  --brand-200: #A9EDD4;
+  --brand-100: #D6F7EA;
+  --brand-050: #EDFBF5;
+
+  /* -- Accent: warm gold, for money and ownership -- */
+  --gold-700: #9A6C15;
+  --gold-600: #BE8A22;
+  --gold-500: #D9A93C;
+  --gold-300: #F0CE7E;
+  --gold-100: #FBF0D6;
+  --gold-text: #5E400A;
+
+  /* -- Status -- */
+  --ok-600: #067647;     --ok-500: #12B76A;     --ok-100: #ECFDF3;     --ok-text: #067647;
+  --warn-600: #B54708;   --warn-500: #F79009;   --warn-100: #FFFAEB;   --warn-text: #B54708;
+  --danger-600: #B42318; --danger-500: #F04438; --danger-100: #FEF3F2; --danger-text: #B42318;
+  --info-600: #175CD3;   --info-500: #2E90FA;   --info-100: #EFF8FF;   --info-text: #175CD3;
+  --purple-500: #7A5AF8; --purple-100: #F4F3FF; --purple-text: #5925DC;
+
+  /* -- Neutral ramp: cool grey, which is what makes it read as clinical -- */
+  --ink-900: #101828;
+  --ink-800: #1D2939;
+  --ink-700: #344054;
+  --ink-600: #475467;
+  --ink-500: #667085;
+  --ink-400: #98A2B3;
+  --ink-300: #D0D5DD;
+  --ink-200: #EAECF0;
+  --ink-100: #F2F4F7;
+  --ink-050: #F9FAFB;
+
+  /* -- Surfaces -- */
+  --canvas: #EFEFED;
+  --bg: #FFFFFF;
+  --bg-soft: #F9FAFB;
+  --surface: #FFFFFF;
+  --surface-2: #F9FAFB;
+  --surface-3: #F2F4F7;
+  --surface-inset: #FCFCFD;
+  --surface-raised: #FFFFFF;
+
+  --sidebar: #FFFFFF;
+  --sidebar-2: #FCFCFD;
+  --sidebar-ink: #475467;
+  --sidebar-ink-dim: #98A2B3;
+  --sidebar-active: #F2F4F7;
+  --sidebar-active-ink: #101828;
+
+  --line: #EAECF0;
+  --line-strong: #D0D5DD;
+  --line-faint: #F2F4F7;
+
+  --text: #101828;
+  --text-soft: #475467;
+  --text-dim: #667085;
+  --text-invert: #FFFFFF;
+
+  /* -- Interaction: named states, so a hover is a token and not a guess -- */
+  /* A soft brand wash used as a surface: a selected row, an unread item, an
+     accent band. The --brand-0xx ramp entries are fixed values and stay light
+     in both themes, which is what left several panels glowing white in dark
+     mode; these are the theme-aware versions to use for a background. */
+  --accent-soft: #EDFBF5;
+  --accent-soft-strong: #D6F7EA;
+  --accent-line: #A9EDD4;
+
+  --hover: #F4F5F7;
+  --hover-strong: #EAECF0;
+  --pressed: #E4E7EC;
+  --selected: #EDFBF5;
+  --disabled-bg: #F2F4F7;
+  --disabled-ink: #98A2B3;
+
+  /* -- Form controls -- */
+  --input-bg: #FFFFFF;
+  --input-bg-soft: #F9FAFB;
+  --input-bg-disabled: #F2F4F7;
+  --input-border: #D0D5DD;
+  --input-border-hover: #98A2B3;
+  --input-ink: #101828;
+  --input-placeholder: #98A2B3;
+
+  /* -- Layered surfaces: menus, dialogs, tooltips, toasts -- */
+  --menu-bg: #FFFFFF;
+  --menu-line: #EAECF0;
+  --menu-hover: #F4F5F7;
+  --dialog-bg: #FFFFFF;
+  --tooltip-bg: #1D2939;
+  --tooltip-ink: #FFFFFF;
+  --toast-bg: #FFFFFF;
+  --code-bg: #F2F4F7;
+  --code-ink: #344054;
+  --scrim: rgba(16, 24, 40, .45);
+  --backdrop: rgba(16, 24, 40, .55);
+  --skeleton-1: #F2F4F7;
+  --skeleton-2: #EAECF0;
+
+  /* -- The press ripple, on a solid button and on a pale one -- */
+  --ripple-on-solid: rgba(255, 255, 255, .40);
+  --ripple-on-surface: rgba(16, 24, 40, .10);
+
+  /* -- A printed receipt is paper. It stays paper in dark mode, because that
+        is what is about to come out of the printer. -- */
+  --paper: #FFFFFF;
+  --paper-ink: #000000;
+  --paper-ink-dim: #444444;
+  --paper-line: #BBBBBB;
+  --paper-line-strong: #999999;
+
+  /* -- On a saturated fill --
+     White in both themes, because the fill underneath is dark in both. A token
+     rather than a literal so the intent is legible and a future change happens
+     in one place. */
+  --on-solid: #FFFFFF;
+  --on-solid-dim: rgba(255, 255, 255, .78);
+
+  /* -- On a deliberately dark panel: the marketing hero, the sign-in art -- */
+  --on-dark: #FFFFFF;
+  --on-dark-soft: rgba(255, 255, 255, .82);
+  --on-dark-dim: rgba(255, 255, 255, .62);
+  --on-dark-line: rgba(255, 255, 255, .14);
+  --on-dark-fill: rgba(255, 255, 255, .10);
+  --on-dark-fill-strong: rgba(255, 255, 255, .18);
+
+  /* -- Charts: a fixed order, so a series is the same colour twice running -- */
+  --chart-1: #0E7A50;
+  --chart-2: #2E90FA;
+  --chart-3: #D9A93C;
+  --chart-4: #7A5AF8;
+  --chart-5: #F04438;
+  --chart-6: #12B76A;
+  --chart-grid: #EAECF0;
+  --chart-ink: #667085;
+
+  /* -- Type -- */
+  --font: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Noto Sans', Roboto, Arial, sans-serif;
+  --font-display: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-num: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-base: 0.9375rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: 2.25rem;
+  --fs-4xl: 2.75rem;
+  --fs-5xl: 3.5rem;
+  --lh-tight: 1.2;
+  --lh-snug: 1.4;
+  --lh-base: 1.6;
+
+  /* -- Spacing (4px base) -- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px; --s-5: 20px;
+  --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 48px; --s-10: 64px;
+  --s-12: 96px; --s-14: 128px;
+
+  /* -- Radius -- */
+  --r-xs: 6px; --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
+  --r-2xl: 24px; --r-3xl: 32px; --r-pill: 999px;
+
+  /* -- Elevation -- */
+  --sh-xs: 0 1px 2px rgba(16, 24, 40, .05);
+  --sh-sm: 0 1px 3px rgba(16, 24, 40, .10), 0 1px 2px rgba(16, 24, 40, .06);
+  --sh-md: 0 4px 8px -2px rgba(16, 24, 40, .10), 0 2px 4px -2px rgba(16, 24, 40, .06);
+  --sh-lg: 0 12px 16px -4px rgba(16, 24, 40, .08), 0 4px 6px -2px rgba(16, 24, 40, .03);
+  --sh-xl: 0 20px 24px -4px rgba(16, 24, 40, .08), 0 8px 8px -4px rgba(16, 24, 40, .03);
+  --sh-2xl: 0 32px 64px -12px rgba(16, 24, 40, .14);
+  --sh-up: 0 -4px 16px rgba(16, 24, 40, .06);
+  --sh-brand: 0 1px 2px rgba(16, 24, 40, .05);
+  --sh-brand-lg: 0 4px 12px -2px rgba(14, 122, 80, .28);
+  --ring: 0 0 0 4px rgba(18, 153, 106, .16);
+  --ring-danger: 0 0 0 4px rgba(240, 68, 56, .16);
+  --pulse-from: rgba(18, 153, 106, .45);
+  --pulse-to: rgba(18, 153, 106, 0);
+
+  /* -- Motion -- */
+  --ease: cubic-bezier(.32, .72, .28, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --t-fast: .13s;
+  --t-base: .2s;
+  --t-slow: .34s;
+  --t-parallax: .9s;
+
+  /* -- Layout -- */
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 76px;
+  --topbar-h: 68px;
+  --tap: 44px;
+  /* Set per element by the setup ring; declared here so the ring renders at
+     zero rather than transparent if the inline style is ever missing. */
+  --percent: 0;
+  --menu-w: 268px;
+  --panel-w: 380px;
+
+  /* -- Marketing surfaces -- */
+  --hero-sky: #CFE4FA;
+  --hero-warm: #FBE3B8;
+  --hero-mid: #FFFFFF;
+  --hero-glow-brand: rgba(40, 199, 149, .30);
+  --hero-glow-gold: rgba(217, 169, 60, .22);
+  --hero-glow-sky: rgba(207, 228, 250, .60);
+  --hero-glow-warm: rgba(251, 227, 184, .55);
+  --panel-dark: linear-gradient(155deg, #0A5A3C 0%, #06301F 55%, #041F14 100%);
+}
+
+/* ==========================================================================
+   Dark. Declared once — see the note at the top of this file.
+
+   Night shifts are ordinary in Pakistani pharmacies, so this is a designed
+   palette rather than an inversion: the same cool-grey logic pulled down into
+   near-black blues, with the brand kept bright enough to stay legible.
+   ========================================================================== */
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --canvas: #0B0F17;
+  --bg: #101623;
+  --bg-soft: #141B2A;
+  --surface: #101623;
+  --surface-2: #161E2E;
+  --surface-3: #1C2537;
+  --surface-inset: #0D131E;
+  --surface-raised: #182133;
+
+  --sidebar: #0F1520;
+  --sidebar-2: #0C111B;
+  --sidebar-ink: #94A3B8;
+  --sidebar-ink-dim: #64748B;
+  --sidebar-active: #1C2537;
+  --sidebar-active-ink: #F8FAFC;
+
+  --line: #232C3D;
+  --line-strong: #33405A;
+  --line-faint: #1A2231;
+
+  --ink-900: #F8FAFC;
+  --ink-800: #E2E8F0;
+  --ink-700: #CBD5E1;
+  --ink-600: #94A3B8;
+  --ink-500: #7C8BA1;
+  --ink-400: #64748B;
+  --ink-300: #475569;
+  --ink-200: #2A3547;
+  --ink-100: #1E2635;
+  --ink-050: #161E2E;
+
+  --text: #F8FAFC;
+  --text-soft: #CBD5E1;
+  --text-dim: #94A3B8;
+  --text-invert: #0B0F17;
+
+  --accent-soft: #0C2A1E;
+  --accent-soft-strong: #103A29;
+  --accent-line: #17513A;
+
+  --hover: #1A2334;
+  --hover-strong: #222D42;
+  --pressed: #27334A;
+  --selected: #06301F;
+  --disabled-bg: #1A2231;
+  --disabled-ink: #64748B;
+
+  --input-bg: #0D131E;
+  --input-bg-soft: #141B2A;
+  --input-bg-disabled: #161E2E;
+  --input-border: #33405A;
+  --input-border-hover: #475569;
+  --input-ink: #F8FAFC;
+  --input-placeholder: #64748B;
+
+  --menu-bg: #182133;
+  --menu-line: #27334A;
+  --menu-hover: #222D42;
+  --dialog-bg: #141B2A;
+  --tooltip-bg: #E2E8F0;
+  --tooltip-ink: #0B0F17;
+  --toast-bg: #182133;
+  --code-bg: #0D131E;
+  --code-ink: #CBD5E1;
+  --scrim: rgba(2, 6, 12, .66);
+  --backdrop: rgba(2, 6, 12, .72);
+  --skeleton-1: #161E2E;
+  --skeleton-2: #1E2635;
+
+  /* A brand or danger fill is dark in this theme too, so its text stays white. */
+  --on-solid: #FFFFFF;
+  --ripple-on-solid: rgba(255, 255, 255, .40);
+  --ripple-on-surface: rgba(255, 255, 255, .10);
+  --on-solid-dim: rgba(255, 255, 255, .78);
+
+  --ok-100: #052E1E;     --ok-text: #6EE7B7;
+  --warn-100: #341B04;   --warn-text: #FCD34D;
+  --danger-100: #3B0D0A; --danger-text: #FCA5A5;
+  --info-100: #0A2647;   --info-text: #93C5FD;
+  --purple-100: #1E1B4B; --purple-text: #C4B5FD;
+  --gold-100: #2E2308;   --gold-text: #F0CE7E;
+
+  --chart-1: #28C795;
+  --chart-2: #60A5FA;
+  --chart-3: #F0CE7E;
+  --chart-4: #A78BFA;
+  --chart-5: #FCA5A5;
+  --chart-6: #6EE7B7;
+  --chart-grid: #232C3D;
+  --chart-ink: #94A3B8;
+
+  --hero-sky: #16324F;
+  --hero-warm: #3A2E12;
+  --hero-mid: #101623;
+  --hero-glow-brand: rgba(40, 199, 149, .22);
+  --hero-glow-gold: rgba(217, 169, 60, .16);
+  --hero-glow-sky: rgba(22, 50, 79, .70);
+  --hero-glow-warm: rgba(58, 46, 18, .60);
+  --panel-dark: linear-gradient(155deg, #08462F 0%, #05261A 55%, #030F0A 100%);
+
+  --sh-xs: 0 1px 2px rgba(0, 0, 0, .5);
+  --sh-sm: 0 1px 3px rgba(0, 0, 0, .55), 0 1px 2px rgba(0, 0, 0, .4);
+  --sh-md: 0 4px 8px -2px rgba(0, 0, 0, .6), 0 2px 4px -2px rgba(0, 0, 0, .4);
+  --sh-lg: 0 12px 16px -4px rgba(0, 0, 0, .6), 0 4px 6px -2px rgba(0, 0, 0, .4);
+  --sh-xl: 0 20px 24px -4px rgba(0, 0, 0, .65);
+  --sh-2xl: 0 32px 64px -12px rgba(0, 0, 0, .75);
+  --sh-up: 0 -4px 16px rgba(0, 0, 0, .5);
+  --ring: 0 0 0 4px rgba(40, 199, 149, .22);
+  --ring-danger: 0 0 0 4px rgba(240, 68, 56, .24);
+  --pulse-from: rgba(40, 199, 149, .45);
+  --pulse-to: rgba(40, 199, 149, 0);
+}
+
+/* A browser that blocks /theme.js leaves no data-theme at all. Rather than
+   force that person into permanent light, follow the device for the handful of
+   properties that decide whether the page is readable. Everything else is
+   deliberately not duplicated here — see the note at the top. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --canvas: #0B0F17;
+    --bg: #101623;
+    --surface: #101623;
+    --text: #F8FAFC;
+    --text-soft: #CBD5E1;
+    --line: #232C3D;
+  }
+}

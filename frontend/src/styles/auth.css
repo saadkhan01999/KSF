@@ -1,0 +1,360 @@
+/* ==========================================================================
+   Sign in, forgotten password, and the account screens that sit outside the
+   workspace shell. Every rule these screens use lives in this one file.
+   --------------------------------------------------------------------------
+   The layout: brand on the left, form on the right. Below 940px the brand
+   panel becomes a short header so the form is the first thing under a thumb,
+   and below 560px it disappears entirely — on a phone at a counter, the only
+   thing that matters is the password field.
+   ========================================================================== */
+
+.auth {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  background: var(--canvas);
+}
+
+/* ------------------------------ brand panel ----------------------------- */
+
+.auth-brand {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+  padding: var(--s-9) clamp(var(--s-6), 4vw, var(--s-10));
+  background: var(--panel-dark);
+  color: var(--on-dark);
+}
+
+/* Two slow, huge, blurred circles. They are the only motion on this screen
+   and they stop when the visitor has asked for less of it. */
+.auth-brand::before,
+.auth-brand::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.auth-brand::before {
+  top: -20%;
+  right: -16%;
+  width: 640px;
+  height: 640px;
+  background: radial-gradient(circle, var(--hero-glow-brand), transparent 66%);
+  animation: ksf-blob 24s var(--ease) infinite;
+}
+.auth-brand::after {
+  bottom: -24%;
+  left: -18%;
+  width: 560px;
+  height: 560px;
+  background: radial-gradient(circle, var(--hero-glow-gold), transparent 68%);
+  animation: ksf-blob 30s var(--ease) infinite reverse;
+}
+.auth-brand > * { position: relative; z-index: 1; }
+
+.auth-brand-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+}
+.auth-theme {
+  color: var(--on-dark-dim);
+  border-color: var(--on-dark-line);
+  background: var(--on-dark-fill);
+}
+.auth-theme:hover { color: var(--on-dark); background: var(--on-dark-fill-strong); }
+
+.auth-brand-body { margin-top: auto; margin-bottom: auto; max-width: 46ch; }
+.auth-brand-body h1 {
+  font-size: clamp(1.9rem, 3.2vw, 2.9rem);
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  font-weight: 650;
+  color: var(--on-dark);
+}
+.auth-brand-body > p {
+  margin-top: var(--s-4);
+  font-size: var(--fs-lg);
+  line-height: 1.55;
+  color: var(--on-dark-soft);
+}
+
+.auth-points {
+  list-style: none;
+  padding: 0;
+  margin-top: var(--s-8);
+  display: grid;
+  gap: var(--s-5);
+}
+.auth-points li {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: var(--s-4);
+  align-items: start;
+}
+.auth-points li > span[aria-hidden] {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--on-dark-fill);
+  border: 1px solid var(--on-dark-line);
+  color: var(--brand-300);
+}
+.auth-points svg { width: 19px; height: 19px; }
+.auth-points strong {
+  display: block;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--on-dark);
+  margin-bottom: 2px;
+}
+.auth-points span:not([aria-hidden]) {
+  display: block;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: var(--on-dark-dim);
+}
+
+.auth-brand-foot {
+  font-size: var(--fs-xs);
+  color: var(--on-dark-dim);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.auth-brand-foot span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* -------------------------------- the form ------------------------------ */
+
+.auth-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+  padding: var(--s-8) clamp(var(--s-4), 3vw, var(--s-8));
+  overflow-y: auto;
+}
+.auth-main-inner {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.auth-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 32px;
+}
+.auth-top-row .auth-theme {
+  color: var(--text-dim);
+  background: transparent;
+  border-color: transparent;
+}
+.auth-top-row .auth-theme:hover { color: var(--text); background: var(--hover); }
+
+.auth-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: var(--fs-sm);
+  padding: 6px 0;
+  transition: color var(--t-fast) var(--ease);
+}
+.auth-back:hover { color: var(--brand-600); }
+
+.auth-mark { display: flex; justify-content: center; margin-bottom: var(--s-2); }
+
+/* The card. */
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--sh-lg);
+  padding: clamp(var(--s-6), 3vw, var(--s-8));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  animation: ksf-fade-up var(--t-slow) var(--ease-out) both;
+}
+
+.auth-head { text-align: left; }
+.auth-head h2 {
+  font-size: var(--fs-2xl);
+  letter-spacing: -.025em;
+  font-weight: 650;
+}
+.auth-head p {
+  margin-top: 6px;
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.auth-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r-lg);
+  background: var(--accent-soft);
+  color: var(--brand-600);
+  margin-bottom: var(--s-4);
+}
+.auth-icon.is-warn { background: var(--warn-100); color: var(--warn-600); }
+.auth-icon.is-ok { background: var(--ok-100); color: var(--ok-600); }
+
+.auth-form { display: flex; flex-direction: column; gap: var(--s-4); }
+.auth-form .btn-lg { margin-top: var(--s-1); }
+
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.auth-link {
+  color: var(--brand-600);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+.auth-link:hover { text-decoration: underline; }
+
+.auth-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--danger-100);
+  border: 1px solid var(--danger-500);
+  color: var(--danger-text);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1.5;
+  animation: ksf-shake .42s var(--ease) both;
+}
+.auth-error svg { flex: 0 0 18px; margin-top: 1px; }
+
+.auth-alt {
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.auth-alt a, .auth-alt .link-button {
+  color: var(--brand-600);
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth-alt a:hover, .auth-alt .link-button:hover { text-decoration: underline; }
+
+/* ------------------------------- trust row ------------------------------ */
+
+/* Three short claims, each of which is true of this build: the connection is
+   encrypted, the session cookie cannot be read by a script, and the workspace
+   is behind a role check on the server. */
+.auth-trust {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-2) var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line-faint);
+}
+.auth-trust span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.auth-trust svg { width: 13px; height: 13px; color: var(--ok-600); }
+
+/* ---------------------------- returning person -------------------------- */
+
+.auth-known {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+.auth-known .avatar { flex: 0 0 40px; width: 40px; height: 40px; }
+.auth-known-meta { min-width: 0; flex: 1; }
+.auth-known-meta strong { display: block; font-size: var(--fs-sm); font-weight: 650; }
+.auth-known-meta span {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-legal {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.6;
+  max-width: 440px;
+}
+
+/* -------------------------------- single -------------------------------- */
+
+/* Forgotten password, reset, verify: no brand panel, one centred card. */
+.auth.is-single { grid-template-columns: minmax(0, 1fr); }
+.auth.is-single .auth-brand { display: none; }
+.auth.is-single .auth-main { padding-block: var(--s-9); }
+
+/* ------------------------------ responsive ------------------------------ */
+
+@media (max-width: 940px) {
+  .auth { grid-template-columns: minmax(0, 1fr); }
+  .auth-brand {
+    gap: var(--s-5);
+    padding: var(--s-6) var(--s-5) var(--s-7);
+  }
+  .auth-brand-body { margin: 0; }
+  .auth-brand-body h1 { font-size: var(--fs-2xl); }
+  .auth-brand-body > p { font-size: var(--fs-base); }
+  .auth-points, .auth-brand-foot { display: none; }
+  .auth-main { justify-content: flex-start; padding-top: var(--s-6); }
+}
+
+@media (max-width: 560px) {
+  .auth-brand { display: none; }
+  .auth-main { padding: var(--s-5) var(--s-4) var(--s-9); }
+  .auth-card {
+    padding: var(--s-5);
+    border-radius: var(--r-xl);
+  }
+  .auth-main .auth-mark { margin-top: var(--s-2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-brand::before,
+  .auth-brand::after,
+  .auth-card { animation: none; }
+}

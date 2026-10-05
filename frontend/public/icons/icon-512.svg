@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512" role="img" aria-label="KSF">
+  <title>KSF</title>
+  <defs><linearGradient id="ksfMask512" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#12996A"/><stop offset=".55" stop-color="#0E7A50"/><stop offset="1" stop-color="#172A24"/></linearGradient></defs>
+  <rect width="64" height="64" fill="url(#ksfMask512)"/>
+  <g transform="translate(32 32) scale(0.8) translate(-32 -32)">
+    <path d="M6.59 8 L19.766 8 L19.766 25.882 L37.649 8 L56.472 8 L33.884 31.059 L57.414 56 L39.061 56 L19.766 35.765 L19.766 56 L6.59 56 L6.59 8 Z" fill="#FFFFFF" transform="translate(-4 2) scale(0.93)"/>
+    <g transform="rotate(-45 49 14)"><rect x="41.5" y="10.5" width="15" height="7" rx="3.5" fill="#E7B84A"/><rect x="48.4" y="10.5" width="1.4" height="7" fill="#172A24" opacity=".3"/></g>
+  </g>
+</svg>

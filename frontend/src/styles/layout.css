@@ -1,0 +1,480 @@
+/* ==========================================================================
+   Application shell
+   --------------------------------------------------------------------------
+   Edge to edge, as a working dashboard should be: the sidebar runs the full
+   height of the window on the left, the top bar runs its full width, and the
+   page uses every pixel in between. Nothing floats on a canvas any more —
+   the margins that used to frame the shell were space the till and the
+   reports could not use.
+
+     - The shell is fixed to the viewport and never scrolls as a page.
+     - The sidebar is a flex child, not an overlay, on a desktop.
+     - `.main` is the scroll container; the top bar sticks inside it.
+
+   Breakpoints, used the same way in every stylesheet:
+     xxs  < 360    xs  360–479    sm  480–639    md  640–1023
+     lg  1024–1279   xl  1280–1535   xxl ≥ 1536
+   Below 1100px the sidebar becomes a drawer; below 720px the five daily
+   actions move to a bottom bar.
+   ========================================================================== */
+
+.shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  background: var(--surface);
+  isolation: isolate;
+}
+
+/* Painted on body too, so an overscroll bounce never shows a different colour. */
+body { background: var(--surface); }
+
+/* ------------------------------- Sidebar ------------------------------- */
+.sidebar {
+  position: relative;
+  z-index: 30;
+  flex: 0 0 var(--sidebar-w);
+  width: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+  transition: flex-basis var(--t-base) var(--ease), width var(--t-base) var(--ease),
+              transform var(--t-slow) var(--ease-out);
+}
+.sidebar.is-collapsed { flex-basis: var(--sidebar-w-collapsed); width: var(--sidebar-w-collapsed); }
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-5) var(--s-5) var(--s-4);
+  min-height: var(--topbar-h);
+}
+.sidebar.is-collapsed .sidebar-brand { padding-inline: 0; justify-content: center; }
+
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--s-2) var(--s-3) var(--s-4);
+}
+
+.nav-group + .nav-group { margin-top: var(--s-5); }
+.nav-label {
+  padding: 0 var(--s-3) var(--s-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--sidebar-ink-dim);
+}
+.sidebar.is-collapsed .nav-label { text-align: center; font-size: 9px; letter-spacing: 0; padding-inline: 0; }
+
+/* The active item is a soft grey pill with a hairline — the reference uses no
+   accent bar, and the restraint is what makes the sidebar read as calm. */
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--tap);
+  padding: 10px var(--s-3);
+  margin-bottom: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  color: var(--sidebar-ink);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease);
+}
+.nav-item:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+.nav-item.is-active {
+  background: var(--sidebar-active);
+  border-color: var(--line);
+  color: var(--sidebar-active-ink);
+  font-weight: 600;
+  box-shadow: var(--sh-xs);
+}
+.nav-item svg { flex: 0 0 20px; width: 20px; height: 20px; }
+.nav-item.is-active svg { color: var(--brand-600); }
+.nav-item-text { overflow: hidden; text-overflow: ellipsis; }
+
+.nav-count {
+  margin-left: auto;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--danger-500);
+  color: var(--on-solid);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.nav-count.is-muted { background: var(--surface-3); color: var(--text-dim); border: 1px solid var(--line); }
+
+.sidebar.is-collapsed .nav-item { justify-content: center; padding-inline: 0; }
+.sidebar.is-collapsed .nav-item-text,
+.sidebar.is-collapsed .nav-count { display: none; }
+.sidebar.is-collapsed .nav-item.has-badge::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger-500);
+  box-shadow: 0 0 0 2px var(--sidebar);
+}
+
+.sidebar-foot {
+  padding: var(--s-3) var(--s-3) var(--s-4);
+  border-top: 1px solid var(--line-faint);
+}
+
+/* The account card at the foot of the sidebar, as in the reference. */
+.account-card {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 56px;
+  padding: 8px var(--s-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  text-align: left;
+  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+.account-card:hover { background: var(--surface-2); border-color: var(--line); }
+.account-card .meta { min-width: 0; flex: 1; }
+.account-card .meta strong {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-card .meta span { font-size: var(--fs-xs); color: var(--text-dim); }
+.account-card > svg:last-child { flex: 0 0 16px; color: var(--text-dim); }
+.sidebar.is-collapsed .account-card { justify-content: center; padding-inline: 0; }
+.sidebar.is-collapsed .account-card .meta,
+.sidebar.is-collapsed .account-card > svg:last-child { display: none; }
+
+.collapse-btn {
+  width: 100%;
+  min-height: 38px;
+  margin-top: var(--s-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--r-md);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.collapse-btn:hover { background: var(--surface-2); color: var(--text); }
+
+/* ------------------------------- Main area ------------------------------ */
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--surface);
+  scroll-behavior: smooth;
+  /* The scroll container for in-app parallax. */
+  perspective: 1px;
+  perspective-origin: 0 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  min-height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--page-gutter);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar-search { position: relative; flex: 1 1 360px; max-width: 480px; }
+.topbar-search > svg {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.topbar-search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--s-4) 0 40px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-base);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+.topbar-search input::placeholder { color: var(--text-dim); }
+.topbar-search input:focus { outline: none; border-color: var(--brand-400); box-shadow: var(--ring); }
+.topbar-search kbd {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: opacity var(--t-fast) var(--ease);
+}
+.topbar-search input:focus ~ kbd { opacity: 0; }
+
+.icon-btn {
+  position: relative;
+  width: var(--tap);
+  height: var(--tap);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease);
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--line); }
+.icon-btn:active { transform: scale(.95); }
+.icon-btn .dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--danger-500);
+  color: var(--on-solid);
+  font-size: 10px;
+  font-weight: 700;
+  border: 2px solid var(--surface);
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--tap);
+  padding: 4px var(--s-3) 4px 4px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.user-chip:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.user-chip .meta { text-align: left; line-height: 1.25; }
+.user-chip .meta strong { display: block; font-size: var(--fs-sm); font-weight: 600; }
+.user-chip .meta span { font-size: var(--fs-xs); color: var(--text-dim); }
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--brand-400), var(--brand-700));
+  color: var(--on-solid);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  overflow: hidden;
+}
+.avatar.lg { width: 52px; height: 52px; flex-basis: 52px; font-size: var(--fs-md); }
+.avatar.sm { width: 30px; height: 30px; flex-basis: 30px; font-size: 11px; }
+.avatar.xs { width: 24px; height: 24px; flex-basis: 24px; font-size: 10px; }
+.avatar.gold { background: linear-gradient(140deg, var(--gold-300), var(--gold-600)); color: var(--brand-950); }
+.avatar.neutral { background: var(--surface-3); color: var(--text-soft); border: 1px solid var(--line); }
+
+/* Overlapping avatar stack, used in the marketing hero and on team rows. */
+.avatar-stack { display: inline-flex; }
+.avatar-stack .avatar { border: 2px solid var(--surface); }
+.avatar-stack .avatar + .avatar { margin-left: -10px; }
+
+/* ------------------------------ Page canvas ----------------------------- */
+.page {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: var(--s-6) var(--page-gutter) var(--s-10);
+  animation: ksf-fade-up var(--t-slow) var(--ease-out) both;
+}
+:root { --page-gutter: var(--s-6); }
+@media (min-width: 1536px) { :root { --page-gutter: var(--s-8); } }
+@media (min-width: 1920px) { :root { --page-gutter: var(--s-9); } }
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--s-5);
+}
+.page-head h1 { font-size: var(--fs-2xl); letter-spacing: -.02em; }
+.page-head .sub { color: var(--text-soft); margin-top: 4px; font-size: var(--fs-base); max-width: 78ch; }
+.page-head .actions { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; margin-left: auto; }
+
+/* ----------------------------- Mobile chrome ---------------------------- */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+  animation: ksf-fade var(--t-base) var(--ease) both;
+}
+
+.mobile-bar { display: none; }
+
+/* Shown whenever the sidebar is an overlay rather than a column. */
+.nav-toggle { display: none; }
+@media (max-width: 1100px) { .nav-toggle { display: grid; } }
+
+@media (max-width: 1100px) {
+  .sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    flex-basis: min(300px, 84vw);
+    width: min(300px, 84vw);
+    transform: translateX(-100%);
+    box-shadow: var(--sh-2xl);
+  }
+  .sidebar.is-open { transform: none; }
+  .sidebar.is-collapsed { flex-basis: min(300px, 84vw); width: min(300px, 84vw); }
+  .sidebar.is-collapsed .nav-item { justify-content: flex-start; padding-inline: var(--s-3); }
+  .sidebar.is-collapsed .nav-item-text { display: block; }
+  .sidebar.is-collapsed .nav-count { display: grid; }
+  .sidebar.is-collapsed .account-card { justify-content: flex-start; padding-inline: var(--s-3); }
+  .sidebar.is-collapsed .account-card .meta { display: block; }
+  .collapse-btn { display: none; }
+
+  .topbar { padding-inline: var(--s-4); }
+  :root { --page-gutter: var(--s-4); }
+  .page { padding-top: var(--s-5); padding-bottom: 96px; }
+}
+
+@media (max-width: 720px) {
+  :root { --topbar-h: 60px; --page-gutter: var(--s-3); }
+  .page { padding-top: var(--s-4); padding-bottom: 96px; }
+  .page-head { margin-bottom: var(--s-4); }
+  .page-head h1 { font-size: var(--fs-xl); }
+  .page-head .actions { width: 100%; }
+  .page-head .actions > * { flex: 1 1 auto; }
+  .topbar-search { flex-basis: auto; }
+  .topbar-search kbd { display: none; }
+
+  /* The five things counter staff touch all day, one thumb away. */
+  .mobile-bar {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 45;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: saturate(180%) blur(16px);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: var(--sh-up);
+  }
+  .mobile-bar a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 58px;
+    padding: 6px 2px;
+    color: var(--text-dim);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color var(--t-fast) var(--ease);
+  }
+  .mobile-bar a svg { width: 21px; height: 21px; }
+  .mobile-bar a.is-active { color: var(--brand-600); }
+  .mobile-bar a.is-pos .pos-fab {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    margin-top: -20px;
+    border-radius: 50%;
+    background: linear-gradient(140deg, var(--brand-400), var(--brand-700));
+    box-shadow: var(--sh-brand-lg);
+    color: var(--on-solid);
+  }
+  .mobile-bar a.is-pos span { color: var(--brand-600); }
+}
+
+/* The account chip in the top bar. The chevron says it opens something —
+   without it people click once, see a menu, and still expect a page. */
+.user-chip-chev { color: var(--text-dim); transition: transform var(--t-fast) var(--ease); }
+.user-chip[aria-expanded='true'] .user-chip-chev { transform: rotate(180deg); }
+.user-chip[aria-expanded='true'] { border-color: var(--line-strong); background: var(--surface-2); }
+.icon-btn[aria-expanded='true'] { background: var(--hover-strong); color: var(--text); }
+
+/* --------------------------- The smallest phones -------------------------- */
+@media (max-width: 479px) {
+  .topbar { gap: var(--s-2); }
+  .topbar-search input { padding-right: var(--s-2); }
+  .user-chip { padding-right: 4px; border-color: transparent; }
+}
+@media (max-width: 359px) {
+  :root { --page-gutter: 10px; --tap: 40px; }
+  .topbar-search { display: none; }
+  .mobile-bar a { font-size: 9.5px; }
+}
+
+/* --------------------------- Support-mode banner -------------------------- */
+/* The Super Admin working inside a pharmacy sees, on every screen, whose
+   pharmacy it is and how to leave. */
+.support-banner {
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  padding: 10px var(--page-gutter);
+  background: var(--gold-100); color: var(--gold-text);
+  border-bottom: 1px solid var(--gold-300);
+  font-size: var(--fs-sm); font-weight: 600;
+}
+.support-banner svg { flex: 0 0 auto; }
+.support-banner .grow { flex: 1 1 200px; min-width: 0; }
+.support-banner button { margin-left: auto; }

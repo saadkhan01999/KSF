@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Runtime data: backups, import snapshots, the development mail outbox
+.data/
+
+# Settings and secrets — .env.example is the template that is committed
+.env
+.env.local
+.env.*.local
+deploy/.env
+
+# Certificates and keys
+deploy/nginx/certs/
+*.crt
+*.key
+*.pem
+
+# Editor and operating system noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Delivery archives
+*.zip
+*.rar

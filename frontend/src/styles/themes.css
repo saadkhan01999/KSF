@@ -1,0 +1,140 @@
+/* ==========================================================================
+   Brand themes
+   --------------------------------------------------------------------------
+   Five colour themes. "KSF Green" is the original and is simply the default
+   tokens in tokens.css; the other four replace the brand ramp and the few
+   tokens derived from it (selected rows, focus rings, the first chart series,
+   the dark marketing panel). Layout, spacing, type and the status colours
+   never change, so every screen keeps its contrast in every theme.
+
+   The theme is an attribute on <html>: data-brand="ocean-blue". It is set
+   before the first paint by public/theme.js, from the last theme this
+   browser saw, and then confirmed from the server — the pharmacy's theme, or
+   the person's own when their role may choose one.
+
+   Light and dark are independent of the brand: each theme below declares its
+   dark-mode washes once, under [data-theme='dark'].
+   ========================================================================== */
+
+/* ------------------------------ Ocean Blue ------------------------------ */
+:root[data-brand='ocean-blue'] {
+  --brand-950: #04162E; --brand-900: #072447; --brand-800: #0A3466; --brand-700: #0D4A8C;
+  --brand-600: #1366B8; --brand-500: #1E80D8; --brand-400: #4FA3EE; --brand-300: #8EC5F6;
+  --brand-200: #C2DFFB; --brand-100: #E0EFFD; --brand-050: #F1F8FE;
+  --accent-soft: #F1F8FE; --accent-soft-strong: #E0EFFD; --accent-line: #C2DFFB; --selected: #F1F8FE;
+  --sh-brand-lg: 0 4px 12px -2px rgba(19, 102, 184, .28);
+  --ring: 0 0 0 4px rgba(30, 128, 216, .16);
+  --pulse-from: rgba(30, 128, 216, .45); --pulse-to: rgba(30, 128, 216, 0);
+  --chart-1: #1366B8;
+  --hero-glow-brand: rgba(79, 163, 238, .30);
+  --panel-dark: linear-gradient(155deg, #0D4A8C 0%, #072447 55%, #04162E 100%);
+}
+:root[data-brand='ocean-blue'][data-theme='dark'] {
+  --accent-soft: #0A1F3A; --accent-soft-strong: #0E2C52; --accent-line: #16406F; --selected: #072447;
+  --ring: 0 0 0 4px rgba(79, 163, 238, .24);
+  --pulse-from: rgba(79, 163, 238, .45); --pulse-to: rgba(79, 163, 238, 0);
+  --chart-1: #4FA3EE;
+  --panel-dark: linear-gradient(155deg, #0A3466 0%, #061B36 55%, #030D1B 100%);
+}
+
+/* ----------------------------- Royal Purple ----------------------------- */
+:root[data-brand='royal-purple'] {
+  --brand-950: #1A0B33; --brand-900: #2A1150; --brand-800: #3B1872; --brand-700: #4E2196;
+  --brand-600: #6330B8; --brand-500: #7A48D6; --brand-400: #9A70EA; --brand-300: #BEA2F4;
+  --brand-200: #DCCDFA; --brand-100: #EDE5FD; --brand-050: #F7F3FE;
+  --accent-soft: #F7F3FE; --accent-soft-strong: #EDE5FD; --accent-line: #DCCDFA; --selected: #F7F3FE;
+  --sh-brand-lg: 0 4px 12px -2px rgba(99, 48, 184, .30);
+  --ring: 0 0 0 4px rgba(122, 72, 214, .16);
+  --pulse-from: rgba(122, 72, 214, .45); --pulse-to: rgba(122, 72, 214, 0);
+  --chart-1: #6330B8;
+  --hero-glow-brand: rgba(154, 112, 234, .28);
+  --panel-dark: linear-gradient(155deg, #4E2196 0%, #2A1150 55%, #1A0B33 100%);
+}
+:root[data-brand='royal-purple'][data-theme='dark'] {
+  --accent-soft: #1E1240; --accent-soft-strong: #2A1A58; --accent-line: #3D2780; --selected: #2A1150;
+  --ring: 0 0 0 4px rgba(154, 112, 234, .26);
+  --pulse-from: rgba(154, 112, 234, .45); --pulse-to: rgba(154, 112, 234, 0);
+  --chart-1: #9A70EA;
+  --panel-dark: linear-gradient(155deg, #3B1872 0%, #200D3E 55%, #10061F 100%);
+}
+
+/* ----------------------------- Sunset Amber ----------------------------- */
+:root[data-brand='sunset-amber'] {
+  --brand-950: #2B1203; --brand-900: #461D05; --brand-800: #6A2C08; --brand-700: #8C3B0B;
+  --brand-600: #B4500F; --brand-500: #D46A1C; --brand-400: #EE8F44; --brand-300: #F7B98A;
+  --brand-200: #FBD9BE; --brand-100: #FDECDD; --brand-050: #FEF7F0;
+  --accent-soft: #FEF7F0; --accent-soft-strong: #FDECDD; --accent-line: #FBD9BE; --selected: #FEF7F0;
+  --sh-brand-lg: 0 4px 12px -2px rgba(180, 80, 15, .28);
+  --ring: 0 0 0 4px rgba(212, 106, 28, .18);
+  --pulse-from: rgba(212, 106, 28, .45); --pulse-to: rgba(212, 106, 28, 0);
+  --chart-1: #B4500F;
+  --hero-glow-brand: rgba(238, 143, 68, .28);
+  --panel-dark: linear-gradient(155deg, #8C3B0B 0%, #461D05 55%, #2B1203 100%);
+}
+:root[data-brand='sunset-amber'][data-theme='dark'] {
+  --accent-soft: #2E1606; --accent-soft-strong: #42200A; --accent-line: #5E2F10; --selected: #461D05;
+  --ring: 0 0 0 4px rgba(238, 143, 68, .26);
+  --pulse-from: rgba(238, 143, 68, .45); --pulse-to: rgba(238, 143, 68, 0);
+  --chart-1: #EE8F44;
+  --panel-dark: linear-gradient(155deg, #6A2C08 0%, #361604 55%, #1B0B02 100%);
+}
+
+/* ------------------------------- Graphite ------------------------------- */
+:root[data-brand='graphite'] {
+  --brand-950: #0B0F14; --brand-900: #131A22; --brand-800: #1E2731; --brand-700: #2B3643;
+  --brand-600: #3B4A5C; --brand-500: #536479; --brand-400: #7A8BA0; --brand-300: #A9B6C6;
+  --brand-200: #D3DBE4; --brand-100: #E9EEF3; --brand-050: #F5F7FA;
+  --accent-soft: #F5F7FA; --accent-soft-strong: #E9EEF3; --accent-line: #D3DBE4; --selected: #F5F7FA;
+  --sh-brand-lg: 0 4px 12px -2px rgba(43, 54, 67, .30);
+  --ring: 0 0 0 4px rgba(83, 100, 121, .18);
+  --pulse-from: rgba(83, 100, 121, .45); --pulse-to: rgba(83, 100, 121, 0);
+  --chart-1: #3B4A5C;
+  --hero-glow-brand: rgba(122, 139, 160, .28);
+  --panel-dark: linear-gradient(155deg, #2B3643 0%, #131A22 55%, #0B0F14 100%);
+}
+:root[data-brand='graphite'][data-theme='dark'] {
+  --brand-600: #8FA0B5; --brand-500: #A9B6C6; --brand-400: #C3CDD9;
+  --accent-soft: #161D26; --accent-soft-strong: #1F2833; --accent-line: #2C3846; --selected: #1F2833;
+  --ring: 0 0 0 4px rgba(169, 182, 198, .24);
+  --pulse-from: rgba(169, 182, 198, .45); --pulse-to: rgba(169, 182, 198, 0);
+  --chart-1: #A9B6C6;
+  --panel-dark: linear-gradient(155deg, #2B3643 0%, #161D26 55%, #0B0F14 100%);
+}
+
+/* ------------------------------ The picker ------------------------------ */
+/* One swatch per theme, painted from its own ramp so the picker shows each
+   theme even while another is active. */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s-3); }
+.theme-card {
+  display: flex; flex-direction: column; gap: var(--s-3);
+  padding: var(--s-4); text-align: left;
+  border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.theme-card:hover { border-color: var(--line-strong); box-shadow: var(--sh-sm); }
+.theme-card.is-selected { border-color: var(--brand-500); box-shadow: var(--ring); }
+.theme-card:disabled { opacity: .6; cursor: not-allowed; }
+.theme-card strong { font-size: var(--fs-sm); color: var(--text); }
+.theme-card span { font-size: var(--fs-xs); color: var(--text-dim); }
+.theme-swatch { display: flex; height: 36px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--line); }
+.theme-swatch i { flex: 1; }
+.theme-swatch[data-swatch='ksf-green'] i:nth-child(1) { background: #0A5A3C; }
+.theme-swatch[data-swatch='ksf-green'] i:nth-child(2) { background: #0E7A50; }
+.theme-swatch[data-swatch='ksf-green'] i:nth-child(3) { background: #28C795; }
+.theme-swatch[data-swatch='ksf-green'] i:nth-child(4) { background: #D6F7EA; }
+.theme-swatch[data-swatch='ocean-blue'] i:nth-child(1) { background: #0D4A8C; }
+.theme-swatch[data-swatch='ocean-blue'] i:nth-child(2) { background: #1366B8; }
+.theme-swatch[data-swatch='ocean-blue'] i:nth-child(3) { background: #4FA3EE; }
+.theme-swatch[data-swatch='ocean-blue'] i:nth-child(4) { background: #E0EFFD; }
+.theme-swatch[data-swatch='royal-purple'] i:nth-child(1) { background: #4E2196; }
+.theme-swatch[data-swatch='royal-purple'] i:nth-child(2) { background: #6330B8; }
+.theme-swatch[data-swatch='royal-purple'] i:nth-child(3) { background: #9A70EA; }
+.theme-swatch[data-swatch='royal-purple'] i:nth-child(4) { background: #EDE5FD; }
+.theme-swatch[data-swatch='sunset-amber'] i:nth-child(1) { background: #8C3B0B; }
+.theme-swatch[data-swatch='sunset-amber'] i:nth-child(2) { background: #B4500F; }
+.theme-swatch[data-swatch='sunset-amber'] i:nth-child(3) { background: #EE8F44; }
+.theme-swatch[data-swatch='sunset-amber'] i:nth-child(4) { background: #FDECDD; }
+.theme-swatch[data-swatch='graphite'] i:nth-child(1) { background: #2B3643; }
+.theme-swatch[data-swatch='graphite'] i:nth-child(2) { background: #3B4A5C; }
+.theme-swatch[data-swatch='graphite'] i:nth-child(3) { background: #7A8BA0; }
+.theme-swatch[data-swatch='graphite'] i:nth-child(4) { background: #E9EEF3; }

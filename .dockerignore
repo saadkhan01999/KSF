@@ -1,0 +1,19 @@
+# Everything the image does not need. Keeping this tight makes the build fast
+# and means a stray .env or a local backup can never end up inside an image.
+node_modules
+**/dist
+.data
+.env
+.env.*
+!.env.example
+deploy/.env
+deploy/nginx/certs
+docs
+tests
+windows
+*.log
+.git
+.claude
+.qodo
+**/*.zip
+**/*.rar
