@@ -73,6 +73,32 @@ export function describeDatabase(): string {
   }
 }
 
+/** What to do about the ways a first deployment usually fails to reach the database. */
+export function databaseHint(error: Error): string[] {
+  const text = `${error?.name ?? ''} ${error?.message ?? ''}`;
+  /* Atlas answers a connection from an address that is not on the cluster's
+     IP Access List with a TLS "internal error" alert (number 80) — not with
+     anything that says "access denied". */
+  if (/SSL routines|SSL alert number 80|tlsv1 alert internal error/i.test(text)) {
+    return [
+      'MongoDB Atlas refused the connection from this server\'s address.',
+      'In Atlas open Security > Network Access > Add IP Address and allow this server.',
+      'Railway, Render and similar hosts have no fixed address: add 0.0.0.0/0',
+      '("Allow access from anywhere"); the database user and password still guard the data.'
+    ];
+  }
+  if (/bad auth|authentication failed/i.test(text)) {
+    return [
+      'The database user or password in MONGODB_URI is wrong.',
+      'Check them in Atlas > Database Access; a password containing @ : / ? # [ ] or % must be URL-encoded.'
+    ];
+  }
+  if (/ECONNREFUSED|querySrv|ENOTFOUND|Server selection|MongoServerSelectionError/i.test(text)) {
+    return ['Check MONGODB_URI (in .env, or the host\'s environment variables) and that the database is reachable from this computer.'];
+  }
+  return [];
+}
+
 /* ------------------------------------------------------------ transactions */
 
 /** The current transaction's session as a driver option, or nothing. */

@@ -19,7 +19,7 @@
    Errors come back as ApiError carrying the server's own wording, which is
    written for pharmacy staff, and the field it refers to. */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 const SUPPORT_STORE = 'ksf-support-pharmacy';
 
 export class ApiError extends Error {
