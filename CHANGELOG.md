@@ -6,9 +6,9 @@ Pakistan Standard Time.
 ## Unreleased
 
 ### Deployment
-- **Railway (API) and Vercel (website).** `vercel.json` forwards `/api` to
-  the Railway service, so sign-in cookies stay first-party. Steps in
-  `deploy/README.md`.
+- **Railway (API) and Vercel (website).** `frontend/vercel.json` forwards
+  `/api` to the Railway service, so sign-in cookies stay first-party. Steps
+  in `deploy/README.md`.
 - `TRUST_PROXY` takes a hop count (`1`, `2`). It used to be passed to Express
   as text, which read `2` as an address and logged every visitor as the
   proxy.

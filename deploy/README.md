@@ -197,7 +197,7 @@ to the proxy's address.
 ## Railway (API) and Vercel (website)
 
 The API runs on Railway and the website on Vercel. Vercel forwards every
-`/api/…` request to Railway (`vercel.json`), so the browser only ever talks
+`/api/…` request to Railway (`frontend/vercel.json`), so the browser only ever talks
 to the Vercel address. The sign-in cookies stay first-party, `SameSite`
 keeps working, and Safari does not sign people out on every reload the way
 it would with cross-site cookies.
@@ -239,10 +239,9 @@ Sign-up codes and password resets are e-mailed, so they need the SMTP
 settings. Build command `npm run build`, start command `npm start` (the
 defaults Railway picks from `package.json`).
 
-**3. Vercel.** `vercel.json` holds the Railway address. Use the one in the
-folder that is the project's *Root Directory*: `frontend/vercel.json` when
-it is `frontend`, the root `vercel.json` when it is the repository root. If
-the Railway address changes, change it in both. Do **not** set
+**3. Vercel.** Set the project's *Root Directory* to `frontend`; Vercel
+then reads `frontend/vercel.json`, which holds the Railway address. If the
+Railway address changes, change it there. Do **not** set
 `VITE_API_BASE_URL` in Vercel; the default `/api/v1` is what goes through
 the forwarding. Redeploy after changing either side.
 
