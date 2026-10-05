@@ -28,7 +28,7 @@ Only **three** settings are required: `MONGODB_URI`, the two JWT secrets, and
 | `NODE_ENV` | `development` | `production` turns on HSTS, refuses console e-mail, hides internals from the health check and requires distinct JWT secrets |
 | `PORT` | `8790` | Port the API (and, after a build, the website) listens on |
 | `PUBLIC_APP_URL` | `http://localhost:5180` | The address people type. Used in e-mails, referral links and payment returns |
-| `PUBLIC_ALLOWED_ORIGINS` | `http://localhost:5180,http://localhost:4180` | Comma-separated origins allowed to call the API. The origin of `PUBLIC_APP_URL` is always allowed. In development any localhost port is accepted as well |
+| `PUBLIC_ALLOWED_ORIGINS` | `http://localhost:5180,http://localhost:4180` | Comma-separated origins allowed to call the API. The origin of `PUBLIC_APP_URL` is always allowed. `*` stands for one run of letters and digits, so `https://ksf-x86j-*-ssam1.vercel.app` covers every Vercel deployment address of that project. In development any localhost port is accepted as well |
 | `STATIC_DIR` | `frontend/dist` | The built website the API serves in production |
 | `TRUST_PROXY` | `loopback` | Which proxies to believe for the visitor's IP (Express `trust proxy`): `loopback`, `uniquelocal`, an IP, `false`, or a number of proxy hops. Behind Nginx on Docker: `uniquelocal`. On Railway: `1`, or `2` with Vercel forwarding `/api` to it |
 

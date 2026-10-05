@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { ALLOWED_ORIGINS, env, IS_PROD, originAllowed, STATIC_FOLDER, VERSION } from '../config/env.js';
+import { env, IS_PROD, isAllowedOrigin, originAllowed, STATIC_FOLDER, VERSION } from '../config/env.js';
 import { describeDatabase, supportsTransactions } from '../db/mongo.js';
 import { HttpError } from '../core/errors.js';
 import { nowIso, rateLimit } from '../core/util.js';
@@ -67,11 +67,22 @@ function baseContext(req: Request): Ctx {
   return ctx;
 }
 
+/* A sign-in page on an address the server does not know fails with nothing
+   but a 403 in the browser. Say once per address, in the server log, which
+   one it was and where to allow it. */
+const refusedOrigins = new Set<string>();
+function noteRefusedOrigin(origin: string | undefined): void {
+  if (!origin || refusedOrigins.has(origin) || refusedOrigins.size >= 20) return;
+  refusedOrigins.add(origin);
+  console.warn(`[KSF] Refused a sign-in or sign-up from ${origin.slice(0, 200)}: add it to PUBLIC_ALLOWED_ORIGINS (or PUBLIC_APP_URL) if it is yours.`);
+}
+
 async function handle(def: RouteDef, req: Request, res: Response): Promise<void> {
   const ctx = baseContext(req);
 
   if (def.access === 'public') {
     if (WRITE_METHODS.has(req.method) && !def.options.allowCrossOrigin && !originAllowed(req.headers.origin, req.headers.host)) {
+      noteRefusedOrigin(req.headers.origin);
       sendJson(res, 403, { message: 'That request did not come from this application.' });
       return;
     }
@@ -161,7 +172,7 @@ export function createApp(): express.Express {
   /* Cross-origin calls are allowed only from the configured web origins. */
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && ALLOWED_ORIGINS.has(origin)) {
+    if (origin && isAllowedOrigin(origin)) {
       res.set({ 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin' });
     }
     if (req.method === 'OPTIONS') {

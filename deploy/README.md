@@ -214,7 +214,7 @@ TLS handshake, and the server stops at start-up with
 NODE_ENV=production
 COOKIE_SECURE=true
 PUBLIC_APP_URL=https://ksf-x86j.vercel.app
-PUBLIC_ALLOWED_ORIGINS=https://ksf-x86j.vercel.app
+PUBLIC_ALLOWED_ORIGINS=https://ksf-x86j.vercel.app,https://ksf-x86j-*-ssam1.vercel.app
 TRUST_PROXY=2
 
 MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
@@ -232,7 +232,8 @@ MAIL_USER=...
 MAIL_PASSWORD=...
 ```
 
-Railway sets `PORT` itself; leave it out. `TRUST_PROXY=2` counts the two
+The `*` entry lets sign-in work on Vercel's per-deployment addresses
+(`ksf-x86j-<id>-ssam1.vercel.app`) too. Railway sets `PORT` itself; leave it out. `TRUST_PROXY=2` counts the two
 proxies in front of the API (Vercel, then Railway's edge), so rate limits
 and the security log see each visitor's own address rather than Vercel's.
 Sign-up codes and password resets are e-mailed, so they need the SMTP

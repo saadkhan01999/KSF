@@ -166,12 +166,27 @@ function originOf(url: string): string {
   try { return new URL(url).origin; } catch { return ''; }
 }
 
+/**
+ * A test for allowed origins. An entry may hold `*`, which stands for one run
+ * of letters and digits — enough for Vercel's per-deployment addresses
+ * (https://ksf-x86j-*-team.vercel.app), never a dot or a hyphen, so it cannot
+ * stretch over somebody else's team or domain.
+ */
+export function originMatcher(entries: string[]): (origin: string) => boolean {
+  const exact = new Set(entries.filter((entry) => !entry.includes('*')));
+  const patterns = entries.filter((entry) => entry.includes('*')).map((entry) => new RegExp(
+    `^${entry.split('*').map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[a-z0-9]+')}$`
+  ));
+  return (origin) => exact.has(origin) || patterns.some((pattern) => pattern.test(origin));
+}
+
 /* The address people open KSF at is always allowed, so a deployment whose
    web app lives on another host (Vercel in front of Railway, say) cannot
    lock its own sign-in page out by leaving it off the list. */
 export const ALLOWED_ORIGINS = new Set(
   [...env.PUBLIC_ALLOWED_ORIGINS.split(','), originOf(env.PUBLIC_APP_URL)].map((value) => value.trim()).filter(Boolean)
 );
+export const isAllowedOrigin = originMatcher([...ALLOWED_ORIGINS]);
 
 /**
  * Is this Origin allowed to post to a public endpoint? In production the
@@ -180,7 +195,7 @@ export const ALLOWED_ORIGINS = new Set(
  */
 export function originAllowed(origin: string | undefined, host: string | undefined): boolean {
   if (!origin) return true;
-  if (ALLOWED_ORIGINS.has(origin)) return true;
+  if (isAllowedOrigin(origin)) return true;
   if (host && (origin === `http://${host}` || origin === `https://${host}`)) return true;
   if (IS_PROD) return false;
   return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);

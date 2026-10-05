@@ -12,7 +12,7 @@ const { generateSecret, totpNow, verifyTotp } = await import('../backend/src/sec
 const { stockState, expiryState, plural } = await import('../backend/src/modules/shared.ts');
 const { barcodeVariants } = await import('../backend/src/modules/catalogue.ts');
 const { SYSTEM_ROLES, PERMISSION_KEYS, THEMES, PHARMACY_ADMIN_ROLE } = await import('../backend/src/domain/permissions.ts');
-const { trustProxySetting, ALLOWED_ORIGINS } = await import('../backend/src/config/env.ts');
+const { trustProxySetting, ALLOWED_ORIGINS, originMatcher } = await import('../backend/src/config/env.ts');
 const { databaseHint } = await import('../backend/src/db/mongo.ts');
 
 describe('reading imported files', () => {
@@ -163,6 +163,18 @@ describe('deployment settings', () => {
 
   it('allows the address people open KSF at', () => {
     assert.ok(ALLOWED_ORIGINS.has(new URL(process.env.PUBLIC_APP_URL ?? 'http://localhost:5180').origin));
+  });
+
+  it('allows every Vercel deployment address of one project, and nobody else', () => {
+    const allowed = originMatcher(['https://ksf-x86j.vercel.app', 'https://ksf-x86j-*-ssam1.vercel.app']);
+    assert.equal(allowed('https://ksf-x86j.vercel.app'), true);
+    assert.equal(allowed('https://ksf-x86j-suicpihss-ssam1.vercel.app'), true);
+    assert.equal(allowed('https://ksf-x86j-iv4iykmwl-ssam1.vercel.app'), true);
+    assert.equal(allowed('https://ksf-x86j-abc-evil-ssam1.vercel.app'), false);
+    assert.equal(allowed('https://ksf-x86j-abc-ssam1.vercel.app.evil.com'), false);
+    assert.equal(allowed('https://evil.com/?https://ksf-x86j-abc-ssam1.vercel.app'), false);
+    assert.equal(allowed('http://ksf-x86j-abc-ssam1.vercel.app'), false);
+    assert.equal(allowed('https://ksf-x86jx-abc-ssam1.vercel.app'), false);
   });
 
   it('explains an Atlas IP Access List refusal', () => {
