@@ -238,6 +238,10 @@ body { background: var(--surface); }
 }
 .topbar-search input::placeholder { color: var(--text-dim); }
 .topbar-search input:focus { outline: none; border-color: var(--brand-400); box-shadow: var(--ring); }
+/* 16px on a touch screen, or the phone zooms in on focus (see .input). */
+@media (pointer: coarse) {
+  .topbar-search input { font-size: 16px; }
+}
 .topbar-search kbd {
   position: absolute;
   right: 10px;
@@ -456,7 +460,25 @@ body { background: var(--surface); }
 /* --------------------------- The smallest phones -------------------------- */
 @media (max-width: 479px) {
   .topbar { gap: var(--s-2); }
-  .topbar-search input { padding-right: var(--s-2); }
+  .topbar-search input { padding-right: var(--s-2); padding-left: 34px; text-overflow: ellipsis; }
+  .topbar-search > svg { left: 11px; }
+  /* Squeezed between the menu button and the icons, the field is a magnifier
+     until it is tapped; then it spans the bar while you type, and goes back
+     when you tap away. A field too narrow for its own word shows only the
+     magnifier rather than "S…". */
+  .topbar-search { min-width: 44px; container-type: inline-size; }
+  .topbar-search:focus-within {
+    position: absolute;
+    top: 50%;
+    left: var(--page-gutter);
+    right: var(--page-gutter);
+    z-index: 2;
+    max-width: none;
+    transform: translateY(-50%);
+  }
+  @container (max-width: 110px) {
+    .topbar-search input::placeholder { color: transparent; }
+  }
   .user-chip { padding-right: 4px; border-color: transparent; }
 }
 @media (max-width: 359px) {

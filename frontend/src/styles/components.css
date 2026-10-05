@@ -342,6 +342,12 @@
 .select.is-invalid,
 .textarea.is-invalid { border-color: var(--danger-500); box-shadow: var(--ring-danger); }
 .textarea { min-height: 96px; resize: vertical; line-height: var(--lh-base); }
+/* A phone zooms the whole page in when a field with text under 16px is
+   focused, and stays zoomed: the form lurches sideways under the finger. On a
+   touch screen, fields are 16px. */
+@media (pointer: coarse) {
+  .input, .select, .textarea { font-size: 16px; }
+}
 
 .select {
   padding-right: 38px;
@@ -443,21 +449,29 @@
 .switch input:disabled + .track { opacity: .5; }
 .switch .txt { font-size: var(--fs-base); font-weight: 500; }
 
+/* On a narrow screen a long row of options scrolls sideways, like .tabs,
+   rather than folding "Within 30 days" onto three lines. */
 .segment {
   display: inline-flex;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
   padding: 3px;
   gap: 2px;
   background: var(--surface-3);
   border-radius: var(--r-sm);
   border: 1px solid var(--line);
 }
+.segment::-webkit-scrollbar { display: none; }
 .segment button {
+  flex: none;
   min-height: 34px;
   padding: 0 var(--s-3);
   border-radius: 6px;
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-dim);
+  white-space: nowrap;
   transition: all var(--t-fast) var(--ease);
 }
 .segment button:hover { color: var(--text); }
@@ -481,8 +495,10 @@
   flex-wrap: wrap;
   margin-bottom: var(--s-4);
 }
-.toolbar .search { position: relative; flex: 1 1 260px; min-width: 180px; max-width: 380px; }
-.toolbar .search svg {
+/* The magnifier sits inside the field wherever a search field is — in a
+   card as much as in a toolbar, where it used to drop onto a line of its own. */
+.search { position: relative; }
+.search > svg {
   position: absolute;
   left: 12px;
   top: 50%;
@@ -490,8 +506,10 @@
   color: var(--text-dim);
   width: 17px;
   height: 17px;
+  pointer-events: none;
 }
-.toolbar .search input { padding-left: 37px; }
+.search > .input { padding-left: 37px; }
+.toolbar .search { flex: 1 1 260px; min-width: 180px; max-width: 380px; }
 .toolbar .select { width: auto; min-width: 150px; }
 .toolbar .spacer { flex: 1 1 auto; }
 
@@ -1145,6 +1163,12 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
     left: var(--s-3);
     width: auto;
     max-width: none;
+    /* Never taller than the screen between the top bar and the bottom bar
+       (58px and the home-indicator inset), so with the keyboard up every
+       field in the calculator can still be scrolled to. */
+    max-height: calc(100dvh - var(--topbar-h) - 58px - env(safe-area-inset-bottom, 0px) - var(--s-4));
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 }
 

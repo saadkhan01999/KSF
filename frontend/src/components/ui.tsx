@@ -838,21 +838,31 @@ export function Menu({
       }
     };
     /* Scrolling the page behind an open menu leaves it hanging in the wrong
-       place. Closing is less surprising than following. */
-    const onScroll = () => setOpen(false);
+       place. Closing is less surprising than following.
+
+       Not for a panel, though: it is laid out with its button rather than
+       pinned to coordinates, and it holds fields. On a phone, tapping one
+       opens the keyboard, which resizes the window and scrolls the field into
+       view — and the panel used to close under the finger, before a single
+       digit could be typed. And a resize that only changes the height is the
+       keyboard coming or going, not the layout moving, so a floating menu
+       ignores it too. */
+    const width = window.innerWidth;
+    const onScroll = () => { if (!panel) setOpen(false); };
+    const onResize = () => { if (!panel && window.innerWidth !== width) setOpen(false); };
 
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
     document.querySelector('.main')?.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+    window.addEventListener('resize', onResize);
 
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
       document.querySelector('.main')?.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      window.removeEventListener('resize', onResize);
     };
-  }, [open, items]);
+  }, [open, items, panel]);
 
   /* Opening with the keyboard should put you on the first entry; opening with
      the mouse should not steal the pointer's place. */
