@@ -131,6 +131,19 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   }
 }
 
+/* A reply with no KSF message never reached the KSF server: something in
+   between answered — the hosting's firewall, or a proxy that could not get
+   through. Say which, because "could not be completed" helps nobody fix it. */
+function relayProblem(response: Response): string {
+  if (response.headers.get('x-vercel-mitigated')) {
+    return `The website's security check (Vercel firewall) blocked this request before it reached KSF (error ${response.status}). `
+      + 'The site owner can allow /api in Vercel › Firewall.';
+  }
+  if (response.status === 429) return 'Too many requests reached the server. Please wait a minute and try again.';
+  if (response.status >= 502 && response.status <= 504) return 'The KSF server is not answering right now. Please try again in a minute.';
+  return `That request could not be completed (error ${response.status}).`;
+}
+
 export async function apiRequest<T>(path: string, init: RequestInit = {}, attempt = 0): Promise<T> {
   const response = await send(path, init);
   const body = await response.json().catch(() => ({} as Record<string, unknown>)) as Record<string, unknown>;
@@ -153,7 +166,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, attemp
 
     throw new ApiError(
       response.status,
-      typeof body.message === 'string' ? body.message : 'That request could not be completed.',
+      typeof body.message === 'string' ? body.message : relayProblem(response),
       typeof body.field === 'string' ? body.field : undefined,
       code,
       body
