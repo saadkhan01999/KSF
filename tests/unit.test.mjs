@@ -12,7 +12,7 @@ const { generateSecret, totpNow, verifyTotp } = await import('../backend/src/sec
 const { stockState, expiryState, plural } = await import('../backend/src/modules/shared.ts');
 const { barcodeVariants } = await import('../backend/src/modules/catalogue.ts');
 const { SYSTEM_ROLES, PERMISSION_KEYS, THEMES, PHARMACY_ADMIN_ROLE } = await import('../backend/src/domain/permissions.ts');
-const { trustProxySetting, ALLOWED_ORIGINS, originMatcher } = await import('../backend/src/config/env.ts');
+const { trustProxySetting, ALLOWED_ORIGINS, originMatcher, originAllowed } = await import('../backend/src/config/env.ts');
 const { databaseHint } = await import('../backend/src/db/mongo.ts');
 
 describe('reading imported files', () => {
@@ -175,6 +175,15 @@ describe('deployment settings', () => {
     assert.equal(allowed('https://evil.com/?https://ksf-x86j-abc-ssam1.vercel.app'), false);
     assert.equal(allowed('http://ksf-x86j-abc-ssam1.vercel.app'), false);
     assert.equal(allowed('https://ksf-x86jx-abc-ssam1.vercel.app'), false);
+  });
+
+  it('takes the browser\'s same-origin mark from any address, and refuses other sites', () => {
+    const railway = 'ksf-production-9911.up.railway.app';
+    assert.equal(originAllowed('https://ksf-x86j-anything-ssam1.vercel.app', railway, 'same-origin'), true);
+    assert.equal(originAllowed('https://pharmacy.example.pk', railway, 'same-origin'), true);
+    assert.equal(originAllowed('https://evil.example', railway, 'cross-site'), false);
+    assert.equal(originAllowed('https://evil.example', railway, 'same-site'), false);
+    assert.equal(originAllowed('https://evil.example', railway, undefined), false);
   });
 
   it('explains an Atlas IP Access List refusal', () => {

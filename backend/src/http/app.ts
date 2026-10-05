@@ -81,7 +81,7 @@ async function handle(def: RouteDef, req: Request, res: Response): Promise<void>
   const ctx = baseContext(req);
 
   if (def.access === 'public') {
-    if (WRITE_METHODS.has(req.method) && !def.options.allowCrossOrigin && !originAllowed(req.headers.origin, req.headers.host)) {
+    if (WRITE_METHODS.has(req.method) && !def.options.allowCrossOrigin && !originAllowed(req.headers.origin, req.headers.host, req.get('sec-fetch-site'))) {
       noteRefusedOrigin(req.headers.origin);
       sendJson(res, 403, { message: 'That request did not come from this application.' });
       return;
