@@ -12,7 +12,10 @@ Pakistan Standard Time.
 - `TRUST_PROXY` takes a hop count (`1`, `2`). It used to be passed to Express
   as text, which read `2` as an address and logged every visitor as the
   proxy.
-- The origin of `PUBLIC_APP_URL` is always an allowed origin.
+- The origin of `PUBLIC_APP_URL` is always an allowed origin, and
+  `PUBLIC_ALLOWED_ORIGINS` takes `*` for Vercel's per-deployment addresses
+  (`https://ksf-x86j-*-ssam1.vercel.app`). A refused origin is named once in
+  the server log.
 - A start-up that MongoDB Atlas refuses (`SSL alert number 80`: the server's
   address is not on the IP Access List) or that has a wrong database password
   now says so, and how to fix it.
