@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from './api';
 
 export interface Business {
   legalName: string;
@@ -44,7 +45,7 @@ export function loadBusiness(): Promise<Business> {
   if (cache) return Promise.resolve(cache);
   if (inFlight) return inFlight;
 
-  inFlight = fetch('/api/v1/public/brand')
+  inFlight = fetch(`${API_BASE_URL}/public/brand`)
     .then((response) => (response.ok ? response.json() : null))
     .then((body: { business?: Partial<Business> } | null) => {
       cache = { ...EMPTY_BUSINESS, ...(body?.business ?? {}) };

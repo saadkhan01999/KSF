@@ -127,7 +127,7 @@ async function handle(def: RouteDef, req: Request, res: Response): Promise<void>
 export function createApp(): express.Express {
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', process.env.TRUST_PROXY ?? 'loopback');
+  app.set('trust proxy', env.TRUST_PROXY);
 
   /* `script-src 'self'` is the line that matters: the web app has no inline
      scripts. Inline styles are allowed because React writes style

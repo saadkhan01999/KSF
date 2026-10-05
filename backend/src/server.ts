@@ -9,7 +9,7 @@
    ========================================================================== */
 
 import { env, VERSION } from './config/env.js';
-import { connect, describeDatabase, disconnect, supportsTransactions } from './db/mongo.js';
+import { connect, databaseHint, describeDatabase, disconnect, supportsTransactions } from './db/mongo.js';
 import { bootstrap } from './db/bootstrap.js';
 import './modules/index.js';
 import { createApp } from './http/app.js';
@@ -59,8 +59,6 @@ async function start(): Promise<void> {
 start().catch((error) => {
   console.error('[KSF] The server could not start.');
   console.error((error as Error).message);
-  if (/ECONNREFUSED|querySrv|ENOTFOUND|Server selection/i.test(String((error as Error).message))) {
-    console.error('      Check MONGODB_URI in .env and that the database is reachable from this computer.');
-  }
+  for (const line of databaseHint(error as Error)) console.error(`      ${line}`);
   process.exit(1);
 });

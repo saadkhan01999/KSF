@@ -12,6 +12,8 @@ const { generateSecret, totpNow, verifyTotp } = await import('../backend/src/sec
 const { stockState, expiryState, plural } = await import('../backend/src/modules/shared.ts');
 const { barcodeVariants } = await import('../backend/src/modules/catalogue.ts');
 const { SYSTEM_ROLES, PERMISSION_KEYS, THEMES, PHARMACY_ADMIN_ROLE } = await import('../backend/src/domain/permissions.ts');
+const { trustProxySetting, ALLOWED_ORIGINS } = await import('../backend/src/config/env.ts');
+const { databaseHint } = await import('../backend/src/db/mongo.ts');
 
 describe('reading imported files', () => {
   it('detects semicolons and keeps quoted commas and newlines', () => {
@@ -146,5 +148,28 @@ describe('roles and themes', () => {
   it('offers exactly five themes with the original green first', () => {
     assert.equal(THEMES.length, 5);
     assert.equal(THEMES[0].key, 'ksf-green');
+  });
+});
+
+describe('deployment settings', () => {
+  it('reads TRUST_PROXY as Express expects it', () => {
+    assert.equal(trustProxySetting('1'), 1);
+    assert.equal(trustProxySetting(' 2 '), 2);
+    assert.equal(trustProxySetting('true'), true);
+    assert.equal(trustProxySetting('false'), false);
+    assert.equal(trustProxySetting('loopback'), 'loopback');
+    assert.equal(trustProxySetting('loopback, 10.0.0.1'), 'loopback, 10.0.0.1');
+  });
+
+  it('allows the address people open KSF at', () => {
+    assert.ok(ALLOWED_ORIGINS.has(new URL(process.env.PUBLIC_APP_URL ?? 'http://localhost:5180').origin));
+  });
+
+  it('explains an Atlas IP Access List refusal', () => {
+    const error = Object.assign(new Error('40427917037F0000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:../deps/openssl/openssl/ssl/record/rec_layer_s3.c:1601:SSL alert number 80'), { name: 'MongoServerSelectionError' });
+    assert.match(databaseHint(error).join(' '), /Network Access/);
+    assert.match(databaseHint(new Error('bad auth : authentication failed')).join(' '), /password/);
+    assert.match(databaseHint(new Error('querySrv ENOTFOUND _mongodb._tcp.x')).join(' '), /MONGODB_URI/);
+    assert.deepEqual(databaseHint(new Error('something else')), []);
   });
 });

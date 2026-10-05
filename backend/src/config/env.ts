@@ -32,11 +32,25 @@ const bool = (fallback: boolean) => z
 
 const int = (fallback: number, min = 0) => z.coerce.number().int().min(min).default(fallback);
 
+/**
+ * Express "trust proxy" from its text form. Express reads a string as a list
+ * of addresses, so `2` or `true` straight from the environment trusts no
+ * proxy at all and every visitor gets the proxy's IP — a hop count has to
+ * arrive as a number.
+ */
+export function trustProxySetting(value: string): boolean | number | string {
+  const text = value.trim();
+  if (text === 'true' || text === 'false') return text === 'true';
+  if (/^\d+$/.test(text)) return Number(text);
+  return text;
+}
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: int(8790, 1),
   PUBLIC_APP_URL: z.string().default('http://localhost:5180'),
   PUBLIC_ALLOWED_ORIGINS: z.string().default('http://localhost:5180,http://localhost:4180'),
+  TRUST_PROXY: z.string().default('loopback').transform(trustProxySetting),
   STATIC_DIR: z.string().default('frontend/dist'),
 
   /* ------------------------------------------------------------ database */
@@ -144,8 +158,16 @@ export const VERSION: string = JSON.parse(readFileSync(fromRoot('package.json'),
 export const STATIC_FOLDER = (): string => fromRoot(env.STATIC_DIR);
 export const OUTBOX_FOLDER = (): string => fromRoot(env.MAIL_OUTBOX);
 
+/** "https://ksf.example.pk" from a full address, or '' when it is not one. */
+function originOf(url: string): string {
+  try { return new URL(url).origin; } catch { return ''; }
+}
+
+/* The address people open KSF at is always allowed, so a deployment whose
+   web app lives on another host (Vercel in front of Railway, say) cannot
+   lock its own sign-in page out by leaving it off the list. */
 export const ALLOWED_ORIGINS = new Set(
-  env.PUBLIC_ALLOWED_ORIGINS.split(',').map((value) => value.trim()).filter(Boolean)
+  [...env.PUBLIC_ALLOWED_ORIGINS.split(','), originOf(env.PUBLIC_APP_URL)].map((value) => value.trim()).filter(Boolean)
 );
 
 /**

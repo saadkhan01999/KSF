@@ -194,6 +194,61 @@ Run it under a process manager (systemd, PM2, or Windows Task Scheduler at
 start-up) behind any reverse proxy that terminates TLS; set `TRUST_PROXY`
 to the proxy's address.
 
+## Railway (API) and Vercel (website)
+
+The API runs on Railway and the website on Vercel. Vercel forwards every
+`/api/…` request to Railway (`vercel.json`), so the browser only ever talks
+to the Vercel address. The sign-in cookies stay first-party, `SameSite`
+keeps working, and Safari does not sign people out on every reload the way
+it would with cross-site cookies.
+
+**1. MongoDB Atlas.** Railway has no fixed outgoing address. In Atlas ›
+Security › Network Access › Add IP Address, choose *Allow access from
+anywhere* (`0.0.0.0/0`). Without it Atlas drops the connection during the
+TLS handshake, and the server stops at start-up with
+`SSL routines … tlsv1 alert internal error … SSL alert number 80`.
+
+**2. Railway › the service › Variables.**
+
+```ini
+NODE_ENV=production
+COOKIE_SECURE=true
+PUBLIC_APP_URL=https://ksf-x86j.vercel.app
+PUBLIC_ALLOWED_ORIGINS=https://ksf-x86j.vercel.app
+TRUST_PROXY=2
+
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
+MONGODB_DB=ksf_pharmacy
+
+JWT_ACCESS_SECRET=<48 random bytes>
+JWT_REFRESH_SECRET=<a different 48 random bytes>
+
+SUPER_ADMIN_EMAIL=you@yourcompany.pk
+SUPER_ADMIN_PASSWORD=<a strong password>
+
+MAIL_TRANSPORT=smtp
+MAIL_HOST=smtp.example.com
+MAIL_USER=...
+MAIL_PASSWORD=...
+```
+
+Railway sets `PORT` itself; leave it out. `TRUST_PROXY=2` counts the two
+proxies in front of the API (Vercel, then Railway's edge), so rate limits
+and the security log see each visitor's own address rather than Vercel's.
+Sign-up codes and password resets are e-mailed, so they need the SMTP
+settings. Build command `npm run build`, start command `npm start` (the
+defaults Railway picks from `package.json`).
+
+**3. Vercel.** `vercel.json` holds the Railway address. Use the one in the
+folder that is the project's *Root Directory*: `frontend/vercel.json` when
+it is `frontend`, the root `vercel.json` when it is the repository root. If
+the Railway address changes, change it in both. Do **not** set
+`VITE_API_BASE_URL` in Vercel; the default `/api/v1` is what goes through
+the forwarding. Redeploy after changing either side.
+
+**4. Check.** `https://ksf-x86j.vercel.app/api/v1/health` answers
+`{"ok":true,…}` from Railway through Vercel. Then sign in as the Super Admin.
+
 ---
 
 ## Files here
