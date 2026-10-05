@@ -16,6 +16,9 @@ Pakistan Standard Time.
   `PUBLIC_ALLOWED_ORIGINS` takes `*` for Vercel's per-deployment addresses
   (`https://ksf-x86j-*-ssam1.vercel.app`). A refused origin is named once in
   the server log.
+- Sign-in and sign-up accept a request the browser marks
+  `Sec-Fetch-Site: same-origin`, so they work on any address the site is
+  opened at without listing it.
 - A start-up that MongoDB Atlas refuses (`SSL alert number 80`: the server's
   address is not on the IP Access List) or that has a wrong database password
   now says so, and how to fix it.

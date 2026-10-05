@@ -184,7 +184,10 @@ export function originMatcher(entries: string[]): (origin: string) => boolean {
    web app lives on another host (Vercel in front of Railway, say) cannot
    lock its own sign-in page out by leaving it off the list. */
 export const ALLOWED_ORIGINS = new Set(
-  [...env.PUBLIC_ALLOWED_ORIGINS.split(','), originOf(env.PUBLIC_APP_URL)].map((value) => value.trim()).filter(Boolean)
+  [...env.PUBLIC_ALLOWED_ORIGINS.split(','), originOf(env.PUBLIC_APP_URL)]
+    /* Quotes and a trailing slash are how the list usually gets typed into a dashboard; neither is part of an origin. */
+    .map((value) => value.trim().replace(/^["']|["']$/g, '').replace(/\/+$/, ''))
+    .filter(Boolean)
 );
 export const isAllowedOrigin = originMatcher([...ALLOWED_ORIGINS]);
 
@@ -192,9 +195,18 @@ export const isAllowedOrigin = originMatcher([...ALLOWED_ORIGINS]);
  * Is this Origin allowed to post to a public endpoint? In production the
  * answer is the configured list; in development any localhost port is
  * accepted too, because the dev launcher moves to the next free port.
+ *
+ * First, though, the browser's own word: every current browser marks a
+ * request with Sec-Fetch-Site, which no page script can set or change.
+ * "same-origin" means the page and the address it called share an origin —
+ * whichever address that is: the Vercel site, one of its per-deployment
+ * links, a custom domain or the API's own. Cookies only ever travel to that
+ * same origin, so there is nothing to forge across sites. The list remains
+ * for older browsers and for pages that call the API from another origin.
  */
-export function originAllowed(origin: string | undefined, host: string | undefined): boolean {
+export function originAllowed(origin: string | undefined, host: string | undefined, fetchSite?: string): boolean {
   if (!origin) return true;
+  if (fetchSite === 'same-origin') return true;
   if (isAllowedOrigin(origin)) return true;
   if (host && (origin === `http://${host}` || origin === `https://${host}`)) return true;
   if (IS_PROD) return false;
