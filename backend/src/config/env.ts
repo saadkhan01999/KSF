@@ -106,6 +106,9 @@ const schema = z.object({
   OTP_EXPIRY_MINUTES: int(10, 1),
   OTP_MAX_ATTEMPTS: int(5, 1),
   OTP_MAX_SENDS: int(5, 1),
+  /* Testing only: the sign-up code is also sent back to the browser and shown
+     on screen, so anyone can sign up with an address they do not own. */
+  SHOW_SIGNUP_CODE: bool(false),
   REFERRAL_TRIAL_DAYS: int(15, 0),
   REFERRAL_MAX_USES: int(100, 1),
   REFERRAL_MAX_PER_DAY: int(10, 1),

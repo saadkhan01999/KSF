@@ -115,6 +115,7 @@ the new parameters.
 | `OTP_EXPIRY_MINUTES` | `10` | How long an e-mailed code is valid |
 | `OTP_MAX_ATTEMPTS` | `5` | Wrong guesses before a code is used up |
 | `OTP_MAX_SENDS` | `5` | Codes per address per hour |
+| `SHOW_SIGNUP_CODE` | `false` | **Testing only.** `true` shows the sign-up code on the confirm screen as well as e-mailing it, so sign-up works without SMTP. E-mail addresses are then not really checked; the server logs a warning at every start. Password-reset codes are never shown |
 | `REFERRAL_TRIAL_DAYS` | `15` | Extra trial days for a pharmacy that signs up with a referral code |
 | `REFERRAL_MAX_USES` | `100` | Lifetime uses of one code |
 | `REFERRAL_MAX_PER_DAY` | `10` | Uses of one code per day |

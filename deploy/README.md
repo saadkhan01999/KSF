@@ -236,7 +236,9 @@ Railway sets `PORT` itself; leave it out. `TRUST_PROXY=2` counts the two
 proxies in front of the API (Vercel, then Railway's edge), so rate limits
 and the security log see each visitor's own address rather than Vercel's.
 Sign-up codes and password resets are e-mailed, so they need the SMTP
-settings. Build command `npm run build`, start command `npm start` (the
+settings. To try sign-up before SMTP is ready, add `SHOW_SIGNUP_CODE=true`:
+the confirm screen then shows the code. Remove it before real customers sign
+up, because anyone could then register an address they do not own. Build command `npm run build`, start command `npm start` (the
 defaults Railway picks from `package.json`).
 
 **3. Vercel.** Set the project's *Root Directory* to `frontend`; Vercel

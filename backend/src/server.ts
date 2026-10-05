@@ -45,6 +45,10 @@ async function start(): Promise<void> {
     console.log(`KSF API v${VERSION} listening on http://127.0.0.1:${env.PORT}`);
     console.log(`Database: ${describeDatabase()}${supportsTransactions() ? ' · transactions on' : ' · standalone (no transactions)'}`);
     console.log(`Ready in ${Date.now() - startedAt}ms`);
+    if (env.SHOW_SIGNUP_CODE) {
+      console.warn('[KSF] SHOW_SIGNUP_CODE is on: sign-up codes are shown on screen, so e-mail addresses are not really checked.');
+      console.warn('      Testing only. Remove it (or set it to false) before real customers sign up.');
+    }
   });
 
   const stop = (signal: string) => {

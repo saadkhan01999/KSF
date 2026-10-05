@@ -356,6 +356,8 @@
 }
 .status-note strong { display: block; margin-bottom: 3px; }
 .status-note-icon { flex: none; display: inline-flex; margin-top: 1px; }
+/* The sign-up code, shown on screen only while the server is in testing mode. */
+.status-note .signup-test-code { font-size: 1.5rem; letter-spacing: 0.25em; font-variant-numeric: tabular-nums; margin: 2px 0 4px; }
 
 .status-note.tone-info { background: var(--info-100); border-color: color-mix(in srgb, var(--info-500) 30%, transparent); color: var(--info-text); }
 .status-note.tone-ok { background: var(--ok-100); border-color: color-mix(in srgb, var(--ok-500) 30%, transparent); color: var(--ok-text); }
