@@ -76,6 +76,8 @@ export default function Register() {
   const [you, setYou] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [confirm, setConfirm] = useState('');
   const [code, setCode] = useState('');
+  /* Only sent while the server runs with SHOW_SIGNUP_CODE for testing. */
+  const [testCode, setTestCode] = useState<string | null>(null);
   const [referral, setReferral] = useState<ReferralCheck | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
 
@@ -139,11 +141,12 @@ export default function Register() {
       setErrors({ confirm: 'The two passwords do not match.' });
       return;
     }
-    const reply = await send<{ data: { email: string } }>('/register/start', {
+    const reply = await send<{ data: { email: string; testCode?: string } }>('/register/start', {
       ...you,
       referralCode: referral?.valid ? referral.code : undefined
     });
     if (!reply) return;
+    setTestCode(reply.data.testCode ?? null);
     setNotice(`We have sent a six-digit code to ${reply.data.email}. It expires in ten minutes.`);
     setStep('verify');
     void api.get<{ data: RegistrationState }>('/register/state').then((r) => setDraft(r.data));
@@ -159,9 +162,10 @@ export default function Register() {
   };
 
   const resend = async () => {
-    const reply = await send<{ message?: string }>('/register/resend', {});
+    const reply = await send<{ message?: string; testCode?: string }>('/register/resend', {});
     if (!reply) return;
     setCode('');
+    setTestCode(reply.testCode ?? null);
     setNotice(reply.message ?? 'A new code is on its way.');
   };
 
@@ -293,6 +297,13 @@ export default function Register() {
             Confirm and open my account
           </Button>
 
+          {testCode && (
+            <StatusNote tone="warn" title="Testing mode: your code is">
+              <strong className="signup-test-code">{testCode}</strong>
+              Type it in above. The e-mail address is not checked while the server shows codes on screen.
+            </StatusNote>
+          )}
+
           <Button variant="ghost" block onClick={() => { void resend(); }} disabled={busy} icon={<RefreshCw size={15} />}>
             Send the code again
           </Button>
@@ -302,7 +313,7 @@ export default function Register() {
           )}
           <p className="auth-alt">
             Wrong address?{' '}
-            <button type="button" className="link-button" onClick={() => { setStep('details'); setCode(''); }}>
+            <button type="button" className="link-button" onClick={() => { setStep('details'); setCode(''); setTestCode(null); }}>
               Go back and change it
             </button>
           </p>

@@ -87,6 +87,10 @@ publicRoute('GET', '/api/v1/public/referral/:code', async (ctx) => {
 
 publicRoute('GET', '/api/v1/register/state', async (ctx) => ({ data: await draftView(await loadDraft(ctx)) }));
 
+/** The sign-up code for the screen, only while SHOW_SIGNUP_CODE is on for testing. */
+const shownCode = (code: string | null): { testCode?: string } =>
+  (env.SHOW_SIGNUP_CODE && code ? { testCode: code } : {});
+
 const startingPharmacyName = (firstName: string): string => (firstName.trim() ? `${firstName.trim()}'s Pharmacy` : 'My Pharmacy');
 
 /**
@@ -211,6 +215,7 @@ publicRoute('POST', '/api/v1/register/start', async (ctx) => {
       : { $set: { referral_code: null, payload: { ...base, referralProblem: claim.reason ?? '' } } });
   }
 
+  let issuedCode: string | null = null;
   if (existing) {
     sendMail({
       to: email, subject: 'You already have a KSF account',
@@ -220,12 +225,16 @@ publicRoute('POST', '/api/v1/register/start', async (ctx) => {
   } else {
     const issued = await issueCode({ purpose: PURPOSES.EMAIL_VERIFY, email, ip: ctx.ip });
     if (issued.throttled || !issued.code) tooMany('Too many codes have been sent to that address. Please try again in an hour.');
+    issuedCode = issued.code;
     sendMail({ to: email, template: 'verifyEmail', ...templates.verifyEmail({ code: issued.code!, name: firstName, minutes: env.OTP_EXPIRY_MINUTES }) })
       .catch((error) => console.warn('[KSF] verification e-mail failed:', (error as Error).message));
   }
 
   ctx.setCookie.push(regCookie(token));
-  return { data: { step: 2, email: maskEmail(email), expiresInMinutes: env.OTP_EXPIRY_MINUTES }, message: `We have sent a six-digit code to ${maskEmail(email)}.` };
+  return {
+    data: { step: 2, email: maskEmail(email), expiresInMinutes: env.OTP_EXPIRY_MINUTES, ...shownCode(issuedCode) },
+    message: `We have sent a six-digit code to ${maskEmail(email)}.`
+  };
 });
 
 publicRoute('POST', '/api/v1/register/verify-email', async (ctx) => {
@@ -263,7 +272,7 @@ publicRoute('POST', '/api/v1/register/resend', async (ctx) => {
   if (issued.throttled || !issued.code) tooMany('Too many codes have been sent to that address. Please try again in an hour.');
   sendMail({ to: draft.email ?? '', template: 'verifyEmail', ...templates.verifyEmail({ code: issued.code!, name: String((draft.payload as Record<string, string>).firstName ?? ''), minutes: env.OTP_EXPIRY_MINUTES }) })
     .catch((error) => console.warn('[KSF] verification e-mail failed:', (error as Error).message));
-  return { ok: true, message: `A new code is on its way to ${maskEmail(draft.email ?? '')}.`, expiresInMinutes: env.OTP_EXPIRY_MINUTES };
+  return { ok: true, message: `A new code is on its way to ${maskEmail(draft.email ?? '')}.`, expiresInMinutes: env.OTP_EXPIRY_MINUTES, ...shownCode(issued.code) };
 });
 
 publicRoute('POST', '/api/v1/public/password-strength', async (ctx) => {

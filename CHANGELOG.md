@@ -16,6 +16,9 @@ Pakistan Standard Time.
 - A start-up that MongoDB Atlas refuses (`SSL alert number 80`: the server's
   address is not on the IP Access List) or that has a wrong database password
   now says so, and how to fix it.
+- `SHOW_SIGNUP_CODE=true` (testing only, off by default) shows the sign-up
+  code on the confirm screen, so sign-up can be tried before SMTP is set up.
+  Password-reset codes are never shown.
 - The website's business details request uses `VITE_API_BASE_URL` like every
   other request, and a blank `VITE_API_BASE_URL` falls back to `/api/v1`.
 

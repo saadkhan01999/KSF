@@ -24,7 +24,9 @@ describe('KSF API', { skip }, () => {
   const state = {};
 
   async function register(client, first, email) {
-    await client.post('/api/v1/register/start', { firstName: first, lastName: 'Test', email, password: PASSWORD, mobile: '0300 1234567' });
+    const started = await client.post('/api/v1/register/start', { firstName: first, lastName: 'Test', email, password: PASSWORD, mobile: '0300 1234567' });
+    /* The code only ever reaches the browser when SHOW_SIGNUP_CODE is on for testing. */
+    assert.equal(started.data.testCode, undefined);
     const reply = await client.post('/api/v1/register/verify-email', { code: await codeFor(client, email) }, 201);
     client.token = reply.accessToken;
     return reply;
