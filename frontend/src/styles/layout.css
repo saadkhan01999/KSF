@@ -325,6 +325,15 @@ body { background: var(--surface); }
 .avatar.xs { width: 24px; height: 24px; flex-basis: 24px; font-size: 10px; }
 .avatar.gold { background: linear-gradient(140deg, var(--gold-300), var(--gold-600)); color: var(--brand-950); }
 .avatar.neutral { background: var(--surface-3); color: var(--text-soft); border: 1px solid var(--line); }
+.avatar.xl { width: 84px; height: 84px; flex-basis: 84px; font-size: var(--fs-xl); }
+/* A photo fills the circle; the gradient behind it never shows through. */
+.avatar.has-photo { background: var(--surface-3); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* A photo beside "Choose photo" and "Remove". */
+.photo-picker { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+.photo-picker-actions { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.photo-picker-actions .hint { flex-basis: 100%; }
 
 /* Overlapping avatar stack, used in the marketing hero and on team rows. */
 .avatar-stack { display: inline-flex; }

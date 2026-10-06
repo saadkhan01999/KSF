@@ -9,6 +9,7 @@ import { useApp } from '../context/AppContext';
 import { useApiData, useAction } from '../hooks/useApi';
 import { api } from '../services/api';
 import { Button, Card, Tabs, TextInput, Segmented, Modal, Alert, Badge } from '../components/ui';
+import { PhotoPicker } from '../components/people';
 import { ChangePasswordModal } from '../components/Layout';
 import SecurityCentre from './settings/SecurityCentre';
 import { ago, dateTime, phone as fmtPhone } from '../utils/format';
@@ -60,7 +61,8 @@ function Profile() {
           <TextInput label="Mobile number" inputMode="tel" wrapClass="span-2" value={phoneNo} placeholder="0300 1234567" onChange={(event) => setPhoneNo(event.target.value)} />
         </div>
         <dl className="kv mt-5">
-          <dt>Role</dt><dd>{user?.roleName}{user?.isOwner ? <> <Badge tone="gold" dot={false}>Registered the pharmacy</Badge></> : null}</dd>
+          <dt>Role</dt><dd>{user?.roleName}{user?.isOwner ? <> <Badge tone="gold" dot={false}>Registered the pharmacy</Badge></> : null}{user?.isPlatformStaff ? <> <Badge tone="purple" dot={false}>KSF team</Badge></> : null}</dd>
+          {user?.jobTitle && <><dt>Job title</dt><dd>{user.jobTitle}</dd></>}
           {user?.pharmacyName && !user.isPlatformAdmin && <><dt>Pharmacy</dt><dd>{user.pharmacyName}</dd></>}
           {user?.branchName && <><dt>Branch</dt><dd>{user.branchName}</dd></>}
           {user?.pharmacistRegNo && <><dt>Registration</dt><dd className="mono">{user.pharmacistRegNo}</dd></>}
@@ -73,6 +75,7 @@ function Profile() {
       </Card>
 
       <div className="col" style={{ gap: 'var(--s-5)' }}>
+        {(user?.isPlatformAdmin || user?.isPlatformStaff) && <MyPhoto />}
         <Card title="Signing in" icon={<Mail size={18} />}>
           <dl className="kv">
             <dt>E-mail</dt><dd>{user?.email} {user?.emailVerified ? <Badge tone="ok" dot={false}>Confirmed</Badge> : null}</dd>
@@ -99,10 +102,26 @@ function Profile() {
   );
 }
 
+/** The Super Admin and their team choose the face everybody on the desk sees. */
+function MyPhoto() {
+  const { user, ok, fail, refreshSession } = useApp();
+  const { busy, run } = useAction();
+  const change = (image: string | null) => run(
+    () => (image ? api.put('/platform/me/avatar', { image }) : api.delete('/platform/me/avatar')),
+    () => { ok(image ? 'Photo saved' : 'Photo removed'); void refreshSession(); }
+  );
+  return (
+    <Card title="Your photo" subtitle="Shown beside your name in the platform console" icon={<User size={18} />}>
+      <PhotoPicker name={user?.fullName ?? ''} value={user?.avatarUrl ?? null} onChange={(image) => { void change(image); }} onError={(message) => fail(new Error(message))} busy={busy} />
+    </Card>
+  );
+}
+
 function Appearance() {
   const { user, workspace, theme, setTheme, can, ok, refreshWorkspace, previewBrand } = useApp();
   const { run } = useAction();
-  const chooses = !!user?.isPlatformAdmin || can('appearance.theme') || can('settings.write');
+  const platform = !!user?.isPlatformAdmin || !!user?.isPlatformStaff;
+  const chooses = platform || can('appearance.theme') || can('settings.write');
   const mine = user?.theme ?? null;
   const themes = workspace?.themes ?? [];
 
@@ -127,7 +146,7 @@ function Appearance() {
           ? (
             <>
               <div className="theme-grid">
-                {!user?.isPlatformAdmin && (
+                {!platform && (
                   <button type="button" className={`theme-card ${!mine ? 'is-selected' : ''}`} onClick={() => { void choose(null); }}>
                     <span className="theme-swatch" data-swatch={workspace?.pharmacyTheme ?? 'ksf-green'}><i /><i /><i /><i /></span>
                     <strong>{!mine && <Check size={14} />} The pharmacy's theme</strong>

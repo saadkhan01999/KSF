@@ -39,7 +39,7 @@ export default function PlatformActivity() {
       ]} />
       {tab === 'activity' && (
         <div className="toolbar">
-          <Checkbox label="Only what I did as Super Admin" checked={platformOnly} onChange={(on) => { setPlatformOnly(on); setPage(1); }} />
+          <Checkbox label="Only what the KSF team did" checked={platformOnly} onChange={(on) => { setPlatformOnly(on); setPage(1); }} />
         </div>
       )}
       <div className="table-wrap">

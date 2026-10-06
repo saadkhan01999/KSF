@@ -22,6 +22,11 @@ export interface SessionUser {
   isOwner: boolean;
   /** The one account that runs the whole platform. */
   isPlatformAdmin: boolean;
+  /** A member of the Super Admin's team: the platform console, with their role's permissions. */
+  isPlatformStaff?: boolean;
+  jobTitle?: string | null;
+  /** Their photo, when they have one. */
+  avatarUrl?: string | null;
   /** The Super Admin working inside a pharmacy, with every permission. */
   supportMode: boolean;
   pharmacyId: string | null;

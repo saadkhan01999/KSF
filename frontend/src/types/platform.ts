@@ -81,6 +81,8 @@ export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 export interface TicketMessage {
   id: string; author_id: string | null; author_name: string; author_side: 'pharmacy' | 'platform'; body: string; created_at: string;
+  /** Platform replies, on the platform side only: who on the desk wrote it. */
+  agent_name?: string | null; agent_role?: string | null;
 }
 
 export interface TicketSummary {
@@ -89,9 +91,33 @@ export interface TicketSummary {
   created_at: string; updated_at: string; last_activity_at: string; resolved_at: string | null;
   unread_by_pharmacy: number; unread_by_platform: number; message_count?: number;
   last_message?: { author_side: 'pharmacy' | 'platform'; author_name: string; preview: string; created_at: string } | null;
+  /** Platform side only: who on the desk has it, and who finished it. */
+  assigned_to?: string | null; assigned_to_name?: string | null; assigned_to_avatar?: string | null;
+  resolved_by?: string | null; resolved_by_name?: string | null;
 }
 
 export interface Ticket extends TicketSummary { messages: TicketMessage[] }
+
+/** Somebody on the support desk a request can be given to. */
+export interface SupportAgent { id: string; name: string; role: string; avatar_url: string | null }
+
+/* ------------------------------------------------------- the Super Admin's team */
+export interface TeamMember {
+  id: string; full_name: string; email: string; phone: string | null; job_title: string | null;
+  status: 'active' | 'suspended'; role_id: string | null; role_name: string | null; avatar_url: string | null;
+  last_login_at: string | null; created_at: string; two_factor: boolean; must_change_password: boolean; locked: boolean;
+}
+
+export interface TeamRole {
+  id: string; name: string; description: string | null; permissions: string[]; members: number; created_at: string; updated_at: string;
+}
+
+export interface TeamResponse {
+  data: TeamMember[];
+  roles: TeamRole[];
+  catalogue: { key: string; label: string; group: string }[];
+  templates: { key: string; name: string; description: string; permissions: string[] }[];
+}
 
 export interface PlanRow {
   id: string; key: string; name: string; tagline: string | null; description: string | null; period: string; periodDays: number;

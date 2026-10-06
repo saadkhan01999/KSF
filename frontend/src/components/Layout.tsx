@@ -2,9 +2,10 @@
 
    Two navigations share it. A pharmacy's people see the pharmacy, filtered
    by permission, so a cashier sees a short, calm menu and the Admin sees
-   everything. The platform Super Admin sees the platform console — and,
-   while working inside a pharmacy, that pharmacy's full menu under a banner
-   that says whose pharmacy it is and how to leave. */
+   everything. The platform Super Admin sees the platform console, and so
+   does each member of their team, filtered by their team role — and, while
+   working inside a pharmacy, that pharmacy's full menu under a banner that
+   says whose pharmacy it is and how to leave. */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
@@ -14,7 +15,7 @@ import {
   ShieldCheck, Bell, ScrollText, Settings, LogOut, Menu as MenuIcon, X, Search,
   PanelLeftClose, PanelLeftOpen, Sun, Moon, Monitor, KeyRound, User, Palette,
   Store, Plus, MessagesSquare, ChevronsUpDown, LifeBuoy, ChevronDown, CreditCard, Scale,
-  Building2, Gauge, BadgeDollarSign, Layers, HeartHandshake, ArrowLeftCircle
+  Building2, Gauge, BadgeDollarSign, Layers, HeartHandshake, ArrowLeftCircle, UsersRound
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BrandLogo, BrandMark } from './Brand';
@@ -23,7 +24,8 @@ import { NotificationsMenu, MessagesMenu } from './topbar';
 import { CalculatorMenu } from './Calculator';
 import { api } from '../services/api';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { initials } from '../utils/format';
+import { useHomeRoute } from '../hooks/useHomeRoute';
+import { PersonAvatar } from './people';
 
 interface NavEntry {
   to: string;
@@ -80,28 +82,35 @@ const NAV: NavGroup[] = [
   }
 ];
 
-/* The platform console: the Super Admin's own menu. */
+/* The platform console: the Super Admin's menu, and their team's — each
+   member sees only what their team role includes. */
 const PLATFORM_NAV: NavGroup[] = [
   {
     label: 'Platform',
     items: [
-      { to: '/platform', label: 'Overview', icon: <Gauge /> },
-      { to: '/platform/pharmacies', label: 'Pharmacies', icon: <Building2 /> },
-      { to: '/platform/support', label: 'Support desk', icon: <LifeBuoy />, badge: 'supportOpen', badgeTone: 'alert' },
-      { to: '/platform/help', label: 'People who need help', icon: <HeartHandshake /> }
+      { to: '/platform', label: 'Overview', icon: <Gauge />, permission: 'platform.overview' },
+      { to: '/platform/pharmacies', label: 'Pharmacies', icon: <Building2 />, permission: 'platform.pharmacies.view' },
+      { to: '/platform/support', label: 'Support desk', icon: <LifeBuoy />, permission: 'platform.support', badge: 'supportOpen', badgeTone: 'alert' },
+      { to: '/platform/help', label: 'People who need help', icon: <HeartHandshake />, permission: 'platform.help' }
     ]
   },
   {
     label: 'Money',
     items: [
-      { to: '/platform/income', label: 'Income', icon: <BadgeDollarSign /> },
-      { to: '/platform/plans', label: 'Plans', icon: <Layers /> }
+      { to: '/platform/income', label: 'Income', icon: <BadgeDollarSign />, permission: 'platform.finance.view' },
+      { to: '/platform/plans', label: 'Plans', icon: <Layers />, permission: 'platform.plans.manage' }
+    ]
+  },
+  {
+    label: 'Team',
+    items: [
+      { to: '/platform/team', label: 'My team', icon: <UsersRound />, permission: 'platform.team.manage' }
     ]
   },
   {
     label: 'Records',
     items: [
-      { to: '/platform/activity', label: 'Activity', icon: <ScrollText /> },
+      { to: '/platform/activity', label: 'Activity', icon: <ScrollText />, permission: 'platform.activity' },
       { to: '/platform/notifications', label: 'Notifications', icon: <Bell />, badge: 'notifications', badgeTone: 'alert' },
       { to: '/account', label: 'My account', icon: <User /> }
     ]
@@ -109,10 +118,12 @@ const PLATFORM_NAV: NavGroup[] = [
 ];
 
 const PLATFORM_MOBILE_NAV: NavEntry[] = [
-  { to: '/platform', label: 'Overview', icon: <Gauge /> },
-  { to: '/platform/pharmacies', label: 'Pharmacies', icon: <Building2 /> },
-  { to: '/platform/support', label: 'Support', icon: <LifeBuoy /> },
-  { to: '/platform/income', label: 'Income', icon: <BadgeDollarSign /> },
+  { to: '/platform', label: 'Overview', icon: <Gauge />, permission: 'platform.overview' },
+  { to: '/platform/pharmacies', label: 'Pharmacies', icon: <Building2 />, permission: 'platform.pharmacies.view' },
+  { to: '/platform/support', label: 'Support', icon: <LifeBuoy />, permission: 'platform.support' },
+  { to: '/platform/income', label: 'Income', icon: <BadgeDollarSign />, permission: 'platform.finance.view' },
+  { to: '/platform/help', label: 'Help', icon: <HeartHandshake />, permission: 'platform.help' },
+  { to: '/platform/notifications', label: 'Alerts', icon: <Bell /> },
   { to: '/account', label: 'Account', icon: <User /> }
 ];
 
@@ -187,11 +198,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 
   const mobileItems = useMemo(
-    () => (isPlatform ? PLATFORM_MOBILE_NAV : MOBILE_NAV.filter((item) => !item.permission || can(item.permission))).slice(0, 5),
+    () => {
+      const items = (isPlatform ? PLATFORM_MOBILE_NAV : MOBILE_NAV).filter((item) => !item.permission || can(item.permission));
+      /* Five fit a phone. On the platform, Account always keeps its place. */
+      return isPlatform && items.length > 5 ? [...items.slice(0, 4), items[items.length - 1]] : items.slice(0, 5);
+    },
     [can, isPlatform]
   );
 
-  const home = isPlatform ? '/platform' : '/dashboard';
+  const home = useHomeRoute();
   const admin = !!user && (user.isPlatformAdmin || user.roleKey === 'admin');
 
   const submitSearch = (event: React.FormEvent) => {
@@ -214,9 +229,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const accountMenu = (close: () => void) => (
     <>
       <div className="menu-account">
-        <span className={`avatar ${admin ? 'gold' : ''}`} aria-hidden="true">
-          {initials(user?.fullName)}
-        </span>
+        <PersonAvatar name={user?.fullName} url={user?.avatarUrl} tone={admin ? 'gold' : undefined} />
         <span className="menu-account-meta">
           <strong>{user?.fullName}</strong>
           <span className="truncate">{user?.email}</span>
@@ -309,7 +322,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             align="left"
             trigger={({ toggle, props }) => (
               <button className="account-card" onClick={toggle} aria-label="Account menu" {...props}>
-                <span className={`avatar ${admin ? 'gold' : ''}`}>{initials(user?.fullName)}</span>
+                <PersonAvatar name={user?.fullName} url={user?.avatarUrl} tone={admin ? 'gold' : undefined} />
                 <span className="meta">
                   <strong>{user?.fullName}</strong>
                   <span>{user?.supportMode ? `Support · ${user.pharmacyName ?? ''}` : user?.roleName}</span>
@@ -332,8 +345,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="support-banner" role="status">
             <HeartHandshake size={18} aria-hidden="true" />
             <span className="grow">
-              You are working inside <strong>{user.pharmacyName ?? workspace?.pharmacy?.name ?? 'a pharmacy'}</strong> as the Super Admin.
-              Everything you do is recorded as “Super Admin (support)”.
+              You are working inside <strong>{user.pharmacyName ?? workspace?.pharmacy?.name ?? 'a pharmacy'}</strong>{user.isPlatformStaff ? ' for the KSF team' : ' as the Super Admin'}.
+              {user.isPlatformStaff
+                ? <> Everything you do is recorded under your name, as “KSF team (support)”.</>
+                : <> Everything you do is recorded as “Super Admin (support)”.</>}
             </span>
             <Button size="sm" variant="outline" icon={<ArrowLeftCircle size={15} />} onClick={() => { void backToPlatform(); }}>Back to the platform</Button>
           </div>
@@ -387,10 +402,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             label="Account"
             trigger={({ toggle, props }) => (
               <button className="user-chip" onClick={toggle} aria-label="Account menu" {...props}>
-                <span className={`avatar ${admin ? 'gold' : ''}`}>{initials(user?.fullName)}</span>
+                <PersonAvatar name={user?.fullName} url={user?.avatarUrl} tone={admin ? 'gold' : undefined} />
                 <span className="meta hide-sm">
                   <strong>{user?.fullName}</strong>
-                  <span>{isPlatform ? 'Super Admin' : subscription?.planName ?? user?.roleName}</span>
+                  <span>{isPlatform ? (user?.isPlatformAdmin ? 'Super Admin' : user?.roleName) : subscription?.planName ?? user?.roleName}</span>
                 </span>
                 <ChevronDown size={15} className="user-chip-chev hide-sm" aria-hidden="true" />
               </button>

@@ -15,6 +15,7 @@ import { Layout, ChangePasswordModal } from './components/Layout';
 import { Toaster, PageLoader, EmptyState, Button } from './components/ui';
 import { StepUpDialog } from './components/account-ui';
 import { useViewMode } from './hooks/useParallax';
+import { useHomeRoute } from './hooks/useHomeRoute';
 
 /* Public pages. Each is its own chunk, so a signed-in cashier at a till
    never downloads the marketing site. */
@@ -61,35 +62,26 @@ const Income = lazy(() => import('./pages/platform/Income'));
 const Plans = lazy(() => import('./pages/platform/Plans'));
 const HelpQueue = lazy(() => import('./pages/platform/HelpQueue'));
 const PlatformActivity = lazy(() => import('./pages/platform/PlatformActivity'));
+const Team = lazy(() => import('./pages/platform/Team'));
 
 function Guard({ permission, children }: { permission?: string; children: React.ReactNode }) {
-  const { can } = useApp();
+  const { can, isPlatform } = useApp();
   const navigate = useNavigate();
+  const home = useHomeRoute();
 
   if (permission && !can(permission)) {
     return (
       <EmptyState
         icon={<ShieldAlert size={28} />}
         title="You do not have access to this screen"
-        message="Your role does not include this part of KSF. If you need it, ask your pharmacy Admin to update your role."
-        action={<Button variant="primary" onClick={() => navigate('/dashboard')}>Back to dashboard</Button>}
+        message={isPlatform
+          ? 'Your team role does not include this part of the platform. If you need it, ask the Super Admin to update your role.'
+          : 'Your role does not include this part of KSF. If you need it, ask your pharmacy Admin to update your role.'}
+        action={<Button variant="primary" onClick={() => navigate(home)}>Back to my first screen</Button>}
       />
     );
   }
   return <>{children}</>;
-}
-
-/** The first screen a role can actually open. A cashier without dashboard
-    access lands on the till rather than on an error. */
-function useHomeRoute(): string {
-  const { can, isPlatform } = useApp();
-  if (isPlatform) return '/platform';
-  if (can('dashboard.view')) return '/dashboard';
-  if (can('pos.operate')) return '/pos';
-  if (can('sales.read')) return '/sales';
-  if (can('inventory.read')) return '/inventory';
-  if (can('messages.read')) return '/messages';
-  return '/notifications';
 }
 
 function Protected() {
@@ -111,18 +103,19 @@ function Protected() {
       <Suspense fallback={<PageLoader />}>
         {isPlatform ? (
           <Routes location={location}>
-            <Route path="/platform" element={<PlatformOverview />} />
-            <Route path="/platform/pharmacies" element={<Pharmacies />} />
-            <Route path="/platform/pharmacies/:id" element={<PharmacyDetail />} />
-            <Route path="/platform/support" element={<SupportDesk />} />
-            <Route path="/platform/support/:id" element={<SupportDesk />} />
-            <Route path="/platform/help" element={<HelpQueue />} />
-            <Route path="/platform/income" element={<Income />} />
-            <Route path="/platform/plans" element={<Plans />} />
-            <Route path="/platform/activity" element={<PlatformActivity />} />
+            <Route path="/platform" element={<Guard permission="platform.overview"><PlatformOverview /></Guard>} />
+            <Route path="/platform/pharmacies" element={<Guard permission="platform.pharmacies.view"><Pharmacies /></Guard>} />
+            <Route path="/platform/pharmacies/:id" element={<Guard permission="platform.pharmacies.view"><PharmacyDetail /></Guard>} />
+            <Route path="/platform/support" element={<Guard permission="platform.support"><SupportDesk /></Guard>} />
+            <Route path="/platform/support/:id" element={<Guard permission="platform.support"><SupportDesk /></Guard>} />
+            <Route path="/platform/help" element={<Guard permission="platform.help"><HelpQueue /></Guard>} />
+            <Route path="/platform/income" element={<Guard permission="platform.finance.view"><Income /></Guard>} />
+            <Route path="/platform/plans" element={<Guard permission="platform.plans.manage"><Plans /></Guard>} />
+            <Route path="/platform/team" element={<Guard permission="platform.team.manage"><Team /></Guard>} />
+            <Route path="/platform/activity" element={<Guard permission="platform.activity"><PlatformActivity /></Guard>} />
             <Route path="/platform/notifications" element={<Notifications />} />
             <Route path="/account" element={<Account />} />
-            <Route path="*" element={<Navigate to="/platform" replace />} />
+            <Route path="*" element={<Navigate to={home} replace />} />
           </Routes>
         ) : (
         <Routes location={location}>

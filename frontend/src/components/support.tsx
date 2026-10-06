@@ -1,11 +1,13 @@
 /* The pieces both sides of a support request share: the list of requests
    and the conversation itself. The pharmacy sees "KSF Support" on the
    platform's replies; the platform sees which pharmacy and which person
-   wrote, and their role. */
+   wrote, and their role — and, for its own replies, who on the desk wrote
+   each one and who has the request. */
 
 import { useEffect, useRef, useState } from 'react';
 import { Send, LifeBuoy, Building2 } from 'lucide-react';
 import { Button, StatusBadge, EmptyState, Badge } from './ui';
+import { PersonAvatar } from './people';
 import { ago, dateTime, initials } from '../utils/format';
 import { TICKET_CATEGORY_LABEL, type Ticket, type TicketSummary } from '../types/platform';
 
@@ -34,6 +36,11 @@ export function TicketList({
               <div className="row-tight" style={{ flexWrap: 'wrap', gap: 6 }}>
                 <StatusBadge status={ticket.status} />
                 {(ticket.priority === 'high' || ticket.priority === 'urgent') && <StatusBadge status={ticket.priority} />}
+                {side === 'platform' && ticket.assigned_to_name && (
+                  <span className="row-tight t-xs t-soft ticket-assignee" title={`Given to ${ticket.assigned_to_name}`}>
+                    <PersonAvatar name={ticket.assigned_to_name} url={ticket.assigned_to_avatar} size="xs" /> {ticket.assigned_to_name}
+                  </span>
+                )}
                 {unread ? <span className="unread-dot" aria-label="Unread" /> : null}
               </div>
             </button>
@@ -70,6 +77,9 @@ export function TicketThread({
             <span className="mono">{ticket.reference}</span> · {TICKET_CATEGORY_LABEL[ticket.category] ?? ticket.category}
             {side === 'platform' ? ` · ${ticket.pharmacy_name}` : ''} · opened {dateTime(ticket.created_at)}
           </div>
+          {side === 'platform' && ticket.resolved_by_name && (ticket.status === 'resolved' || ticket.status === 'closed') && (
+            <div className="t-sm t-soft mt-1">{ticket.status === 'closed' ? 'Closed' : 'Resolved'} by {ticket.resolved_by_name}</div>
+          )}
         </div>
         <div className="row-tight" style={{ flexWrap: 'wrap', gap: 6 }}>
           <StatusBadge status={ticket.status} large />
@@ -80,7 +90,10 @@ export function TicketThread({
       <div className="ticket-messages" aria-live="polite">
         {ticket.messages.map((message) => {
           const mine = message.author_side === side;
-          const name = message.author_side === 'platform' ? (side === 'platform' ? message.author_name : 'KSF Support') : message.author_name;
+          /* The desk sees who wrote its replies; the pharmacy sees KSF Support. */
+          const name = message.author_side === 'platform'
+            ? (side === 'platform' ? message.agent_name ?? message.author_name : 'KSF Support')
+            : message.author_name;
           return (
             <div key={message.id} className={`bubble-row ${mine ? 'is-mine' : ''}`}>
               <span className={`avatar sm ${message.author_side === 'platform' ? 'gold' : ''}`} aria-hidden="true">{message.author_side === 'platform' ? 'KS' : initials(message.author_name)}</span>
@@ -88,6 +101,7 @@ export function TicketThread({
                 <div className="bubble-meta">
                   <strong>{name}</strong>
                   {message.author_side === 'pharmacy' && side === 'platform' && ticket.raised_by_role && message.author_id === ticket.raised_by && <Badge tone="neutral" dot={false}>{ticket.raised_by_role}</Badge>}
+                  {message.author_side === 'platform' && side === 'platform' && message.agent_role && <Badge tone="gold" dot={false}>{message.agent_role}</Badge>}
                   <span>{dateTime(message.created_at)}</span>
                 </div>
                 <p>{message.body}</p>

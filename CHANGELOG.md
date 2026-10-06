@@ -5,6 +5,32 @@ Pakistan Standard Time.
 
 ## Unreleased
 
+### The Super Admin's team
+- **My team** (platform console): the Super Admin adds the people who help
+  run KSF — each with their own e-mail address, a temporary password they
+  must replace, a job title and a photo — and gives each one a team role.
+- **Team roles**: as many as needed, each exactly the platform permissions
+  ticked for it (dashboard, pharmacies, working inside a pharmacy, support
+  desk, people who need help, finance, plans, records), with ready-made
+  starting points (Help desk, Finance, Operations manager, Read only).
+  Managing the team is never part of a role, so nobody can promote
+  themselves. A role change, suspension or removal applies at once.
+- Every platform route names the permission it needs, checked on the
+  server; menus and buttons show only what the person's role allows.
+- **Support desk for the team**: a pharmacy's request reaches the Super Admin
+  and everybody whose role answers requests; a request can be given to one
+  person; each reply shows who wrote it (the pharmacy still sees "KSF
+  Support"); when a team member resolves a request the Super Admin is
+  notified with their name. Platform notices are per person.
+- What a team member does inside a pharmacy is recorded as "KSF team:
+  <role> (support)" under their own name.
+
+### Fixed
+- The side menu and the phone's bottom bar highlighted Overview on every
+  platform page as well as the page itself.
+- On phones, table cards (Pharmacies and others) laid a cell's lines side by
+  side and ran off the screen; each cell now stacks beside its label.
+
 ### Deployment
 - **Railway (API) and Vercel (website).** `frontend/vercel.json` forwards
   `/api` to the Railway service, so sign-in cookies stay first-party. Steps

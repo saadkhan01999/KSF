@@ -17,7 +17,7 @@ interface PharmacyList { data: PharmacyRow[]; page: number; pages: number; total
 
 export default function Pharmacies() {
   const navigate = useNavigate();
-  const { enterSupport, ok, fail } = useApp();
+  const { enterSupport, ok, fail, can, user } = useApp();
   const [params] = useSearchParams();
   const [term, setTerm] = useState(params.get('q') ?? '');
   /* The top-bar search lands here with ?q=. */
@@ -34,7 +34,7 @@ export default function Pharmacies() {
   const support = async (row: PharmacyRow) => {
     try {
       await enterSupport(row.id);
-      ok(`Working inside ${row.name}`, 'Everything you do is recorded as Super Admin (support).');
+      ok(`Working inside ${row.name}`, user?.isPlatformAdmin ? 'Everything you do is recorded as Super Admin (support).' : 'Everything you do is recorded under your name, as the KSF team.');
       navigate('/dashboard');
     } catch (problem) {
       fail(problem);
@@ -131,9 +131,11 @@ export default function Pharmacies() {
                               <button className="icon-btn" onClick={() => navigate(`/platform/pharmacies/${row.id}`)} aria-label={`Open ${row.name}`} title="Open">
                                 <Eye size={17} />
                               </button>
-                              <button className="icon-btn" onClick={() => { void support(row); }} aria-label={`Work inside ${row.name}`} title="Work inside this pharmacy">
-                                <LogIn size={17} />
-                              </button>
+                              {can('platform.pharmacies.enter') && (
+                                <button className="icon-btn" onClick={() => { void support(row); }} aria-label={`Work inside ${row.name}`} title="Work inside this pharmacy">
+                                  <LogIn size={17} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

@@ -411,9 +411,9 @@ accountRoute('PATCH', '/api/v1/me', async (ctx) => {
   if (ctx.body.theme !== undefined) {
     const theme = toStr(ctx.body.theme, 40);
     if (theme && !THEME_KEYS.includes(theme)) bad('That theme does not exist.', 'theme');
-    /* The Super Admin and a pharmacy Admin always choose; anyone else needs
-       the permission their Admin gave their role. */
-    if (!ctx.isPlatformAdmin && !ctx.can('appearance.theme') && !ctx.can('settings.write')) {
+    /* The Super Admin, their team and a pharmacy Admin always choose; anyone
+       else needs the permission their Admin gave their role. */
+    if (!ctx.isPlatformAdmin && !ctx.isPlatformStaff && !ctx.can('appearance.theme') && !ctx.can('settings.write')) {
       throw new HttpError(403, 'Your role cannot change the theme. Ask your pharmacy Admin.');
     }
     update.theme = theme || null;
@@ -457,6 +457,6 @@ accountRoute('POST', '/api/v1/me/email/confirm', async (ctx) => {
 
 /** The theme a person sees: their own if they may choose, else the pharmacy's. */
 export async function effectiveTheme(user: AuthUser, permissions: Set<string>, pharmacyTheme: string | null): Promise<string> {
-  const mayChoose = !!user.is_platform_admin || permissions.has('appearance.theme') || permissions.has('settings.write');
+  const mayChoose = !!user.is_platform_admin || !!user.is_platform_staff || permissions.has('appearance.theme') || permissions.has('settings.write');
   return (mayChoose && user.theme) || pharmacyTheme || DEFAULT_THEME;
 }
