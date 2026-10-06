@@ -116,6 +116,13 @@ const PLATFORM_MOBILE_NAV: NavEntry[] = [
   { to: '/account', label: 'Account', icon: <User /> }
 ];
 
+/* A link whose address begins another link's ("/platform" before
+   "/platform/pharmacies") matches its own page exactly; otherwise both light
+   up at once. A detail page under a link ("/platform/pharmacies/PH-1",
+   "/sales/INV-7") still lights the link it belongs to. */
+const EVERY_PATH = [...NAV, ...PLATFORM_NAV].flatMap((group) => group.items.map((item) => item.to));
+const exactOnly = (to: string): boolean => EVERY_PATH.some((other) => other !== to && other.startsWith(`${to}/`));
+
 /* Which subscription statuses count as "nothing to worry about" for the pill
    in the account menu. Anything else — grace, past due, suspended — should
    look different, because it is something the owner has to act on. */
@@ -279,6 +286,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <NavLink
                     key={item.to}
                     to={item.to}
+                    end={exactOnly(item.to)}
                     className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''} ${count > 0 ? 'has-badge' : ''}`}
                     title={collapsed ? item.label : undefined}
                   >
@@ -400,6 +408,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavLink
             key={item.to}
             to={item.to}
+            end={exactOnly(item.to)}
             className={({ isActive }) => `${isActive ? 'is-active' : ''} ${item.to === '/pos' ? 'is-pos' : ''}`}
           >
             {item.to === '/pos' ? <span className="pos-fab">{item.icon}</span> : item.icon}

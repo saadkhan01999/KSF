@@ -640,18 +640,31 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
   table.tbl.responsive thead { display: none; }
   table.tbl.responsive tbody tr { display: block; padding: var(--s-4); border-bottom: 1px solid var(--line); }
   table.tbl.responsive tbody tr:hover { background: var(--surface-2); }
+  /* Two columns: the label, then everything the cell holds stacked under one
+     another. As a flex row, a cell with a name, an e-mail and a phone number
+     laid all three side by side and ran off the screen. */
   table.tbl.responsive tbody td {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(84px, 36%) minmax(0, 1fr);
+    column-gap: var(--s-3);
     align-items: center;
-    justify-content: space-between;
-    gap: var(--s-4);
+    justify-items: end;
     padding: 6px 0;
     border: 0;
     text-align: right;
   }
+  table.tbl.responsive tbody td > * {
+    grid-column: 2;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
   table.tbl.responsive tbody td::before {
     content: attr(data-label);
-    flex: 0 0 auto;
+    grid-column: 1;
+    grid-row: 1 / span 8;
+    align-self: center;
+    justify-self: start;
     text-align: left;
     font-size: var(--fs-xs);
     font-weight: 600;
@@ -659,6 +672,7 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
   }
   table.tbl.responsive tbody td.cell-title {
     display: block;
+    justify-items: start;
     text-align: left;
     padding-bottom: var(--s-3);
     margin-bottom: var(--s-2);
