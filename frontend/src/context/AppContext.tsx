@@ -149,6 +149,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast]);
 
   /* ------------------------------ session ----------------------------- */
+  /** The Super Admin or one of their team: they work in the platform console. */
+  const platformAccount = (who: SessionUser | null | undefined): boolean => !!who && (who.isPlatformAdmin || !!who.isPlatformStaff);
+
   const refreshWorkspace = useCallback(async () => {
     try {
       const next = await api.get<Bootstrap>('/bootstrap');
@@ -160,13 +163,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshSubscription = useCallback(async () => {
-    if (!supportPharmacy() && user?.isPlatformAdmin) return;
+    if (!supportPharmacy() && platformAccount(user)) return;
     try {
       setSubscription(await api.get<SubscriptionState>('/billing/entitlements'));
     } catch {
       /* The last known answer stays. */
     }
-  }, [user?.isPlatformAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.isPlatformAdmin, user?.isPlatformStaff]);
 
   const clearSession = useCallback(() => {
     setAccessToken(null);
@@ -197,9 +201,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEndedBecause(null);
     setUser(reply.user);
     setSubscription(reply.subscription ?? null);
-    if (reply.user.isPlatformAdmin && supportPharmacy()) await refreshSession();
+    if (platformAccount(reply.user) && supportPharmacy()) await refreshSession();
     else {
-      if (!reply.user.isPlatformAdmin) setSupportPharmacy(null);
+      if (!platformAccount(reply.user)) setSupportPharmacy(null);
       await refreshWorkspace();
     }
   }, [refreshSession, refreshWorkspace]);
@@ -259,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (reply?.accessToken && reply.user) {
         setUser(reply.user as SessionUser);
         setSubscription((reply.subscription ?? null) as SubscriptionState | null);
-        if ((reply.user as SessionUser).isPlatformAdmin && supportPharmacy()) await refreshSession();
+        if (platformAccount(reply.user as SessionUser) && supportPharmacy()) await refreshSession();
         else await refreshWorkspace();
       } else {
         setSupportPharmacy(null);
@@ -320,7 +324,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const permissions = useMemo(() => new Set(user?.permissions ?? []), [user]);
   const can = useCallback((permission: string) => permissions.has(permission), [permissions]);
   const canAny = useCallback((...list: string[]) => list.some((p) => permissions.has(p)), [permissions]);
-  const isPlatform = !!user?.isPlatformAdmin && !user.supportMode;
+  const isPlatform = platformAccount(user) && !user?.supportMode;
 
   const setting = useCallback((key: string, fallback = '') => workspace?.settings?.[key] ?? fallback, [workspace]);
 

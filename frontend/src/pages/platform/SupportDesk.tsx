@@ -1,6 +1,8 @@
 /* The platform's support desk: every request from every pharmacy in one
    queue, unread first. Answering puts the request in the pharmacy's court;
-   "Work inside" opens that pharmacy to fix the problem where it is. */
+   "Work inside" opens that pharmacy to fix the problem where it is. The
+   Super Admin and their help desk share it: a request can be given to one
+   person, and every reply shows who on the desk wrote it. */
 
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -10,11 +12,11 @@ import { useApiData, useDebounced, useAction } from '../../hooks/useApi';
 import { api, query } from '../../services/api';
 import { Button, Tabs, SearchField, SelectInput, EmptyState, TableSkeleton, Pager } from '../../components/ui';
 import { TicketList, TicketThread } from '../../components/support';
-import { TICKET_STATUS_LABEL, type Ticket, type TicketStatus, type TicketSummary } from '../../types/platform';
+import { TICKET_STATUS_LABEL, type SupportAgent, type Ticket, type TicketStatus, type TicketSummary } from '../../types/platform';
 
 interface Queue {
   data: TicketSummary[]; page: number; pages: number; total: number; size: number;
-  counts: Record<TicketStatus | 'unread', number>;
+  counts: Record<TicketStatus | 'unread' | 'mine', number>;
 }
 
 type Filter = 'open' | 'unread' | 'resolved' | 'closed' | 'all';
@@ -22,16 +24,18 @@ type Filter = 'open' | 'unread' | 'resolved' | 'closed' | 'all';
 export default function SupportDesk() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { ok, enterSupport, fail, refreshWorkspace } = useApp();
+  const { ok, enterSupport, fail, refreshWorkspace, can, user } = useApp();
   const { busy, run } = useAction();
   const [filter, setFilter] = useState<Filter>('open');
   const [term, setTerm] = useState('');
   const search = useDebounced(term);
   const [priority, setPriority] = useState('all');
+  const [assignee, setAssignee] = useState('all');
   const [page, setPage] = useState(1);
   const [replyStatus, setReplyStatus] = useState<TicketStatus>('waiting');
 
-  const list = useApiData<Queue>(`/platform/support/tickets${query({ status: filter, q: search, priority, page })}`, [filter, search, priority, page]);
+  const list = useApiData<Queue>(`/platform/support/tickets${query({ status: filter, q: search, priority, assignee, page })}`, [filter, search, priority, assignee, page]);
+  const agents = useApiData<{ data: SupportAgent[] }>('/platform/support/agents');
   const detail = useApiData<{ data: Ticket; pharmacy: { name: string; status: string; phone: string | null; email: string | null } | null }>(
     id ? `/platform/support/tickets/${id}` : null, [id]
   );
@@ -53,12 +57,21 @@ export default function SupportDesk() {
     (result) => { detail.setData((current) => (current ? { ...current, data: result.data } : current)); void list.reload(true); }
   );
 
+  const assign = (person: string) => run(
+    () => api.patch<{ data: Ticket }>(`/platform/support/tickets/${id}`, { assignedTo: person || null }),
+    (result) => {
+      detail.setData((current) => (current ? { ...current, data: result.data } : current));
+      ok(person ? `Given to ${result.data.assigned_to_name}` : 'Back with the whole desk');
+      void list.reload(true);
+    }
+  );
+
   const goInside = async () => {
     const ticket = detail.data?.data;
     if (!ticket) return;
     try {
       await enterSupport(ticket.pharmacy_id);
-      ok(`Working inside ${ticket.pharmacy_name}`, 'Everything you do is recorded as Super Admin (support).');
+      ok(`Working inside ${ticket.pharmacy_name}`, user?.isPlatformAdmin ? 'Everything you do is recorded as Super Admin (support).' : 'Everything you do is recorded under your name, as the KSF team.');
       navigate('/dashboard');
     } catch (problem) {
       fail(problem);
@@ -95,6 +108,13 @@ export default function SupportDesk() {
             <SearchField value={term} onChange={(value) => { setTerm(value); setPage(1); }} placeholder="Reference, subject, pharmacy or person…" />
             <SelectInput aria-label="Priority" value={priority} onChange={(event) => { setPriority(event.target.value); setPage(1); }}
               options={[{ value: 'all', label: 'Any priority' }, { value: 'urgent', label: 'Urgent' }, { value: 'high', label: 'High' }, { value: 'normal', label: 'Normal' }, { value: 'low', label: 'Low' }]} />
+            <SelectInput aria-label="Given to" value={assignee} onChange={(event) => { setAssignee(event.target.value); setPage(1); }}
+              options={[
+                { value: 'all', label: 'Anybody on the desk' },
+                { value: 'me', label: `Given to me${counts?.mine ? ` (${counts.mine} open)` : ''}` },
+                { value: 'none', label: 'Not given to anybody' },
+                ...(agents.data?.data ?? []).filter((agent) => agent.id !== user?.id).map((agent) => ({ value: agent.id, label: `Given to ${agent.name}` }))
+              ]} />
           </div>
           <div className="desk-list-body">
             {list.loading && !list.data
@@ -116,11 +136,22 @@ export default function SupportDesk() {
                 : (
                   <>
                     <div className="row-between" style={{ padding: 'var(--s-3) var(--s-5)', borderBottom: '1px solid var(--line)', gap: 8, flexWrap: 'wrap' }}>
-                      <button className="link-button" onClick={() => navigate(`/platform/pharmacies/${ticket.pharmacy_id}`)}><Building2 size={15} /> {ticket.pharmacy_name}</button>
+                      {can('platform.pharmacies.view')
+                        ? <button className="link-button" onClick={() => navigate(`/platform/pharmacies/${ticket.pharmacy_id}`)}><Building2 size={15} /> {ticket.pharmacy_name}</button>
+                        : <span className="row-tight t-sm t-semi"><Building2 size={15} /> {ticket.pharmacy_name}</span>}
                       <div className="row-tight" style={{ gap: 8, flexWrap: 'wrap' }}>
+                        <SelectInput aria-label="Given to" value={ticket.assigned_to ?? ''} onChange={(event) => { void assign(event.target.value); }}
+                          options={[
+                            { value: '', label: 'Not given to anybody' },
+                            ...(agents.data?.data ?? []).map((agent) => ({ value: agent.id, label: agent.id === user?.id ? `${agent.name} (me)` : `${agent.name} · ${agent.role}` })),
+                            ...(ticket.assigned_to && !(agents.data?.data ?? []).some((agent) => agent.id === ticket.assigned_to)
+                              ? [{ value: ticket.assigned_to, label: ticket.assigned_to_name ?? 'Someone no longer on the desk' }] : [])
+                          ]} />
                         <SelectInput aria-label="Status" value={ticket.status} onChange={(event) => { void setStatus(event.target.value as TicketStatus); }}
                           options={(Object.keys(TICKET_STATUS_LABEL) as TicketStatus[]).map((key) => ({ value: key, label: TICKET_STATUS_LABEL[key] }))} />
-                        <Button size="sm" variant="outline" icon={<LogIn size={15} />} onClick={() => { void goInside(); }}>Work inside</Button>
+                        {can('platform.pharmacies.enter') && (
+                          <Button size="sm" variant="outline" icon={<LogIn size={15} />} onClick={() => { void goInside(); }}>Work inside</Button>
+                        )}
                       </div>
                     </div>
                     <TicketThread

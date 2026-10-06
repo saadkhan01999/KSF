@@ -23,7 +23,11 @@ type Tab = 'overview' | 'people' | 'billing' | 'support' | 'activity';
 export default function PharmacyDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { enterSupport, ok, fail } = useApp();
+  const { enterSupport, ok, fail, can, user } = useApp();
+  /* What this person's team role allows here; the server checks again. */
+  const manages = can('platform.pharmacies.manage');
+  const handlesMoney = can('platform.finance.manage');
+  const entersPharmacies = can('platform.pharmacies.enter');
   const { busy, run } = useAction();
   const [tab, setTab] = useState<Tab>('overview');
   const { data, loading, reload } = useApiData<Detail>(`/platform/pharmacies/${id}`, [id]);
@@ -45,7 +49,7 @@ export default function PharmacyDetail() {
   const goInside = async (path = '/dashboard') => {
     try {
       await enterSupport(pharmacy.id);
-      ok(`Working inside ${pharmacy.name}`, 'Everything you do is recorded as Super Admin (support).');
+      ok(`Working inside ${pharmacy.name}`, user?.isPlatformAdmin ? 'Everything you do is recorded as Super Admin (support).' : 'Everything you do is recorded under your name, as the KSF team.');
       navigate(path);
     } catch (problem) {
       fail(problem);
@@ -72,13 +76,13 @@ export default function PharmacyDetail() {
           </p>
         </div>
         <div className="actions">
-          <Button variant="outline" icon={<Pencil size={16} />} onClick={() => setEditOpen(true)}>Edit details</Button>
-          <Button variant="outline" icon={<CreditCard size={16} />} onClick={() => setPlanOpen(true)}>Plan</Button>
-          <Button variant="outline" icon={<Wallet size={16} />} onClick={() => setPaymentOpen(true)}>Record payment</Button>
-          {pharmacy.status === 'active'
+          {manages && <Button variant="outline" icon={<Pencil size={16} />} onClick={() => setEditOpen(true)}>Edit details</Button>}
+          {manages && <Button variant="outline" icon={<CreditCard size={16} />} onClick={() => setPlanOpen(true)}>Plan</Button>}
+          {handlesMoney && <Button variant="outline" icon={<Wallet size={16} />} onClick={() => setPaymentOpen(true)}>Record payment</Button>}
+          {manages && (pharmacy.status === 'active'
             ? <Button variant="danger" icon={<Ban size={16} />} onClick={() => setStatusTo('suspended')}>Suspend</Button>
-            : <Button variant="secondary" icon={<PlayCircle size={16} />} onClick={() => setStatusTo('active')}>Reactivate</Button>}
-          <Button variant="primary" icon={<LogIn size={16} />} onClick={() => { void goInside(); }} disabled={pharmacy.status === 'closed'}>Work inside</Button>
+            : <Button variant="secondary" icon={<PlayCircle size={16} />} onClick={() => setStatusTo('active')}>Reactivate</Button>)}
+          {entersPharmacies && <Button variant="primary" icon={<LogIn size={16} />} onClick={() => { void goInside(); }} disabled={pharmacy.status === 'closed'}>Work inside</Button>}
         </div>
       </div>
 
@@ -151,8 +155,16 @@ export default function PharmacyDetail() {
         </>
       )}
 
-      {tab === 'people' && <People data={data} onHelp={(path) => { void goInside(path); }} />}
-      {tab === 'billing' && <Billing data={data} onPlan={() => setPlanOpen(true)} onPayment={() => setPaymentOpen(true)} onVerify={setVerifying} onRefund={setRefunding} />}
+      {tab === 'people' && <People data={data} onHelp={entersPharmacies ? (path) => { void goInside(path); } : undefined} />}
+      {tab === 'billing' && (
+        <Billing
+          data={data}
+          onPlan={manages ? () => setPlanOpen(true) : undefined}
+          onPayment={handlesMoney ? () => setPaymentOpen(true) : undefined}
+          onVerify={handlesMoney ? setVerifying : undefined}
+          onRefund={handlesMoney ? setRefunding : undefined}
+        />
+      )}
 
       {tab === 'support' && (
         <Card title="Support requests" subtitle="Everything this pharmacy has asked KSF for" pad={false}>
@@ -224,7 +236,7 @@ export default function PharmacyDetail() {
 }
 
 /* --------------------------------------------------------------- people */
-function People({ data, onHelp }: { data: Detail; onHelp: (path: string) => void }) {
+function People({ data, onHelp }: { data: Detail; onHelp?: (path: string) => void }) {
   return (
     <div className="col" style={{ gap: 'var(--s-5)' }}>
       {data.help.length > 0 && (
@@ -236,14 +248,14 @@ function People({ data, onHelp }: { data: Detail; onHelp: (path: string) => void
                   <div className="t-semi">{item.name} <span className="t-dim t-sm">· {item.role}</span></div>
                   <div className="t-sm"><Badge tone="warn" dot={false}>{item.title}</Badge> <span className="t-dim">{item.detail}</span></div>
                 </div>
-                <Button size="sm" variant="primary" icon={<LogIn size={15} />} onClick={() => onHelp('/staff')}>Fix it</Button>
+                {onHelp && <Button size="sm" variant="primary" icon={<LogIn size={15} />} onClick={() => onHelp('/staff')}>Fix it</Button>}
               </div>
             ))}
           </div>
         </Card>
       )}
       <Card title="Staff" subtitle={`${data.staff.length} account(s)`} pad={false}
-        actions={<Button size="sm" variant="outline" icon={<LogIn size={15} />} onClick={() => onHelp('/staff')}>Manage inside</Button>}>
+        actions={onHelp && <Button size="sm" variant="outline" icon={<LogIn size={15} />} onClick={() => onHelp('/staff')}>Manage inside</Button>}>
         <div className="table-scroll">
           <table className="tbl responsive">
             <thead><tr><th>Person</th><th>Role</th><th>Status</th><th>Last signed in</th></tr></thead>
@@ -272,15 +284,15 @@ function People({ data, onHelp }: { data: Detail; onHelp: (path: string) => void
 
 /* -------------------------------------------------------------- billing */
 function Billing({ data, onPlan, onPayment, onVerify, onRefund }: {
-  data: Detail; onPlan: () => void; onPayment: () => void;
-  onVerify: (attempt: PaymentAttemptRow) => void; onRefund: (payment: PlatformPayment) => void;
+  data: Detail; onPlan?: () => void; onPayment?: () => void;
+  onVerify?: (attempt: PaymentAttemptRow) => void; onRefund?: (payment: PlatformPayment) => void;
 }) {
   const subscription = data.subscription;
   const open = data.attempts.filter((attempt) => ['created', 'pending'].includes(attempt.status));
   return (
     <div className="col" style={{ gap: 'var(--s-5)' }}>
       <Card title="Subscription" icon={<CreditCard size={18} />}
-        actions={<><Button size="sm" variant="outline" onClick={onPlan}>Change or extend</Button><Button size="sm" variant="primary" onClick={onPayment}>Record payment</Button></>}>
+        actions={<>{onPlan && <Button size="sm" variant="outline" onClick={onPlan}>Change or extend</Button>}{onPayment && <Button size="sm" variant="primary" onClick={onPayment}>Record payment</Button>}</>}>
         {subscription
           ? (
             <dl className="kv">
@@ -308,7 +320,7 @@ function Billing({ data, onPlan, onPayment, onVerify, onRefund }: {
                     <td data-label="Amount" className="t-right num t-semi">{rupees(attempt.amount_paisa)}</td>
                     <td data-label="Actions">
                       <div className="row-actions">
-                        {attempt.provider === 'bank-transfer' && <Button size="sm" variant="primary" icon={<BadgeCheck size={15} />} onClick={() => onVerify(attempt)}>Confirm</Button>}
+                        {attempt.provider === 'bank-transfer' && onVerify && <Button size="sm" variant="primary" icon={<BadgeCheck size={15} />} onClick={() => onVerify(attempt)}>Confirm</Button>}
                       </div>
                     </td>
                   </tr>
@@ -335,7 +347,7 @@ function Billing({ data, onPlan, onPayment, onVerify, onRefund }: {
                       <td data-label="Amount" className="t-right num t-semi">{rupees(payment.amount_paisa)}</td>
                       <td data-label="Actions">
                         <div className="row-actions">
-                          {payment.status === 'succeeded' && (payment.refunded_paisa ?? 0) < payment.amount_paisa && (
+                          {onRefund && payment.status === 'succeeded' && (payment.refunded_paisa ?? 0) < payment.amount_paisa && (
                             <button className="icon-btn" onClick={() => onRefund(payment)} aria-label="Refund" title="Refund"><RotateCcw size={16} /></button>
                           )}
                         </div>

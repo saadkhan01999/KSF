@@ -47,6 +47,12 @@ export interface User extends Base {
   pharmacy_id: Id | null; branch_id: Id | null; role_id: Id | null;
   /** The one platform account that runs the whole service. */
   is_platform_admin?: Flag;
+  /** A member of the Super Admin's own team: no pharmacy, one platform role. */
+  is_platform_staff?: Flag;
+  platform_role_id?: Id | null;
+  job_title?: string | null;
+  /** The photo, served from /api/v1/avatars/<avatar_id>. A new photo gets a new id. */
+  avatar_id?: Id | null;
   full_name: string; email: string; phone: string | null; cnic: string | null; pharmacist_reg_no: string | null;
   password_hash: string; password_changed_at: When | null; must_change_password: Flag;
   status: 'active' | 'suspended' | 'archived'; failed_attempts: number; locked_until: When | null;
@@ -54,6 +60,17 @@ export interface User extends Base {
   totp_secret: string | null; totp_enabled: Flag; totp_confirmed_at: When | null; recovery_generated_at: When | null;
   is_owner: Flag; theme: string | null; avatar_tone?: string;
   created_at: When; updated_at: When;
+}
+
+/** A role in the Super Admin's team: a name and the platform permissions it holds. */
+export interface PlatformRole extends Base {
+  name: string; name_key: string; description: string | null; permissions: string[];
+  created_by: Id | null; created_at: When; updated_at: When;
+}
+
+/** A profile photo. The bytes live in the database: a container's disk is wiped on every deploy. */
+export interface Avatar extends Base {
+  user_id: Id; content_type: 'image/jpeg' | 'image/png' | 'image/webp'; bytes: number; data: Buffer; created_at: When;
 }
 
 export interface Session extends Base {
@@ -183,6 +200,11 @@ export interface DayClosing extends Base {
 export interface Notification extends Base {
   pharmacy_id: Id | null; user_id: Id | null; type: string; severity: string; title: string;
   body: string | null; link: string | null; is_read: Flag; created_at: When;
+  /** Platform notices only: which team members see it — a platform permission,
+      or 'owner' for the Super Admin alone. The Super Admin sees them all. */
+  audience?: string | null;
+  /** Platform notices only: who has read it. Each person reads their own copy. */
+  read_by?: Id[];
 }
 
 export interface ActivityLog extends Base {
@@ -331,6 +353,8 @@ export interface MailDelivery extends Base {
 /* --------------------------------------------------------------- support */
 export interface TicketMessage {
   id: Id; author_id: Id | null; author_name: string; author_side: 'pharmacy' | 'platform'; body: string; created_at: When;
+  /** Platform replies: the team member who wrote it. The pharmacy sees "KSF Support". */
+  agent_name?: string | null; agent_role?: string | null;
 }
 
 export interface SupportTicket extends Base {
@@ -339,4 +363,6 @@ export interface SupportTicket extends Base {
   status: 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed'; messages: TicketMessage[];
   assigned_to: Id | null; resolved_at: When | null; created_at: When; updated_at: When; last_activity_at: When;
   unread_by_pharmacy: Flag; unread_by_platform: Flag;
+  /** Who on the platform side marked it resolved or closed. */
+  resolved_by?: Id | null; resolved_by_name?: string | null;
 }

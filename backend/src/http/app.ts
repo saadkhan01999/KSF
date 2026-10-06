@@ -19,6 +19,8 @@ import { describeDatabase, supportsTransactions } from '../db/mongo.js';
 import { HttpError } from '../core/errors.js';
 import { nowIso, rateLimit } from '../core/util.js';
 import { isElevated } from '../security/sessions.js';
+import { platformAllows } from '../domain/platform.js';
+import { sendAvatar } from '../services/avatars.js';
 import { authenticate } from './authenticate.js';
 import type { Ctx, HandlerResult } from './context.js';
 import { routes, type RouteDef } from './router.js';
@@ -47,7 +49,8 @@ function baseContext(req: Request): Ctx {
   const ip = clientIp(req);
   const queryString = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?') + 1) : '';
   const ctx: Ctx = {
-    user: null, session: null, pharmacyId: null, permissions: new Set(), isPlatformAdmin: false, supportMode: false,
+    user: null, session: null, pharmacyId: null, permissions: new Set(), isPlatformAdmin: false, isPlatformStaff: false,
+    platformPermissions: new Set(), supportMode: false,
     can: (permission) => ctx.permissions.has(permission),
     require: (permission) => { if (!ctx.permissions.has(permission)) throw new HttpError(403, 'You do not have permission to do this.'); },
     requireRecentVerification: () => {
@@ -93,10 +96,16 @@ async function handle(def: RouteDef, req: Request, res: Response): Promise<void>
 
     Object.assign(ctx, {
       user: auth.user, session: auth.session, permissions: auth.permissions, pharmacyId: auth.pharmacyId,
-      supportMode: auth.supportMode, isPlatformAdmin: auth.isPlatformAdmin
+      supportMode: auth.supportMode, isPlatformAdmin: auth.isPlatformAdmin, isPlatformStaff: auth.isPlatformStaff,
+      platformPermissions: auth.platformPermissions
     });
 
-    if (def.access === 'platform' && !ctx.isPlatformAdmin) throw new HttpError(403, 'Only the platform Super Admin can do this.');
+    if (def.access === 'platform') {
+      if (!ctx.isPlatformAdmin && !ctx.isPlatformStaff) throw new HttpError(403, 'Only the KSF platform team can do this.');
+      if (!platformAllows(ctx, def.platform ?? 'owner')) {
+        throw new HttpError(403, def.platform === 'owner' ? 'Only the Super Admin can do this.' : 'Your team role does not include this. Ask the Super Admin.');
+      }
+    }
     if (def.access === 'pharmacy') {
       if (!ctx.pharmacyId) {
         throw new HttpError(400, 'Open a pharmacy first: this screen belongs to one pharmacy.', undefined, 'pharmacy_required');
@@ -200,6 +209,11 @@ export function createApp(): express.Express {
       ...(IS_PROD ? {} : { database: describeDatabase() })
     });
   });
+
+  /* Profile photos are plain images an <img> asks for, so they are served
+     here rather than as JSON. The address is a random id that changes with
+     every new photo, which is what lets it be cached for a year. */
+  app.get('/api/v1/avatars/:id', (req, res, next) => { sendAvatar(String(req.params.id), res).catch(next); });
 
   const api = express.Router();
   for (const def of routes) {

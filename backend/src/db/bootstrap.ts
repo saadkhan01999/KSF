@@ -20,7 +20,9 @@ const INDEXES: Record<string, IndexDescription[]> = {
   pharmacies: [{ key: { slug: 1 }, unique: true }, { key: { status: 1, created_at: -1 } }],
   branches: [{ key: { pharmacy_id: 1 } }],
   roles: [{ key: { pharmacy_id: 1, key: 1 }, unique: true }],
-  users: [{ key: { email: 1 }, unique: true }, { key: { pharmacy_id: 1, role_id: 1 } }, { key: { is_platform_admin: 1 } }],
+  users: [{ key: { email: 1 }, unique: true }, { key: { pharmacy_id: 1, role_id: 1 } }, { key: { is_platform_admin: 1 } }, { key: { is_platform_staff: 1, platform_role_id: 1 } }],
+  platform_roles: [{ key: { name_key: 1 }, unique: true }],
+  avatars: [{ key: { user_id: 1 } }],
   sessions: [{ key: { user_id: 1, revoked_at: 1 } }, { key: { device_id: 1 } }, { key: { expires_at: 1 } }],
   devices: [{ key: { user_id: 1, status: 1 } }, { key: { pharmacy_id: 1 } }],
   settings: [{ key: { pharmacy_id: 1 } }],
@@ -39,7 +41,7 @@ const INDEXES: Record<string, IndexDescription[]> = {
   ],
   expenses: [{ key: { pharmacy_id: 1, expense_date: -1 } }],
   day_closings: [{ key: { pharmacy_id: 1, business_date: -1 } }],
-  notifications: [{ key: { pharmacy_id: 1, created_at: -1 } }, { key: { pharmacy_id: 1, type: 1, is_read: 1 } }],
+  notifications: [{ key: { pharmacy_id: 1, created_at: -1 } }, { key: { pharmacy_id: 1, type: 1, is_read: 1 } }, { key: { pharmacy_id: 1, audience: 1, created_at: -1 } }],
   activity_logs: [{ key: { pharmacy_id: 1, created_at: -1 } }],
   audit_logs: [{ key: { pharmacy_id: 1, sequence: 1 }, unique: true }],
   security_events: [{ key: { user_id: 1, type: 1, created_at: -1 } }, { key: { pharmacy_id: 1, created_at: -1 } }],
@@ -67,7 +69,10 @@ const INDEXES: Record<string, IndexDescription[]> = {
     { key: { status: 1, next_attempt_at: 1 } }, { key: { pharmacy_id: 1, created_at: -1 } },
     { key: { notice_key: 1 }, unique: true, partialFilterExpression: { notice_key: { $type: 'string' } } }
   ],
-  support_tickets: [{ key: { reference: 1 }, unique: true }, { key: { pharmacy_id: 1, last_activity_at: -1 } }, { key: { status: 1, last_activity_at: -1 } }]
+  support_tickets: [
+    { key: { reference: 1 }, unique: true }, { key: { pharmacy_id: 1, last_activity_at: -1 } }, { key: { status: 1, last_activity_at: -1 } },
+    { key: { assigned_to: 1, status: 1 } }
+  ]
 };
 
 export async function ensureIndexes(): Promise<void> {

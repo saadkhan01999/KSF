@@ -19,7 +19,9 @@ interface Person {
 
 export default function HelpQueue() {
   const navigate = useNavigate();
-  const { enterSupport, ok, fail } = useApp();
+  const { enterSupport, ok, fail, can, user } = useApp();
+  /* Fixing somebody's sign-in happens inside their pharmacy. */
+  const entersPharmacies = can('platform.pharmacies.enter');
   const { data, loading, reload } = useApiData<{ data: HelpItem[]; checkedAt: string }>('/platform/help');
   const [term, setTerm] = useState('');
   const search = useDebounced(term);
@@ -28,7 +30,7 @@ export default function HelpQueue() {
   const fix = async (pharmacyId: string, pharmacyName: string | undefined) => {
     try {
       await enterSupport(pharmacyId);
-      ok(`Working inside ${pharmacyName ?? 'the pharmacy'}`, 'Use Staff › Who needs help to fix it. Everything is recorded as Super Admin (support).');
+      ok(`Working inside ${pharmacyName ?? 'the pharmacy'}`, `Use Staff › Who needs help to fix it. Everything is recorded ${user?.isPlatformAdmin ? 'as Super Admin (support)' : 'under your name, as the KSF team'}.`);
       navigate('/staff');
     } catch (problem) {
       fail(problem);
@@ -74,7 +76,7 @@ export default function HelpQueue() {
                               {person.locked_until && new Date(person.locked_until) > new Date() && <Badge tone="danger" dot={false}>Locked</Badge>}
                               <div className="cell-sub">{person.last_login_at ? `signed in ${ago(person.last_login_at)}` : 'never signed in'}</div>
                             </td>
-                            <td data-label="Actions"><div className="row-actions"><Button size="sm" variant="outline" icon={<LogIn size={15} />} onClick={() => { void fix(person.pharmacy_id, person.pharmacy_name); }}>Help inside</Button></div></td>
+                            <td data-label="Actions"><div className="row-actions">{entersPharmacies && <Button size="sm" variant="outline" icon={<LogIn size={15} />} onClick={() => { void fix(person.pharmacy_id, person.pharmacy_name); }}>Help inside</Button>}</div></td>
                           </tr>
                         ))}
                       </tbody>
@@ -98,9 +100,9 @@ export default function HelpQueue() {
                     {data.data.map((item) => (
                       <tr key={`${item.pharmacyId}:${item.id}`}>
                         <td className="cell-title"><div className="row-tight"><UserRound size={15} /><span className="cell-main">{item.name}</span></div><div className="cell-sub">{item.role} · {ago(item.at)}</div></td>
-                        <td data-label="Pharmacy"><button className="link-button" onClick={() => navigate(`/platform/pharmacies/${item.pharmacyId}`)}>{item.pharmacyName}</button></td>
+                        <td data-label="Pharmacy">{can('platform.pharmacies.view') ? <button className="link-button" onClick={() => navigate(`/platform/pharmacies/${item.pharmacyId}`)}>{item.pharmacyName}</button> : item.pharmacyName}</td>
                         <td data-label="Problem"><Badge tone="warn" dot={false}>{item.title}</Badge><div className="cell-sub">{item.detail}</div></td>
-                        <td data-label="Actions"><div className="row-actions"><Button size="sm" variant="primary" icon={<LogIn size={15} />} onClick={() => { void fix(item.pharmacyId, item.pharmacyName); }}>Fix it</Button></div></td>
+                        <td data-label="Actions"><div className="row-actions">{entersPharmacies && <Button size="sm" variant="primary" icon={<LogIn size={15} />} onClick={() => { void fix(item.pharmacyId, item.pharmacyName); }}>Fix it</Button>}</div></td>
                       </tr>
                     ))}
                   </tbody>

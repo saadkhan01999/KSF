@@ -16,12 +16,17 @@ import { nowIso, randomUUID } from './util.js';
 import type { Ctx } from '../http/context.js';
 
 type TrailCtx = Pick<Ctx, 'pharmacyId' | 'ip' | 'userAgent'> & {
-  user: { id: string; full_name: string; role_name?: string } | null;
+  user: { id: string; full_name: string; role_name?: string; is_platform_staff?: 0 | 1 } | null;
   supportMode?: boolean;
 };
 
-const actorRole = (ctx: TrailCtx): string =>
-  ctx.supportMode ? 'Super Admin (support)' : ctx.user?.role_name ?? 'System';
+/* Somebody from KSF is always named as KSF in a pharmacy's records: the
+   Super Admin, or a team member with their role, and "(support)" when they
+   acted inside the pharmacy. */
+const actorRole = (ctx: TrailCtx): string => {
+  if (ctx.user?.is_platform_staff) return `KSF team: ${ctx.user.role_name ?? 'member'}${ctx.supportMode ? ' (support)' : ''}`;
+  return ctx.supportMode ? 'Super Admin (support)' : ctx.user?.role_name ?? 'System';
+};
 
 export async function logActivity(ctx: TrailCtx, entry: {
   action: string; entity?: string | null; entityId?: string | null; summary?: string | null;
@@ -126,14 +131,22 @@ export async function securityEvent(event: {
   });
 }
 
+/**
+ * A notice. For a pharmacy, everybody in it sees it (or just `userId`). For
+ * the platform (pharmacyId null) the Super Admin sees it, and so does every
+ * team member whose role holds `audience` — or just `userId`, when it is
+ * addressed to one person. `audience: 'owner'` is for the Super Admin alone.
+ */
 export async function notify(pharmacyId: string | null, note: {
   type: string; title: string; body?: string | null; severity?: string; link?: string | null; userId?: string | null;
+  audience?: string | null;
 }): Promise<void> {
   const id = randomUUID();
   await col.notifications().insertOne({
     _id: id, id, pharmacy_id: pharmacyId, user_id: note.userId ?? null, type: note.type,
     severity: note.severity ?? 'info', title: note.title, body: note.body ?? null, link: note.link ?? null,
-    is_read: 0, created_at: nowIso()
+    is_read: 0, created_at: nowIso(),
+    ...(pharmacyId === null ? { audience: note.audience ?? 'owner', read_by: [] } : {})
   }, s());
 }
 

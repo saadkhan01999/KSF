@@ -269,6 +269,135 @@ describe('KSF API', { skip }, () => {
     });
   });
 
+  describe('the Super Admin\'s team', () => {
+    const PHOTO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const ALI = { email: 'ali@ksf.test', password: 'HelpDesk#Ali2026' };
+    let ali;
+    let finance;
+
+    it('builds team roles from exactly what is ticked, and nothing a role cannot hold', async () => {
+      await admin.post('/api/v1/platform/team/roles', { name: 'Nothing', permissions: [] }, 400);
+      await admin.post('/api/v1/platform/team/roles', { name: 'Sneaky', permissions: ['platform.team.manage', 'staff.manage'] }, 400);
+      const desk = (await admin.post('/api/v1/platform/team/roles', { name: 'Help desk', permissions: ['platform.support', 'platform.help', 'platform.pharmacies.enter'] }, 201)).data;
+      assert.deepEqual(desk.permissions, ['platform.pharmacies.view', 'platform.pharmacies.enter', 'platform.support', 'platform.help']);
+      await admin.post('/api/v1/platform/team/roles', { name: '  help   DESK ', permissions: ['platform.support'] }, 400);
+      const money = (await admin.post('/api/v1/platform/team/roles', { name: 'Finance', permissions: ['platform.finance.manage'] }, 201)).data;
+      assert.deepEqual(money.permissions, ['platform.finance.view', 'platform.finance.manage']);
+      state.deskRole = desk.id;
+      state.financeRole = money.id;
+    });
+
+    it('adds a member with their own e-mail and photo, who sees only what the role allows', async () => {
+      await admin.post('/api/v1/platform/team', { fullName: 'Ali Raza', email: ALI.email, roleId: state.deskRole, password: 'weak' }, 400);
+      await admin.post('/api/v1/platform/team', { fullName: 'Ali Raza', email: ALI.email, roleId: state.deskRole, password: ALI.password, image: 'data:image/png;base64,PHN2Zz48L3N2Zz4=' }, 400);
+      await admin.post('/api/v1/platform/team', { fullName: 'Ali Raza', email: 'superadmin@ksf.test', roleId: state.deskRole, password: ALI.password }, 400);
+      const added = (await admin.post('/api/v1/platform/team', { fullName: 'Ali Raza', email: ALI.email, jobTitle: 'Support lead', roleId: state.deskRole, password: ALI.password, image: PHOTO }, 201)).data;
+      assert.equal(added.role_name, 'Help desk');
+      assert.match(added.avatar_url, /^\/api\/v1\/avatars\/AV/);
+      state.aliId = added.id;
+
+      const photo = await fetch(server.base + added.avatar_url);
+      assert.equal(photo.status, 200);
+      assert.equal(photo.headers.get('content-type'), 'image/png');
+      assert.equal((await fetch(`${server.base}/api/v1/avatars/AVnot-a-real-photo-id-123`)).status, 404);
+
+      ali = new Client(server.base);
+      const reply = await ali.signIn(ALI.email, ALI.password);
+      assert.equal(reply.user.isPlatformStaff, true);
+      assert.equal(reply.user.isPlatformAdmin, false);
+      assert.equal(reply.user.roleName, 'Help desk');
+      assert.equal(reply.user.mustChangePassword, true);
+      assert.ok(reply.user.permissions.includes('platform.support'));
+      assert.equal((await ali.get('/api/v1/bootstrap')).platform, true);
+
+      await ali.get('/api/v1/platform/support/tickets');
+      await ali.get('/api/v1/platform/pharmacies');
+      await ali.get('/api/v1/platform/overview', 403);
+      await ali.get('/api/v1/platform/income', 403);
+      await ali.post(`/api/v1/platform/pharmacies/${state.pharmacyId}/subscription`, { extendDays: 30 }, 403);
+      await ali.get('/api/v1/platform/team', 403);
+      await ali.post('/api/v1/platform/team/roles', { name: 'Mine', permissions: ['platform.overview'] }, 403);
+      await ali.patch(`/api/v1/platform/team/${state.aliId}`, { roleId: state.financeRole }, 403);
+      await owner.get('/api/v1/platform/team', 403);
+    });
+
+    it('sends a pharmacy\'s request to the desk, and tells the Super Admin who resolved it', async () => {
+      const ticket = (await cashier.post('/api/v1/support/tickets', { subject: 'Cannot print the day close', category: 'technical', body: 'The button does nothing.' }, 201)).data;
+      assert.ok((await ali.get('/api/v1/platform/notifications')).data.some((row) => row.link === `/platform/support/${ticket.id}`));
+
+      const agents = (await admin.get('/api/v1/platform/support/agents')).data.map((row) => row.name);
+      assert.ok(agents.includes('Ali Raza'));
+      await admin.patch(`/api/v1/platform/support/tickets/${ticket.id}`, { assignedTo: state.cashierId }, 400);
+      const given = (await admin.patch(`/api/v1/platform/support/tickets/${ticket.id}`, { assignedTo: state.aliId })).data;
+      assert.equal(given.assigned_to_name, 'Ali Raza');
+      assert.ok((await ali.get('/api/v1/platform/support/tickets?assignee=me')).data.some((row) => row.id === ticket.id));
+      assert.ok((await ali.get('/api/v1/platform/notifications')).data.some((row) => row.title.includes('gave you')));
+
+      await ali.post(`/api/v1/platform/support/tickets/${ticket.id}/messages`, { body: 'Fixed: the printer queue was stuck.', status: 'resolved' }, 201);
+      const seenByPharmacy = (await cashier.get(`/api/v1/support/tickets/${ticket.id}`)).data;
+      assert.equal(seenByPharmacy.status, 'resolved');
+      assert.equal(seenByPharmacy.messages.at(-1).author_name, 'KSF Support');
+      assert.equal(seenByPharmacy.messages.at(-1).agent_name, undefined);
+      assert.equal(seenByPharmacy.resolved_by_name, undefined);
+
+      const seenByDesk = (await admin.get(`/api/v1/platform/support/tickets/${ticket.id}`)).data;
+      assert.equal(seenByDesk.resolved_by_name, 'Ali Raza');
+      assert.equal(seenByDesk.messages.at(-1).agent_name, 'Ali Raza');
+      assert.ok((await admin.get('/api/v1/platform/notifications')).data.some((row) => row.title === `Ali Raza resolved ${ticket.reference}`));
+      assert.ok(JSON.stringify(await owner.get('/api/v1/activity')).includes('KSF team: Help desk'));
+    });
+
+    it('lets each person read their own notices', async () => {
+      const before = (await admin.get('/api/v1/platform/notifications')).counts.unread;
+      await ali.post('/api/v1/platform/notifications/read-all', {});
+      assert.equal((await ali.get('/api/v1/platform/notifications')).counts.unread, 0);
+      assert.equal((await admin.get('/api/v1/platform/notifications')).counts.unread, before);
+    });
+
+    it('works inside a pharmacy only when the role allows it', async () => {
+      ali.pharmacyId = state.pharmacyId;
+      assert.equal((await ali.get('/api/v1/staff')).data.length, 2);
+      await ali.post('/api/v1/roles', { name: 'Made By The Desk', permissions: ['dashboard.view'] });
+      ali.pharmacyId = '';
+      assert.ok(JSON.stringify(await owner.get('/api/v1/activity')).includes('KSF team: Help desk (support)'));
+
+      await admin.post('/api/v1/platform/team', { fullName: 'Sara Finance', email: 'sara@ksf.test', roleId: state.financeRole, password: ALI.password }, 201);
+      finance = new Client(server.base);
+      await finance.signIn('sara@ksf.test', ALI.password);
+      await finance.get('/api/v1/platform/income');
+      await finance.get('/api/v1/platform/support/tickets', 403);
+      finance.pharmacyId = state.pharmacyId;
+      const refused = await finance.call('GET', '/api/v1/staff');
+      assert.equal(refused.status, 403);
+      assert.equal(refused.body.code, 'support_mode_forbidden');
+      finance.pharmacyId = '';
+    });
+
+    it('never reaches past the team: not the Super Admin, not a pharmacy\'s people', async () => {
+      const superId = (await admin.get('/api/v1/auth/session')).user.id;
+      await admin.patch(`/api/v1/platform/team/${superId}`, { status: 'suspended' }, 404);
+      await admin.patch(`/api/v1/platform/team/${state.cashierId}`, { status: 'suspended' }, 404);
+      await admin.post(`/api/v1/platform/team/${state.cashierId}/reset-password`, { password: ALI.password }, 404);
+    });
+
+    it('applies a change of role, a suspension and a removal on the very next request', async () => {
+      await admin.patch(`/api/v1/platform/team/roles/${state.deskRole}`, { permissions: ['platform.help'] });
+      await ali.get('/api/v1/platform/support/tickets', 403);
+      await ali.get('/api/v1/platform/help');
+
+      await admin.delete(`/api/v1/platform/team/roles/${state.deskRole}`, {}, 409);
+      await admin.patch(`/api/v1/platform/team/${state.aliId}`, { status: 'suspended' });
+      assert.equal((await ali.call('GET', '/api/v1/platform/help')).status, 401);
+      const refused = await new Client(server.base).call('POST', '/api/v1/auth/login', ALI);
+      assert.deepEqual([refused.status, refused.body.code], [403, 'account_suspended']);
+      assert.match(refused.body.message, /KSF Super Admin/);
+
+      await admin.delete(`/api/v1/platform/team/${state.aliId}`);
+      assert.equal((await admin.get('/api/v1/platform/team')).data.some((row) => row.id === state.aliId), false);
+      await admin.delete(`/api/v1/platform/team/roles/${state.deskRole}`);
+    });
+  });
+
   describe('data import', () => {
     it('validates, imports, reconciles and rolls back exactly what it created', async () => {
       const csv = 'Medicine name,Retail price (Rs),Cost price (Rs),Category\nBrufen 400mg,45,32,Painkillers\nFlagyl 400mg,30,21,Antibiotics\nBroken,abc,1,\n';

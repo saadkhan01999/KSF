@@ -917,3 +917,9 @@
   .setup-banner-bar { grid-column: 1 / -1; flex-basis: auto; }
   .setup-banner .btn { grid-column: 1 / -1; justify-content: center; }
 }
+
+/* =============================== MY TEAM =============================== */
+/* What a team role may do, one line each, ticked. */
+.team-perm-list { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; }
+.team-perm-list li { display: flex; align-items: flex-start; gap: 8px; font-size: var(--fs-sm); color: var(--text-soft); line-height: 1.45; }
+.team-perm-list li svg { flex: none; margin-top: 3px; color: var(--brand-600); }

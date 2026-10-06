@@ -36,6 +36,7 @@ import {
 import { approximate, publicDevice, registerDevice, revokeDevice } from '../security/devices.js';
 import { issueCode, PURPOSES, verifyCode } from '../security/otp.js';
 import { sendMail, templates } from '../services/mailer.js';
+import { avatarUrl } from '../services/avatars.js';
 import { subscriptionState } from '../services/subscriptions.js';
 import { refreshStockAlerts } from './shared.js';
 import { DEFAULT_THEME, THEME_KEYS } from '../domain/permissions.js';
@@ -70,7 +71,8 @@ export async function publicUser(user: AuthUser, permissions: Set<string>, extra
     id: user.id, fullName: user.full_name, email: user.email, phone: user.phone, cnic: user.cnic,
     pharmacistRegNo: user.pharmacist_reg_no, roleKey: user.role_key, roleName: user.role_name, roleLevel: user.role_level,
     branchId: user.branch_id, branchName: branch?.name ?? null, pharmacyId, pharmacyName: pharmacy?.name ?? null,
-    status: user.status, isOwner: !!user.is_owner, isPlatformAdmin: !!user.is_platform_admin, supportMode: !!extra.supportMode,
+    status: user.status, isOwner: !!user.is_owner, isPlatformAdmin: !!user.is_platform_admin, isPlatformStaff: !!user.is_platform_staff,
+    jobTitle: user.job_title ?? null, avatarUrl: avatarUrl(user.avatar_id), supportMode: !!extra.supportMode,
     mustChangePassword: !!user.must_change_password, emailVerified: !!user.email_verified_at,
     twoFactorEnabled: !!user.totp_enabled, lastLoginAt: user.last_login_at, theme: user.theme ?? null,
     permissions: [...permissions]
@@ -87,7 +89,11 @@ const when = () => new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi'
 /** The password and any second factor are right: device, session, trails. */
 async function completeSignIn(ctx: Ctx, user: User, method: string) {
   const loaded = await loadAuthUser(user.id);
-  if (!loaded) throw new HttpError(403, 'This account has no role. Please contact your pharmacy Admin.');
+  if (!loaded) {
+    throw new HttpError(403, user.is_platform_staff
+      ? 'This account has no team role. Please ask the KSF Super Admin.'
+      : 'This account has no role. Please contact your pharmacy Admin.');
+  }
 
   const registration = await registerDevice({
     pharmacyId: user.pharmacy_id, userId: user.id, userAgent: ctx.userAgent, ip: ctx.ip,
@@ -185,7 +191,9 @@ publicRoute('POST', '/api/v1/auth/login', async (ctx) => {
     countFailure();
     await recordAttempt(email, ctx.ip, false);
     await securityEvent({ pharmacyId: account.pharmacy_id, userId: account.id, emailHint: email, type: 'auth.suspended', severity: 'warn', outcome: 'blocked', ip: ctx.ip, userAgent: ctx.userAgent });
-    throw new HttpError(403, 'This account has been suspended. Please contact your pharmacy Admin.', undefined, 'account_suspended');
+    throw new HttpError(403, account.is_platform_staff
+      ? 'This account has been suspended. Please contact the KSF Super Admin.'
+      : 'This account has been suspended. Please contact your pharmacy Admin.', undefined, 'account_suspended');
   }
 
   const check = await verifyPassword(password, account.password_hash);
@@ -403,9 +411,9 @@ accountRoute('PATCH', '/api/v1/me', async (ctx) => {
   if (ctx.body.theme !== undefined) {
     const theme = toStr(ctx.body.theme, 40);
     if (theme && !THEME_KEYS.includes(theme)) bad('That theme does not exist.', 'theme');
-    /* The Super Admin and a pharmacy Admin always choose; anyone else needs
-       the permission their Admin gave their role. */
-    if (!ctx.isPlatformAdmin && !ctx.can('appearance.theme') && !ctx.can('settings.write')) {
+    /* The Super Admin, their team and a pharmacy Admin always choose; anyone
+       else needs the permission their Admin gave their role. */
+    if (!ctx.isPlatformAdmin && !ctx.isPlatformStaff && !ctx.can('appearance.theme') && !ctx.can('settings.write')) {
       throw new HttpError(403, 'Your role cannot change the theme. Ask your pharmacy Admin.');
     }
     update.theme = theme || null;
@@ -449,6 +457,6 @@ accountRoute('POST', '/api/v1/me/email/confirm', async (ctx) => {
 
 /** The theme a person sees: their own if they may choose, else the pharmacy's. */
 export async function effectiveTheme(user: AuthUser, permissions: Set<string>, pharmacyTheme: string | null): Promise<string> {
-  const mayChoose = !!user.is_platform_admin || permissions.has('appearance.theme') || permissions.has('settings.write');
+  const mayChoose = !!user.is_platform_admin || !!user.is_platform_staff || permissions.has('appearance.theme') || permissions.has('settings.write');
   return (mayChoose && user.theme) || pharmacyTheme || DEFAULT_THEME;
 }

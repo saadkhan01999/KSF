@@ -194,3 +194,35 @@ describe('deployment settings', () => {
     assert.deepEqual(databaseHint(new Error('something else')), []);
   });
 });
+
+describe('the platform team', () => {
+  it('keeps only grantable permissions, with what they depend on', async () => {
+    const { normalisePlatformPermissions, TEAM_MANAGE } = await import('../backend/src/domain/platform.ts');
+    assert.deepEqual(normalisePlatformPermissions(['platform.finance.manage', 'staff.manage', TEAM_MANAGE, 'nonsense']), ['platform.finance.view', 'platform.finance.manage']);
+    assert.deepEqual(normalisePlatformPermissions('platform.support'), []);
+  });
+
+  it('lets the Super Admin do anything and a member only what the role holds', async () => {
+    const { platformAllows } = await import('../backend/src/domain/platform.ts');
+    const owner = { isPlatformAdmin: true, isPlatformStaff: false, platformPermissions: new Set() };
+    const desk = { isPlatformAdmin: false, isPlatformStaff: true, platformPermissions: new Set(['platform.support']) };
+    const pharmacy = { isPlatformAdmin: false, isPlatformStaff: false, platformPermissions: new Set(['platform.support']) };
+    assert.equal(platformAllows(owner, 'owner'), true);
+    assert.equal(platformAllows(desk, 'owner'), false);
+    assert.equal(platformAllows(desk, 'any'), true);
+    assert.equal(platformAllows(desk, 'platform.support'), true);
+    assert.equal(platformAllows(desk, ['platform.help', 'platform.support']), true);
+    assert.equal(platformAllows(desk, 'platform.finance.view'), false);
+    assert.equal(platformAllows(pharmacy, 'any'), false);
+  });
+
+  it('accepts a real photo and refuses anything pretending to be one', async () => {
+    const { readImage } = await import('../backend/src/services/avatars.ts');
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    assert.equal(readImage(png).type, 'image/png');
+    assert.equal(readImage(png.replace('image/png', 'image/jpeg')).type, 'image/png');
+    assert.throws(() => readImage('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='));
+    assert.throws(() => readImage('data:image/png;base64,PHN2Zz48L3N2Zz4='));
+    assert.throws(() => readImage(`data:image/jpeg;base64,${'A'.repeat(500_000)}`));
+  });
+});

@@ -176,6 +176,8 @@ export const col = {
   migrationItems: c<T.MigrationItem>('migration_items'),
   mailDeliveries: c<T.MailDelivery>('mail_deliveries'),
   supportTickets: c<T.SupportTicket>('support_tickets'),
+  platformRoles: c<T.PlatformRole>('platform_roles'),
+  avatars: c<T.Avatar>('avatars'),
 
   /** A collection chosen at run time — only the importer and its rollback need this. */
   raw: (name: string): Collection<Document & { _id: string }> => db().collection<Document & { _id: string }>(name)
