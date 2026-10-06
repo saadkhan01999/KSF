@@ -14,6 +14,7 @@ import { PASSWORD_MIN_LENGTH } from '../security/password.js';
 import { accountRoute, route } from '../http/router.js';
 import { DISCOUNT_REASONS, onHandMap, pageResult, paging, refreshStockAlerts } from './shared.js';
 import { effectiveTheme } from './auth.js';
+import { unreadPlatformNotices } from '../core/platform-notices.js';
 
 const permissionCatalogue = PERMISSIONS.map(([key, label, group]) => ({ key, label, group }));
 const discountReasons = Object.entries(DISCOUNT_REASONS).map(([value, label]) => ({ value, label }));
@@ -21,8 +22,8 @@ const discountReasons = Object.entries(DISCOUNT_REASONS).map(([value, label]) =>
 /* =============================== BOOTSTRAP ===============================
    One call after sign-in that gives the web app everything it needs to draw
    itself: the pharmacy, its branches, the settings, the theme and the badge
-   counts. The platform Super Admin, outside a pharmacy, gets the platform
-   workspace instead. */
+   counts. The platform Super Admin and their team, outside a pharmacy, get
+   the platform workspace instead, with the badges their role may see. */
 accountRoute('GET', '/api/v1/bootstrap', async (ctx) => {
   const common = {
     permissionCatalogue, passwordMinLength: PASSWORD_MIN_LENGTH, discountReasons, version: VERSION,
@@ -30,10 +31,13 @@ accountRoute('GET', '/api/v1/bootstrap', async (ctx) => {
   };
 
   if (!ctx.pharmacyId) {
+    const may = (key: string) => ctx.isPlatformAdmin || ctx.platformPermissions.has(key);
     const [openTickets, pharmacies, notifications] = await Promise.all([
-      col.supportTickets().countDocuments({ status: { $in: ['open', 'in_progress'] } }),
-      col.pharmacies().countDocuments({}),
-      col.notifications().countDocuments({ pharmacy_id: null, is_read: 0 })
+      may('platform.support') ? col.supportTickets().countDocuments({ status: { $in: ['open', 'in_progress'] } }) : 0,
+      may('platform.pharmacies.view') ? col.pharmacies().countDocuments({}) : 0,
+      ctx.isPlatformAdmin || ctx.isPlatformStaff
+        ? col.notifications().countDocuments(unreadPlatformNotices({ userId: ctx.user.id, isPlatformAdmin: ctx.isPlatformAdmin, platformPermissions: ctx.platformPermissions }))
+        : 0
     ]);
     return {
       ...common, platform: true, pharmacy: null, branches: [], settings: {},

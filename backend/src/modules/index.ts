@@ -16,3 +16,4 @@ import './setup.js';
 import './migrate.js';
 import './support.js';
 import './platform.js';
+import './team.js';

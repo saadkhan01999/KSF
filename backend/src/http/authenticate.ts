@@ -17,19 +17,34 @@
    support mode with the X-Pharmacy-Id header; inside it they hold every
    pharmacy permission, and everything they do is logged as "Super Admin
    (support)".
+
+   A member of the Super Admin's team belongs to no pharmacy either. Their
+   platform role is read fresh on every request like a pharmacy role, so a
+   change of role applies at once. They may open a pharmacy in support mode
+   only if the role holds platform.pharmacies.enter, and what they do there
+   is logged under their own name and "KSF team".
    ========================================================================== */
 
 import type { Request } from 'express';
 import { col } from '../db/mongo.js';
 import type { Pharmacy, Session } from '../db/types.js';
 import { PERMISSION_KEYS } from '../domain/permissions.js';
+import { PLATFORM_PERMISSION_KEYS, TEAM_MANAGE } from '../domain/platform.js';
 import { liveSession, revokeSession, touchSession, verifyAccessToken } from '../security/sessions.js';
 import type { AuthUser } from './context.js';
 
 export const PLATFORM_ROLE = { key: 'super-admin', name: 'Super Admin', level: 1000 } as const;
+/** Every team member's role key; the role's own name is what people read. */
+export const PLATFORM_TEAM_ROLE = { key: 'platform-team', level: 500 } as const;
+
+/** Everything the Super Admin may do in the platform console. */
+const SUPER_ADMIN_PLATFORM = new Set([...PLATFORM_PERMISSION_KEYS, TEAM_MANAGE]);
 
 export type AuthOutcome =
-  | { ok: true; user: AuthUser; session: Session; permissions: Set<string>; pharmacyId: string | null; supportMode: boolean; isPlatformAdmin: boolean }
+  | {
+    ok: true; user: AuthUser; session: Session; permissions: Set<string>; platformPermissions: Set<string>;
+    pharmacyId: string | null; supportMode: boolean; isPlatformAdmin: boolean; isPlatformStaff: boolean;
+  }
   | { ok: false; status: number; code: string; message: string };
 
 const SESSION_ENDED = { ok: false as const, status: 401, code: 'session_expired', message: 'Your session has ended. Please sign in again.' };
@@ -47,14 +62,27 @@ async function pharmacyStatus(pharmacyId: string): Promise<Pharmacy['status'] | 
   return row.status;
 }
 
-/** Load a person with their role flattened on, or null. */
+/**
+ * Load a person with their role flattened on, or null. `permissions` is what
+ * they may do where they work: inside their pharmacy, or — for the Super
+ * Admin and the team — in the platform console.
+ */
 export async function loadAuthUser(userId: string): Promise<{ user: AuthUser; permissions: Set<string> } | null> {
   const user = await col.users().findOne({ _id: userId });
   if (!user) return null;
   if (user.is_platform_admin) {
     return {
       user: { ...user, role_key: PLATFORM_ROLE.key, role_name: PLATFORM_ROLE.name, role_level: PLATFORM_ROLE.level, role_is_system: 1 },
-      permissions: new Set<string>()
+      permissions: new Set(SUPER_ADMIN_PLATFORM)
+    };
+  }
+  if (user.is_platform_staff) {
+    const role = user.platform_role_id ? await col.platformRoles().findOne({ _id: user.platform_role_id }) : null;
+    if (!role) return null;
+    return {
+      user: { ...user, role_key: PLATFORM_TEAM_ROLE.key, role_name: role.name, role_level: PLATFORM_TEAM_ROLE.level, role_is_system: 0 },
+      /* Only keys a role may hold: a stored key that is not one is ignored. */
+      permissions: new Set(role.permissions.filter((key) => PLATFORM_PERMISSION_KEYS.includes(key)))
     };
   }
   const role = user.role_id ? await col.roles().findOne({ _id: user.role_id }) : null;
@@ -95,10 +123,16 @@ export async function authenticate(req: Request, ip: string): Promise<AuthOutcom
   let pharmacyId = user.pharmacy_id;
   let supportMode = false;
   const isPlatformAdmin = !!user.is_platform_admin;
+  const isPlatformStaff = !isPlatformAdmin && !!user.is_platform_staff;
+  /* Kept apart from `permissions`, which becomes the pharmacy's in support mode. */
+  const platformPermissions = isPlatformAdmin || isPlatformStaff ? new Set(permissions) : new Set<string>();
 
-  if (isPlatformAdmin) {
+  if (isPlatformAdmin || isPlatformStaff) {
     const requested = String(req.headers['x-pharmacy-id'] ?? '').trim();
     if (requested) {
+      if (isPlatformStaff && !platformPermissions.has('platform.pharmacies.enter')) {
+        return { ok: false, status: 403, code: 'support_mode_forbidden', message: 'Your team role does not include working inside a pharmacy.' };
+      }
       if (!(await pharmacyStatus(requested))) {
         return { ok: false, status: 404, code: 'pharmacy_not_found', message: 'That pharmacy could not be found.' };
       }
@@ -117,5 +151,5 @@ export async function authenticate(req: Request, ip: string): Promise<AuthOutcom
   }
 
   await touchSession(session, ip);
-  return { ok: true, user, session, permissions, pharmacyId, supportMode, isPlatformAdmin };
+  return { ok: true, user, session, permissions, platformPermissions, pharmacyId, supportMode, isPlatformAdmin, isPlatformStaff };
 }

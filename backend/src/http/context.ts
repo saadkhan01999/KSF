@@ -22,7 +22,12 @@ export interface Ctx {
   pharmacyId: string | null;
   permissions: Set<string>;
   isPlatformAdmin: boolean;
-  /** The Super Admin acting inside one pharmacy. */
+  /** A member of the Super Admin's team, holding a platform role. */
+  isPlatformStaff: boolean;
+  /** What this person may do in the platform console — every key for the
+      Super Admin, their role's keys for a team member, none for a pharmacy. */
+  platformPermissions: Set<string>;
+  /** The Super Admin, or a team member, acting inside one pharmacy. */
   supportMode: boolean;
 
   can(permission: string): boolean;

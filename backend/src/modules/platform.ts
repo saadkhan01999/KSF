@@ -11,7 +11,8 @@
    (support)".
 
    Every route here is platformRoute: refused for anybody who is not the
-   platform Super Admin, whatever the browser sends.
+   Super Admin or a member of their team holding the permission the route
+   names, whatever the browser sends.
    ========================================================================== */
 
 import type { Document, Filter } from 'mongodb';
@@ -19,6 +20,7 @@ import { col } from '../db/mongo.js';
 import type { Pharmacy, Plan, SubscriptionPayment } from '../db/types.js';
 import { bad, missing } from '../core/errors.js';
 import { auditLog, logActivity, notify } from '../core/trails.js';
+import { asRead, platformNotices, unreadPlatformNotices } from '../core/platform-notices.js';
 import { addDays, contains, nowIso, slugify, startOfMonth, today, toInt, toStr } from '../core/util.js';
 import { lookupField, monthOf } from '../db/pipeline.js';
 import { platformRoute, type SignedInCtx } from '../http/router.js';
@@ -35,7 +37,10 @@ const n = (row: Document | undefined, key: string): number => Number(row?.[key] 
 
 /** Trails written into a pharmacy's own logs, by the platform. */
 const trailFor = (ctx: SignedInCtx, pharmacyId: string) => ({ pharmacyId, user: ctx.user, ip: ctx.ip, userAgent: ctx.userAgent });
-const actorOf = (ctx: SignedInCtx): PaymentActor => ({ id: ctx.user.id, full_name: ctx.user.full_name, role_name: 'Super Admin', ip: ctx.ip, userAgent: ctx.userAgent });
+const actorOf = (ctx: SignedInCtx): PaymentActor => ({
+  id: ctx.user.id, full_name: ctx.user.full_name, role_name: ctx.isPlatformStaff ? `KSF team: ${ctx.user.role_name}` : 'Super Admin', ip: ctx.ip, userAgent: ctx.userAgent
+});
+const reader = (ctx: SignedInCtx) => ({ userId: ctx.user.id, isPlatformAdmin: ctx.isPlatformAdmin, platformPermissions: ctx.platformPermissions });
 
 async function pharmacyOr404(id: unknown): Promise<Pharmacy> {
   const pharmacy = await col.pharmacies().findOne({ _id: toStr(id, 60) });
@@ -50,7 +55,7 @@ const incomeGroup = (): Document => ({
 const PAID: Filter<SubscriptionPayment> = { status: { $in: ['succeeded', 'refunded'] } };
 
 /* ================================ OVERVIEW ================================ */
-platformRoute('GET', '/api/v1/platform/overview', async () => {
+platformRoute('GET', '/api/v1/platform/overview', 'platform.overview', async () => {
   const now = today();
   const monthStart = startOfMonth(0);
   const lastMonthStart = startOfMonth(-1);
@@ -174,7 +179,7 @@ platformRoute('GET', '/api/v1/platform/overview', async () => {
 });
 
 /* ================================ PHARMACIES ================================ */
-platformRoute('GET', '/api/v1/platform/pharmacies', async (ctx) => {
+platformRoute('GET', '/api/v1/platform/pharmacies', 'platform.pharmacies.view', async (ctx) => {
   const { page, size, skip } = paging(ctx, 25);
   const search = toStr(ctx.query.get('q'), 80);
   const status = toStr(ctx.query.get('status'), 20);
@@ -227,7 +232,7 @@ platformRoute('GET', '/api/v1/platform/pharmacies', async (ctx) => {
   return { ...pageResult(rows, total, { page, size }), plans };
 });
 
-platformRoute('GET', '/api/v1/platform/pharmacies/:id', async (ctx) => {
+platformRoute('GET', '/api/v1/platform/pharmacies/:id', 'platform.pharmacies.view', async (ctx) => {
   const pharmacy = await pharmacyOr404(ctx.params.id);
   const id = pharmacy.id;
   const monthStart = startOfMonth(0);
@@ -278,7 +283,7 @@ platformRoute('GET', '/api/v1/platform/pharmacies/:id', async (ctx) => {
   };
 });
 
-platformRoute('PATCH', '/api/v1/platform/pharmacies/:id', async (ctx) => {
+platformRoute('PATCH', '/api/v1/platform/pharmacies/:id', 'platform.pharmacies.manage', async (ctx) => {
   const pharmacy = await pharmacyOr404(ctx.params.id);
   const body = ctx.body;
   const set: Partial<Pharmacy> = { updated_at: nowIso() };
@@ -313,7 +318,7 @@ platformRoute('PATCH', '/api/v1/platform/pharmacies/:id', async (ctx) => {
  * people out at once; nothing is deleted, and reactivating brings everything
  * back exactly as it was.
  */
-platformRoute('POST', '/api/v1/platform/pharmacies/:id/status', async (ctx) => {
+platformRoute('POST', '/api/v1/platform/pharmacies/:id/status', 'platform.pharmacies.manage', async (ctx) => {
   ctx.requireRecentVerification();
   const pharmacy = await pharmacyOr404(ctx.params.id);
   const status = toStr(ctx.body.status, 20) as Pharmacy['status'];
@@ -344,7 +349,7 @@ platformRoute('POST', '/api/v1/platform/pharmacies/:id/status', async (ctx) => {
  * plan), or extend the current period. Recorded in the pharmacy's audit
  * chain, so the pharmacy can see who changed its plan and why.
  */
-platformRoute('POST', '/api/v1/platform/pharmacies/:id/subscription', async (ctx) => {
+platformRoute('POST', '/api/v1/platform/pharmacies/:id/subscription', 'platform.pharmacies.manage', async (ctx) => {
   const pharmacy = await pharmacyOr404(ctx.params.id);
   const note = toStr(ctx.body.note, 300);
   const planKey = toStr(ctx.body.planKey, 30);
@@ -379,7 +384,7 @@ platformRoute('POST', '/api/v1/platform/pharmacies/:id/subscription', async (ctx
 });
 
 /** Money received outside a provider — cash at the office, a cheque — recorded against the subscription. */
-platformRoute('POST', '/api/v1/platform/pharmacies/:id/payments', async (ctx) => {
+platformRoute('POST', '/api/v1/platform/pharmacies/:id/payments', 'platform.finance.manage', async (ctx) => {
   const pharmacy = await pharmacyOr404(ctx.params.id);
   const subscription = await currentSubscription(pharmacy.id);
   if (!subscription) return bad('This pharmacy has no subscription to pay for.');
@@ -400,7 +405,7 @@ platformRoute('POST', '/api/v1/platform/pharmacies/:id/payments', async (ctx) =>
 });
 
 /* ================================== INCOME ================================== */
-platformRoute('GET', '/api/v1/platform/income', async (ctx) => {
+platformRoute('GET', '/api/v1/platform/income', 'platform.finance.view', async (ctx) => {
   const { page, size, skip } = paging(ctx, 50);
   const from = toStr(ctx.query.get('from'), 10) || startOfMonth(-11).slice(0, 10);
   const to = toStr(ctx.query.get('to'), 10) || today();
@@ -457,7 +462,7 @@ platformRoute('GET', '/api/v1/platform/income', async (ctx) => {
 });
 
 /* ================================ PAYMENTS ================================ */
-platformRoute('GET', '/api/v1/platform/payments/attempts', async (ctx) => {
+platformRoute('GET', '/api/v1/platform/payments/attempts', 'platform.finance.view', async (ctx) => {
   const status = toStr(ctx.query.get('status'), 20) || 'open';
   const match: Document = status === 'open' ? { status: { $in: ['created', 'pending'] } } : status === 'all' ? {} : { status };
   const rows = await col.paymentAttempts().aggregate([
@@ -470,7 +475,7 @@ platformRoute('GET', '/api/v1/platform/payments/attempts', async (ctx) => {
 });
 
 /* A bank transfer is confirmed by the platform, which can see its own bank statement. */
-platformRoute('POST', '/api/v1/platform/payments/attempts/:id/verify', async (ctx) => {
+platformRoute('POST', '/api/v1/platform/payments/attempts/:id/verify', 'platform.finance.manage', async (ctx) => {
   ctx.requireRecentVerification();
   const result = await verifyManualPayment({ attemptId: toStr(ctx.params.id, 60), statementReference: toStr(ctx.body.statementReference, 120), note: toStr(ctx.body.note, 200), actor: actorOf(ctx) });
   if (!result.ok) bad(result.reason ?? 'The transfer could not be confirmed.');
@@ -480,7 +485,7 @@ platformRoute('POST', '/api/v1/platform/payments/attempts/:id/verify', async (ct
   return { ok: true, duplicate: !!result.duplicate, message: result.duplicate ? 'That transfer had already been confirmed.' : 'The transfer has been confirmed and the subscription is active.' };
 });
 
-platformRoute('POST', '/api/v1/platform/payments/:id/refund', async (ctx) => {
+platformRoute('POST', '/api/v1/platform/payments/:id/refund', 'platform.finance.manage', async (ctx) => {
   ctx.requireRecentVerification();
   const result = await requestRefund({ paymentId: toStr(ctx.params.id, 60), amountPaisa: toInt(ctx.body.amountPaisa, 0), reason: toStr(ctx.body.reason, 200), actor: actorOf(ctx) });
   if (!result.ok) return bad(result.reason ?? 'The refund could not be made.');
@@ -491,7 +496,7 @@ platformRoute('POST', '/api/v1/platform/payments/:id/refund', async (ctx) => {
 });
 
 /* Mark a manual refund done once it has been made in the provider's portal. */
-platformRoute('POST', '/api/v1/platform/refunds/:id/complete', async (ctx) => {
+platformRoute('POST', '/api/v1/platform/refunds/:id/complete', 'platform.finance.manage', async (ctx) => {
   const refund = await col.paymentRefunds().findOneAndUpdate(
     { _id: toStr(ctx.params.id, 60), status: 'pending' },
     { $set: { status: 'completed', completed_at: nowIso(), provider_reference: toStr(ctx.body.reference, 120) || null } },
@@ -503,12 +508,12 @@ platformRoute('POST', '/api/v1/platform/refunds/:id/complete', async (ctx) => {
   return { data: refund };
 });
 
-platformRoute('POST', '/api/v1/platform/payments/reconcile', async () => ({ ok: true, ...(await reconcile({ limit: 200 })) }));
+platformRoute('POST', '/api/v1/platform/payments/reconcile', 'platform.finance.manage', async () => ({ ok: true, ...(await reconcile({ limit: 200 })) }));
 
 /* ================================== PLANS ================================== */
 const planOut = (row: Plan) => ({ ...planView(row), trialDays: row.trial_days });
 
-platformRoute('GET', '/api/v1/platform/plans', async () => {
+platformRoute('GET', '/api/v1/platform/plans', 'any', async () => {
   const [plans, usage] = await Promise.all([
     col.plans().find({}).sort({ sort_order: 1 }).toArray(),
     col.pharmacies().aggregate<{ _id: string; n: number }>([{ $group: { _id: '$plan_key', n: { $sum: 1 } } }]).toArray()
@@ -560,7 +565,7 @@ function planChanges(body: Record<string, any>, existing: Plan | null): Partial<
   return set;
 }
 
-platformRoute('POST', '/api/v1/platform/plans', async (ctx) => {
+platformRoute('POST', '/api/v1/platform/plans', 'platform.plans.manage', async (ctx) => {
   const key = slugify(toStr(ctx.body.key, 30) || toStr(ctx.body.name, 30));
   if (!key) bad('Give the plan a key, for example "clinic-annual".', 'key');
   if (await col.plans().findOne({ key })) bad('A plan with that key already exists.', 'key');
@@ -585,7 +590,7 @@ platformRoute('POST', '/api/v1/platform/plans', async (ctx) => {
 });
 
 /* A price change applies to new subscriptions and renewals; a pharmacy mid-period keeps what it paid for. */
-platformRoute('PATCH', '/api/v1/platform/plans/:key', async (ctx) => {
+platformRoute('PATCH', '/api/v1/platform/plans/:key', 'platform.plans.manage', async (ctx) => {
   const existing = await col.plans().findOne({ key: toStr(ctx.params.key, 30) });
   if (!existing) return missing('That plan could not be found.');
   const set = planChanges(ctx.body, existing);
@@ -597,7 +602,7 @@ platformRoute('PATCH', '/api/v1/platform/plans/:key', async (ctx) => {
 
 /* =================================== PEOPLE =================================== */
 /* Find anybody on the platform — the usual first step when somebody phones. */
-platformRoute('GET', '/api/v1/platform/users', async (ctx) => {
+platformRoute('GET', '/api/v1/platform/users', ['platform.help', 'platform.support'], async (ctx) => {
   const search = toStr(ctx.query.get('q'), 80);
   if (search.length < 2) return { data: [] };
   const pattern = contains(search);
@@ -612,7 +617,7 @@ platformRoute('GET', '/api/v1/platform/users', async (ctx) => {
 });
 
 /* Everybody stuck, in every pharmacy, in one queue. */
-platformRoute('GET', '/api/v1/platform/help', async (ctx) => {
+platformRoute('GET', '/api/v1/platform/help', 'platform.help', async (ctx) => {
   const pharmacies = await col.pharmacies().find({ status: 'active' }, { projection: { name: 1 } }).sort({ updated_at: -1 }).limit(500).toArray();
   const lists = await Promise.all(pharmacies.map(async (pharmacy) =>
     (await helpItems(pharmacy._id, { id: ctx.user.id, level: 10_000, top: true })).map((item) => ({ ...item, pharmacyName: pharmacy.name }))));
@@ -621,12 +626,12 @@ platformRoute('GET', '/api/v1/platform/help', async (ctx) => {
 });
 
 /* ================================ TRAILS ================================ */
-platformRoute('GET', '/api/v1/platform/activity', async (ctx) => {
+platformRoute('GET', '/api/v1/platform/activity', 'platform.activity', async (ctx) => {
   const { page, size, skip } = paging(ctx, 50);
   const match: Document = {};
   const pharmacyId = toStr(ctx.query.get('pharmacy'), 60);
   if (pharmacyId) match.pharmacy_id = pharmacyId;
-  if (ctx.query.get('platform') === 'true') match.actor_role = { $regex: '^Super Admin' };
+  if (ctx.query.get('platform') === 'true') match.actor_role = { $regex: '^(Super Admin|KSF team)' };
   const [rows, total] = await Promise.all([
     col.activityLogs().aggregate([{ $match: match }, { $sort: { created_at: -1 } }, { $skip: skip }, { $limit: size }, ...lookupField('pharmacies', 'pharmacy_id', 'name', 'pharmacy_name')]).toArray(),
     col.activityLogs().countDocuments(match)
@@ -634,7 +639,7 @@ platformRoute('GET', '/api/v1/platform/activity', async (ctx) => {
   return pageResult(rows, total, { page, size });
 });
 
-platformRoute('GET', '/api/v1/platform/security', async (ctx) => {
+platformRoute('GET', '/api/v1/platform/security', 'platform.activity', async (ctx) => {
   const { page, size, skip } = paging(ctx, 50);
   const match: Document = { severity: { $in: ['warn', 'danger'] } };
   if (ctx.query.get('all') === 'true') delete match.severity;
@@ -646,21 +651,23 @@ platformRoute('GET', '/api/v1/platform/security', async (ctx) => {
 });
 
 /* ============================ PLATFORM NOTIFICATIONS ============================ */
-platformRoute('GET', '/api/v1/platform/notifications', async () => {
+/* Each person sees the notices meant for them and reads their own copy. */
+platformRoute('GET', '/api/v1/platform/notifications', 'any', async (ctx) => {
   const [rows, unread] = await Promise.all([
-    col.notifications().find({ pharmacy_id: null }).sort({ is_read: 1, created_at: -1 }).limit(100).toArray(),
-    col.notifications().countDocuments({ pharmacy_id: null, is_read: 0 })
+    col.notifications().find(platformNotices(reader(ctx))).sort({ created_at: -1 }).limit(100).toArray(),
+    col.notifications().countDocuments(unreadPlatformNotices(reader(ctx)))
   ]);
-  return { data: rows, counts: { total: rows.length, unread } };
+  const data = rows.map((row) => asRead(row, ctx.user.id)).sort((a, b) => a.is_read - b.is_read);
+  return { data, counts: { total: data.length, unread } };
 });
 
-platformRoute('POST', '/api/v1/platform/notifications/:id/read', async (ctx) => {
-  await col.notifications().updateOne({ _id: toStr(ctx.params.id, 60), pharmacy_id: null }, { $set: { is_read: 1 } });
+platformRoute('POST', '/api/v1/platform/notifications/:id/read', 'any', async (ctx) => {
+  await col.notifications().updateOne({ $and: [platformNotices(reader(ctx)), { _id: toStr(ctx.params.id, 60) }] }, { $addToSet: { read_by: ctx.user.id } });
   return { ok: true };
 });
 
-platformRoute('POST', '/api/v1/platform/notifications/read-all', async () => {
-  const result = await col.notifications().updateMany({ pharmacy_id: null, is_read: 0 }, { $set: { is_read: 1 } });
+platformRoute('POST', '/api/v1/platform/notifications/read-all', 'any', async (ctx) => {
+  const result = await col.notifications().updateMany(unreadPlatformNotices(reader(ctx)), { $addToSet: { read_by: ctx.user.id } });
   return { ok: true, marked: result.modifiedCount };
 });
 
