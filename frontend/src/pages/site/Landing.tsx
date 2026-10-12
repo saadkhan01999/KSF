@@ -91,7 +91,7 @@ export default function Landing() {
     <div className="site">
       <SiteHeader />
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         {/* ------------------------------ hero ------------------------------ */}
         <section className="hero">
           <div className="hero-bg" aria-hidden="true">

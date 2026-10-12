@@ -61,6 +61,7 @@ const Pharmacies = lazy(() => import('./pages/platform/Pharmacies'));
 const PharmacyDetail = lazy(() => import('./pages/platform/PharmacyDetail'));
 const SupportDesk = lazy(() => import('./pages/platform/SupportDesk'));
 const Income = lazy(() => import('./pages/platform/Income'));
+const PlatformAccounts = lazy(() => import('./pages/platform/Accounts'));
 const Plans = lazy(() => import('./pages/platform/Plans'));
 const HelpQueue = lazy(() => import('./pages/platform/HelpQueue'));
 const PlatformActivity = lazy(() => import('./pages/platform/PlatformActivity'));
@@ -112,6 +113,7 @@ function Protected() {
             <Route path="/platform/support/:id" element={<Guard permission="platform.support"><SupportDesk /></Guard>} />
             <Route path="/platform/help" element={<Guard permission="platform.help"><HelpQueue /></Guard>} />
             <Route path="/platform/income" element={<Guard permission="platform.finance.view"><Income /></Guard>} />
+            <Route path="/platform/accounts" element={<Guard permission="platform.finance.view"><PlatformAccounts /></Guard>} />
             <Route path="/platform/plans" element={<Guard permission="platform.plans.manage"><Plans /></Guard>} />
             <Route path="/platform/team" element={<Guard permission="platform.team.manage"><Team /></Guard>} />
             <Route path="/platform/activity" element={<Guard permission="platform.activity"><PlatformActivity /></Guard>} />
@@ -239,7 +241,7 @@ export default function App() {
       '/notifications': 'Notifications', '/activity': 'Activity Log', '/settings': 'Settings',
       '/login': 'Sign in', '/setup': 'Finish setting up', '/account': 'My account',
       '/platform': 'Platform overview', '/platform/pharmacies': 'Pharmacies', '/platform/support': 'Support desk',
-      '/platform/help': 'People who need help', '/platform/income': 'Income', '/platform/plans': 'Plans',
+      '/platform/help': 'People who need help', '/platform/income': 'Income', '/platform/accounts': 'Accounts', '/platform/plans': 'Plans',
       '/platform/activity': 'Activity', '/platform/notifications': 'Notifications'
     };
     const name = titles[location.pathname]

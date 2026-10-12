@@ -30,13 +30,60 @@
   gap: var(--s-6);
   padding: var(--s-4) var(--s-7);
   transition: background var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease),
-              backdrop-filter var(--t-base) var(--ease);
+              backdrop-filter var(--t-base) var(--ease), padding var(--t-base) var(--ease);
 }
 .site-nav.is-stuck {
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  backdrop-filter: saturate(180%) blur(14px);
-  -webkit-backdrop-filter: saturate(180%) blur(14px);
-  box-shadow: var(--sh-sm);
+  padding-block: var(--s-3);
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  box-shadow: 0 1px 0 var(--line), var(--sh-md);
+}
+/* Where blur is not supported, the bar is simply solid. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .site-nav.is-stuck { background: var(--surface); }
+}
+#main:focus { outline: none; }
+
+/* ----------------------------- Back to top ----------------------------- */
+.back-to-top {
+  --progress: 0;
+  position: fixed;
+  right: max(var(--s-5), env(safe-area-inset-right, 0px));
+  bottom: max(var(--s-5), calc(env(safe-area-inset-bottom, 0px) + var(--s-3)));
+  z-index: 60;
+  width: 52px;
+  height: 52px;
+  padding: 3px;
+  border-radius: 50%;
+  /* The ring fills as the page is read. */
+  background: conic-gradient(var(--brand-500) calc(var(--progress) * 1turn), color-mix(in srgb, var(--brand-500) 18%, transparent) 0);
+  box-shadow: var(--sh-brand-lg);
+  opacity: 0;
+  transform: translateY(16px) scale(.9);
+  pointer-events: none;
+  transition: opacity var(--t-base) var(--ease-out), transform var(--t-base) var(--ease-out), box-shadow var(--t-fast) var(--ease);
+}
+.back-to-top.is-shown { opacity: 1; transform: none; pointer-events: auto; }
+.back-to-top > span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(150deg, var(--brand-500), var(--brand-700));
+  color: #fff;
+}
+.back-to-top:hover { transform: translateY(-3px); box-shadow: 0 10px 24px -6px rgba(14, 122, 80, .45); }
+.back-to-top:hover svg { animation: ksf-nudge-up .6s var(--ease-out); }
+.back-to-top:focus-visible { outline: none; box-shadow: var(--ring), var(--sh-brand-lg); }
+@keyframes ksf-nudge-up { 40% { transform: translateY(-3px); } }
+@media (max-width: 640px) {
+  .back-to-top { width: 46px; height: 46px; right: var(--s-4); bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-4)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .back-to-top, .back-to-top:hover { transition: opacity var(--t-base) linear; transform: none; }
+  .back-to-top:hover svg { animation: none; }
 }
 .site-nav-links { display: flex; align-items: center; gap: var(--s-2); margin-inline: auto; }
 .site-nav-links a {

@@ -782,7 +782,7 @@ export function Menu({
   const close = useCallback(() => setOpen(false), []);
   /* A plain menu floats above the page, positioned from its trigger, so a
      menu on a table row is never clipped by the table's scroll box. */
-  const [place, setPlace] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const [place, setPlace] = useState<{ top: number; left?: number; right?: number; minWidth: number } | null>(null);
 
   useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
 
@@ -792,8 +792,17 @@ export function Menu({
     if (!anchor) return;
     const height = surface.current?.offsetHeight ?? 0;
     const below = anchor.bottom + 6;
-    const top = height && below + height > window.innerHeight - 8 && anchor.top - height - 6 > 8 ? anchor.top - height - 6 : below;
-    setPlace(align === 'left' ? { top, left: anchor.left } : { top, right: Math.max(8, window.innerWidth - anchor.right) });
+    const above = anchor.top - height - 6;
+    /* Below the trigger when it fits, else above it; and never off the
+       screen either way (a tall menu scrolls inside itself instead). */
+    const wanted = height && below + height > window.innerHeight - 8 && above > 8 ? above : below;
+    const top = Math.max(8, Math.min(wanted, window.innerHeight - height - 8));
+    /* A menu opening from a wide trigger (the sidebar's account card) is at
+       least as wide as it, so the two read as one control. */
+    const minWidth = Math.min(anchor.width, window.innerWidth - 16);
+    setPlace(align === 'left'
+      ? { top, left: Math.max(8, anchor.left), minWidth }
+      : { top, right: Math.max(8, window.innerWidth - anchor.right), minWidth });
   }, [open, panel, align]);
 
   const items = useCallback(
@@ -901,7 +910,11 @@ export function Menu({
           className="menu is-floating"
           role="menu"
           aria-label={label}
-          style={place ? { top: place.top, left: place.left, right: place.right } : { visibility: 'hidden', top: 0, left: 0 }}
+          /* Both sides are always set: the base .menu rule pins right: 0,
+             which with a left offset stretched the menu across the screen. */
+          style={place
+            ? { top: place.top, left: place.left ?? 'auto', right: place.right ?? 'auto', minWidth: `max(232px, ${place.minWidth}px)` }
+            : { visibility: 'hidden', top: 0, left: 0, right: 'auto' }}
         >
           {children(close)}
         </div>,

@@ -132,3 +132,28 @@
 .pay-option span { display: grid; gap: 2px; min-width: 0; }
 .pay-option strong { display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
 .pay-option small { color: var(--text-dim); font-size: var(--fs-xs); line-height: 1.45; }
+
+/* ---------------------------------------------- the platform's ways to pay */
+.pm-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+.pm-card {
+  display: grid; gap: var(--s-3); align-content: start; min-width: 0; padding: var(--s-5);
+  border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--sh-xs);
+}
+.pm-card.is-on { border-color: color-mix(in srgb, var(--brand-600) 45%, var(--line)); }
+.pm-head { display: flex; align-items: flex-start; gap: var(--s-3); }
+.pm-head h3 { font-size: var(--fs-md); font-weight: 700; margin-bottom: 6px; }
+.pm-icon {
+  flex: 0 0 auto; display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--r-md);
+  background: var(--surface-3); color: var(--text-soft);
+}
+.pm-card.is-on .pm-icon { background: var(--accent-soft); color: var(--brand-600); }
+.pm-note { margin: 0; font-size: var(--fs-sm); color: var(--text-soft); line-height: 1.5; }
+.pm-missing { display: grid; gap: 6px; padding: var(--s-3); border-radius: var(--r-md); background: var(--surface-2); }
+.pm-missing code, .pm-url code { font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.pm-missing code { padding: 2px 6px; border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--line); }
+.pm-url {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px var(--s-2);
+  padding: var(--s-2) var(--s-3); border: 1px dashed var(--line-strong); border-radius: var(--r-md);
+}
+.pm-url-label { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--text-dim); }
+.pm-url .icon-btn { grid-row: 2; grid-column: 2; }

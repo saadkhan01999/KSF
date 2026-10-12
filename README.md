@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.1.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.2.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -52,7 +52,9 @@ support requests they raise.
 | Pharmacies | Every pharmacy, searchable by name, city or Admin; one page per pharmacy with its figures, staff, branches, plan, payments, support history and activity |
 | Actions | Edit a pharmacy, change or extend its plan, record an offline payment, suspend / reactivate (signs everybody out at once), and **work inside** any pharmacy in support mode |
 | Plans and prices | Create plans and change prices, limits and features. **A change reaches every open screen at once** — the public pricing page, every pharmacy's dashboard and billing, and the checkout — and a pharmacy's features follow its subscription the moment it changes |
-| Income | Payments by month, plan, method and pharmacy; bank transfers to confirm; refunds (through Stripe where it was paid there); any pharmacy's invoice |
+| Accounts | **KSF's own books**: subscription income by plan, refunds, other income (setup and training fees) and every expense (team salaries, servers, software, marketing, rent); net profit, a ledger of every movement, twelve months' trend, an A4 statement and CSV downloads |
+| Payment methods | Which ways to pay are switched on (Stripe, bank transfer, JazzCash, Easypaisa, a gateway), test or live, the settings each still needs, and the webhook address to register |
+| Income | Payments by month, plan, method and pharmacy; bank transfers to confirm; refunds (through Stripe where it was paid there); any pharmacy's invoice; offline payments recorded by hand, each slip number once per pharmacy |
 | Medicine directory | Add and correct entries, verify each one as a pharmacist against its references, archive and restore, import a list |
 | Support desk | Every request from every pharmacy in one queue, answered in a thread; the pharmacy is notified and e-mailed |
 | People who need help | Anyone, anywhere, who could not sign in today — locked, wrong password, device limit, lost authenticator — and a search across every account |
@@ -134,7 +136,7 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
    ├─ modules/     one file per area: auth, account, people, catalogue, inventory,
    │               purchasing, selling, cashbook, accounting, reporting, messaging,
    │               billing, invoices, directory, live, setup, migrate, support,
-   │               platform, team, admin
+   │               platform, platform-accounts, team, admin
    ├─ services/    subscriptions, payments (Stripe, gateway, JazzCash, Easypaisa,
    │               bank transfer), live updates, referrals, mailer, data import
    ├─ domain/      permissions and roles, plans and features, platform team,
@@ -221,7 +223,7 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
 
 ## REST API
 
-Every endpoint KSF has is in the tables below: **257** in the route registry,
+Every endpoint KSF has is in the tables below: **265** in the route registry,
 plus the two the server answers itself. The tables are the registry, read out
 of `backend/src/modules/*.ts`; `tests/unit.test.mjs` fails when a route is
 added without a line here.
@@ -592,6 +594,18 @@ added without a line here.
 | `POST /api/v1/platform/pharmacies/:id/subscription` | `platform.pharmacies.manage` | Change or extend a pharmacy's plan |
 | `POST /api/v1/platform/pharmacies/:id/payments` | `platform.finance.manage` | Record a payment received outside a provider |
 
+#### Platform: accounts (KSF's own books)
+
+| Endpoint | Who may call | What it does |
+|---|---|---|
+| `GET /api/v1/platform/accounts/summary` | `platform.finance.view` | KSF's own profit and loss for `?from&to`: subscriptions by plan, refunds, other income, provider fees and expenses; paying pharmacies, payments waiting and refunds owed; twelve months' trend |
+| `GET /api/v1/platform/accounts/transactions` | `platform.finance.view` | Every platform money movement in one ledger: subscription payments, refunds, other income and expenses (`?direction=in\|out&q`) |
+| `GET /api/v1/platform/accounts/entries` | `platform.finance.view` | The platform's other income and expenses (`?kind=income\|expense&category&q`), with totals, the categories and the team's names |
+| `POST /api/v1/platform/accounts/entries` | `platform.finance.manage` | Record platform income (a setup fee) or an expense (team salaries, servers, software, rent): kind, category, amount, date, method, who |
+| `PATCH /api/v1/platform/accounts/entries/:id` | `platform.finance.manage` | Correct a platform income or expense entry |
+| `DELETE /api/v1/platform/accounts/entries/:id` | `platform.finance.manage` | Delete a platform entry; the deletion stays in the activity log |
+| `GET /api/v1/platform/accounts/export` | `platform.finance.view` | Rows for a CSV of KSF's books: `kind=profit-and-loss\|transactions\|entries` |
+
 #### Platform: income, payments and plans
 
 | Endpoint | Who may call | What it does |
@@ -602,6 +616,7 @@ added without a line here.
 | `POST /api/v1/platform/payments/:id/refund` | `platform.finance.manage` | Refund a payment, through the provider where it can (step-up) |
 | `POST /api/v1/platform/refunds/:id/complete` | `platform.finance.manage` | Mark a refund made in the provider's own portal as complete |
 | `POST /api/v1/platform/payments/reconcile` | `platform.finance.manage` | Ask providers about payments nobody heard back on; expire the stale |
+| `GET /api/v1/platform/payments/providers` | `platform.finance.view` | Every way to pay: switched on or not, the setting names it still needs (never values), test or live, and its webhook and return addresses |
 | `GET /api/v1/platform/invoices/:id` | `platform.finance.view` | Any pharmacy's invoice, as the pharmacy sees it |
 | `GET /api/v1/platform/plans` | Platform team | Every plan with how many pharmacies are on it, and the feature catalogue |
 | `POST /api/v1/platform/plans` | `platform.plans.manage` | Create a plan |
@@ -682,6 +697,7 @@ npm test
 | `tests/stripe.test.mjs` | Checkout at the plan's price, signed webhooks (forged, stale and unsigned ones refused; a repeat applied once), renewals at the right price, a failed renewal's grace period, cancellation, refunds and numbered invoices, against a stand-in for Stripe's API |
 | `tests/directory.test.mjs` | The starter set, searching by name, other name, brand or category, verification and its reset when the words change, drafts and archived entries kept from pharmacies, imports, and that only the team members whose role includes it can change it |
 | `tests/access.test.mjs` | Every role: refused without the permission, every built-in role's screens, the platform kept apart, and no pharmacy reading another's records |
+| `tests/platform-accounts.test.mjs` | KSF's own books to the paisa (subscriptions, refunds, other income, expenses), the ledger and downloads, finance roles only, one slip number per pharmacy, and the payment-methods check |
 
 The API suites run against a real MongoDB in a throwaway database
 (`ksf_test_<random>`) that is dropped afterwards. Point them at a server with
@@ -718,6 +734,13 @@ Vercel (website), and the settings that must change for production:
 and `PUBLIC_ALLOWED_ORIGINS`, SMTP for e-mail, and — to take card payments —
 `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` with the webhook registered in
 Stripe (`docs/PAYMENTS.md`).
+
+**Is the new version live?** Open the production address — on Vercel that is
+`https://ksf-x86j.vercel.app` (or your own domain), not an address with an id
+in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
+frozen build and never changes. The version is in the website's footer and in
+`/api/v1/health`; when the two differ, the API on Railway has not redeployed
+from `main` yet (Railway › the service › Deployments).
 
 ---
 

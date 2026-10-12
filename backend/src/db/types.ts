@@ -206,6 +206,14 @@ export interface IncomeEntry extends Base {
   created_by: Id | null; created_at: When; updated_at: When;
 }
 
+/** KSF's own money other than subscriptions: a setup fee in, hosting or a
+    team member's salary out. Platform-wide, so it carries no pharmacy_id. */
+export interface PlatformEntry extends Base {
+  kind: 'income' | 'expense'; category: string; description: string; amount_paisa: number; entry_date: string;
+  payment_method: string; reference: string | null; party: string | null;
+  created_by: Id | null; created_at: When; updated_at: When;
+}
+
 /** One payment to one person for one month: a salary, an advance or a bonus. */
 export interface SalaryPayment extends Base {
   pharmacy_id: Id; branch_id: Id | null; staff_id: Id | null; staff_name: string; kind: 'salary' | 'advance' | 'bonus';

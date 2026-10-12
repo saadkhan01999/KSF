@@ -44,6 +44,7 @@ const INDEXES: Record<string, IndexDescription[]> = {
   expenses: [{ key: { pharmacy_id: 1, expense_date: -1 } }],
   day_closings: [{ key: { pharmacy_id: 1, business_date: -1 } }],
   income_entries: [{ key: { pharmacy_id: 1, received_on: -1 } }],
+  platform_entries: [{ key: { entry_date: -1 } }, { key: { kind: 1, category: 1 } }],
   salary_payments: [{ key: { pharmacy_id: 1, paid_on: -1 } }, { key: { pharmacy_id: 1, staff_id: 1, period: 1, kind: 1 } }],
   supplier_payments: [{ key: { pharmacy_id: 1, paid_on: -1 } }, { key: { purchase_id: 1 } }],
   medicine_directory: [{ key: { name_key: 1 }, unique: true }, { key: { status: 1, category: 1, name_key: 1 } }],
@@ -61,7 +62,9 @@ const INDEXES: Record<string, IndexDescription[]> = {
   subscriptions: [{ key: { pharmacy_id: 1, status: 1 } }, { key: { renewal_at: 1 } }],
   subscription_payments: [
     { key: { pharmacy_id: 1, created_at: -1 } },
-    { key: { provider: 1, provider_reference: 1 }, unique: true, partialFilterExpression: { provider_reference: { $type: 'string' } } }
+    /* A provider's charge id is unique anyway; a slip number typed for an
+       offline payment is unique within its own pharmacy only. */
+    { key: { provider: 1, provider_reference: 1, pharmacy_id: 1 }, unique: true, partialFilterExpression: { provider_reference: { $type: 'string' } } }
   ],
   payment_attempts: [{ key: { reference: 1 }, unique: true }, { key: { pharmacy_id: 1, created_at: -1 } }, { key: { status: 1, expires_at: 1 } }],
   payment_refunds: [{ key: { payment_id: 1 } }],
@@ -81,9 +84,19 @@ const INDEXES: Record<string, IndexDescription[]> = {
   ]
 };
 
+/* Indexes a later release replaced. Dropped once they are found, after their
+   replacement exists. */
+const RETIRED_INDEXES: Array<[collection: string, index: string]> = [
+  /* 2.2.0: offline payment references became unique per pharmacy. */
+  ['subscription_payments', 'provider_1_provider_reference_1']
+];
+
 export async function ensureIndexes(): Promise<void> {
   for (const [name, indexes] of Object.entries(INDEXES)) {
     await db().collection(name).createIndexes(indexes);
+  }
+  for (const [name, index] of RETIRED_INDEXES) {
+    if (await db().collection(name).indexExists(index).catch(() => false)) await db().collection(name).dropIndex(index);
   }
 }
 

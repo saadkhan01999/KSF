@@ -17,6 +17,7 @@
 
 import type { Document, Filter } from 'mongodb';
 import { col } from '../db/mongo.js';
+import { IS_UNIVERSITY } from '../config/env.js';
 import type { Pharmacy, Plan, SubscriptionPayment } from '../db/types.js';
 import { bad, missing } from '../core/errors.js';
 import { auditLog, logActivity, notify } from '../core/trails.js';
@@ -28,7 +29,7 @@ import { forgetPharmacyStatus } from '../http/authenticate.js';
 import { FEATURE_KEYS, FEATURES } from '../domain/plans.js';
 import { revokeAllSessions } from '../security/sessions.js';
 import { changePlan, currentSubscription, getPlan, planView, recordPayment, subscriptionState } from '../services/subscriptions.js';
-import { applyRefund, attemptsFor, listProviders, reconcile, requestRefund, verifyManualPayment, type PaymentActor } from '../services/payments/index.js';
+import { applyRefund, attemptsFor, defaultProviderKey, listProviders, providerSetup, reconcile, requestRefund, verifyManualPayment, type PaymentActor } from '../services/payments/index.js';
 import { helpItems } from './people.js';
 import { pageResult, paging, stockStages } from './shared.js';
 
@@ -398,7 +399,10 @@ platformRoute('POST', '/api/v1/platform/pharmacies/:id/payments', 'platform.fina
     kind: 'manual', provider: 'manual', providerReference: reference, method, verifiedBy: ctx.user.id
   });
   if (!result.ok) bad(result.reason ?? 'The payment could not be recorded.');
-  if (result.duplicate) bad('A payment with that reference has already been recorded.', 'reference');
+  if (result.duplicate) {
+    const earlier = result.payment;
+    bad(`${pharmacy.name} already has ${earlier ? `${rupees(earlier.amount_paisa)} recorded on ${earlier.created_at.slice(0, 10)}` : 'a payment recorded'} under reference ${reference}. If this is a different payment, enter the number on its own slip.`, 'reference');
+  }
   await auditLog(trailFor(ctx, pharmacy.id), { action: 'platform.payment-recorded', entity: 'payment', entityId: result.payment?.id, summary: `${rupees(amount)} received by ${method} (${reference}) recorded by the platform` });
   await notify(pharmacy.id, { type: 'billing', severity: 'success', title: 'Payment received', body: `${rupees(amount)} has been recorded against your subscription. Thank you.`, link: '/settings?tab=billing' });
   return { data: result.payment, subscription: await subscriptionState(pharmacy.id), message: `${rupees(amount)} recorded for ${pharmacy.name}.`, __status: 201 };
@@ -462,6 +466,12 @@ platformRoute('GET', '/api/v1/platform/income', 'platform.finance.view', async (
 });
 
 /* ================================ PAYMENTS ================================ */
+/* Which ways to pay are switched on, what each still needs, and where its
+   webhook must point — the Super Admin's check before taking money. */
+platformRoute('GET', '/api/v1/platform/payments/providers', 'platform.finance.view', async () => ({
+  data: providerSetup(), default: defaultProviderKey(), university: IS_UNIVERSITY
+}));
+
 platformRoute('GET', '/api/v1/platform/payments/attempts', 'platform.finance.view', async (ctx) => {
   const status = toStr(ctx.query.get('status'), 20) || 'open';
   const match: Document = status === 'open' ? { status: { $in: ['created', 'pending'] } } : status === 'all' ? {} : { status };
