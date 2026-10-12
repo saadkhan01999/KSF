@@ -1325,3 +1325,19 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* Website and server versions, side by side (components/VersionCheck.tsx). */
+.version-check {
+  display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
+  margin-bottom: var(--s-4); font-size: var(--fs-sm); color: var(--text-dim);
+}
+.version-check svg { flex: 0 0 auto; }
+.version-check .spin { animation: ksf-spin 1s linear infinite; }
+.version-check b { color: var(--text); font-weight: 650; }
+.version-check.is-ok svg { color: var(--ok-500); }
+.version-check.is-warn {
+  padding: var(--s-2) var(--s-3); border-radius: var(--r-md);
+  background: var(--warn-100); color: var(--warn-text);
+}
+.version-check.is-warn b { color: inherit; }
+dd .version-check { margin: 0; }

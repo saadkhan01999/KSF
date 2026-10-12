@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.2.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.2.1** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -739,8 +739,10 @@ Stripe (`docs/PAYMENTS.md`).
 `https://ksf-x86j.vercel.app` (or your own domain), not an address with an id
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
-`/api/v1/health`; when the two differ, the API on Railway has not redeployed
-from `main` yet (Railway › the service › Deployments).
+`/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
+System) compares the two: "Website 2.2.1 · Server 2.2.1 — up to date", or
+which one still has to redeploy from `main` (Railway › the service ›
+Deployments, or Vercel › Deployments).
 
 ---
 

@@ -17,10 +17,10 @@ import {
 } from '../components/ui';
 import { number, rupees, phone as fmtPhone } from '../utils/format';
 import type { Branch } from '../types';
-import { BRAND } from '../brand';
 import Billing from './settings/Billing';
 import Migration from './settings/Migration';
 import { SetupReminder } from '../components/SetupReminder';
+import { VersionCheck } from '../components/VersionCheck';
 
 interface SettingsResponse {
   pharmacy: Record<string, string | number>;
@@ -457,7 +457,7 @@ export default function SettingsPage() {
           <Card title="About this build" subtitle="KSF Pharmacy Management System">
             <dl className="kv">
               {/* Read from brand.ts rather than typed in. */}
-              <dt>Version</dt><dd>{BRAND.version}</dd>
+              <dt>Version</dt><dd><VersionCheck /></dd>
               <dt>Front end</dt><dd>React 18 · TypeScript · Vite</dd>
               <dt>Back end</dt><dd>Node.js · Express · TypeScript</dd>
               <dt>Database</dt><dd>MongoDB, with transactions for every sale, refund and stock movement</dd>
