@@ -90,11 +90,18 @@ describe('KSF API', { skip }, () => {
       assert.ok(setup.data.steps.find((step) => step.key === 'address').done);
     });
 
-    it('installs the five built-in roles and lets the Admin create one', async () => {
+    it('installs the five built-in roles, and custom roles once the plan includes them', async () => {
       const roles = await owner.get('/api/v1/roles');
       assert.deepEqual(roles.data.filter((role) => role.is_system).map((role) => role.key).sort(), ['admin', 'cashier', 'manager', 'pharmacist', 'regional-manager']);
       state.cashierRole = roles.data.find((role) => role.key === 'cashier').id;
-      await owner.post('/api/v1/roles', { name: 'Night Supervisor', permissions: ['dashboard.view', 'pos.operate', 'sales.read'] });
+      const role = { name: 'Night Supervisor', permissions: ['dashboard.view', 'pos.operate', 'sales.read'] };
+      /* Basic does not include custom roles: 402, with the plans that do. */
+      const locked = await owner.call('POST', '/api/v1/roles', role);
+      assert.equal(locked.status, 402);
+      assert.equal(locked.body.code, 'feature_locked');
+      assert.deepEqual(locked.body.plans.map((plan) => plan.key), ['weekly', 'monthly', 'annual']);
+      await admin.post(`/api/v1/platform/pharmacies/${state.pharmacyId}/subscription`, { planKey: 'weekly' });
+      await owner.post('/api/v1/roles', role);
     });
   });
 

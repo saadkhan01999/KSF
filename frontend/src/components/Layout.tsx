@@ -15,7 +15,7 @@ import {
   ShieldCheck, Bell, ScrollText, Settings, LogOut, Menu as MenuIcon, X, Search,
   PanelLeftClose, PanelLeftOpen, Sun, Moon, Monitor, KeyRound, User, Palette,
   Store, Plus, MessagesSquare, ChevronsUpDown, LifeBuoy, ChevronDown, CreditCard, Scale,
-  Building2, Gauge, BadgeDollarSign, Layers, HeartHandshake, ArrowLeftCircle, UsersRound
+  Building2, Gauge, BadgeDollarSign, Layers, HeartHandshake, ArrowLeftCircle, UsersRound, Landmark, BookOpen
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BrandLogo, BrandMark } from './Brand';
@@ -26,6 +26,8 @@ import { api } from '../services/api';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useHomeRoute } from '../hooks/useHomeRoute';
 import { PersonAvatar } from './people';
+import { SubscriptionBanner } from './SubscriptionBanner';
+import { useBusiness } from '../services/business';
 
 interface NavEntry {
   to: string;
@@ -55,6 +57,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: '/medicines', label: 'Medicines', icon: <Pill />, permission: 'medicines.read' },
       { to: '/categories', label: 'Categories', icon: <Tags />, permission: 'medicines.read' },
+      { to: '/directory', label: 'Medicine directory', icon: <BookOpen /> },
       { to: '/inventory', label: 'Inventory', icon: <Boxes />, permission: 'inventory.read', badge: 'lowStock', badgeTone: 'alert' },
       { to: '/expiry', label: 'Expiry Control', icon: <CalendarClock />, permission: 'inventory.read', badge: 'expiring', badgeTone: 'muted' }
     ]
@@ -65,6 +68,7 @@ const NAV: NavGroup[] = [
       { to: '/suppliers', label: 'Suppliers', icon: <Truck />, permission: 'suppliers.read' },
       { to: '/purchases', label: 'Purchases', icon: <ClipboardList />, permission: 'purchases.read', badge: 'purchasesOpen', badgeTone: 'muted' },
       { to: '/expenses', label: 'Expenses', icon: <Wallet />, permission: 'expenses.read' },
+      { to: '/accounts', label: 'Accounts', icon: <Landmark />, permission: 'accounting.view' },
       { to: '/day-close', label: 'Close the Day', icon: <Scale />, permission: 'day-close.manage' },
       { to: '/reports', label: 'Reports', icon: <BarChart3 />, permission: 'reports.view' }
     ]
@@ -91,7 +95,8 @@ const PLATFORM_NAV: NavGroup[] = [
       { to: '/platform', label: 'Overview', icon: <Gauge />, permission: 'platform.overview' },
       { to: '/platform/pharmacies', label: 'Pharmacies', icon: <Building2 />, permission: 'platform.pharmacies.view' },
       { to: '/platform/support', label: 'Support desk', icon: <LifeBuoy />, permission: 'platform.support', badge: 'supportOpen', badgeTone: 'alert' },
-      { to: '/platform/help', label: 'People who need help', icon: <HeartHandshake />, permission: 'platform.help' }
+      { to: '/platform/help', label: 'People who need help', icon: <HeartHandshake />, permission: 'platform.help' },
+      { to: '/platform/directory', label: 'Medicine directory', icon: <BookOpen /> }
     ]
   },
   {
@@ -149,7 +154,7 @@ const MOBILE_NAV: NavEntry[] = [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { user, workspace, subscription, can, signOut, theme, setTheme, ok, fail, refreshWorkspace, isPlatform, leaveSupport } = useApp();
+  const { user, workspace, subscription, can, hasFeature, signOut, theme, setTheme, ok, fail, refreshWorkspace, isPlatform, leaveSupport } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -159,6 +164,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   /* A phone has room in the top bar for the word, not the sentence: cut to
      "Sea", the sentence read as a broken field. */
   const narrow = useMediaQuery('(max-width: 479px)');
+  /* The isolated university copy says so, so it is never mistaken for the live service. */
+  const { edition } = useBusiness();
   const [passwordOpen, setPasswordOpen] = useState(false);
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
@@ -277,7 +284,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <aside className={`sidebar ${collapsed ? 'is-collapsed' : ''} ${drawerOpen ? 'is-open' : ''}`}>
         <div className="sidebar-brand">
           <Link to={home} style={{ textDecoration: 'none' }} aria-label="KSF home">
-            {collapsed ? <BrandMark size={36} /> : <BrandLogo size={36} />}
+            {collapsed ? <BrandMark size={36} /> : (
+              <span className="sidebar-brand-stack">
+                <BrandLogo size={36} />
+                {edition === 'university' && <span className="edition-tag">University edition</span>}
+              </span>
+            )}
           </Link>
           <button
             className="icon-btn nav-toggle"
@@ -353,6 +365,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Button size="sm" variant="outline" icon={<ArrowLeftCircle size={15} />} onClick={() => { void backToPlatform(); }}>Back to the platform</Button>
           </div>
         )}
+        {!isPlatform && <SubscriptionBanner />}
         <header className="topbar">
           <button
             className="icon-btn nav-toggle"
@@ -389,9 +402,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Button>
           </Allow>
 
-          <Allow permission="messages.read">
-            <MessagesMenu unread={badges?.messagesUnread ?? 0} />
-          </Allow>
+          {hasFeature('messaging.internal') && (
+            <Allow permission="messages.read">
+              <MessagesMenu unread={badges?.messagesUnread ?? 0} />
+            </Allow>
+          )}
 
           {/* The counter calculator opens in place, so a sale in progress is never lost. */}
           <CalculatorMenu />

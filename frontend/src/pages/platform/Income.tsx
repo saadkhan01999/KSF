@@ -4,15 +4,16 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Wallet, RotateCcw, BadgeCheck, Download, RefreshCw, Receipt, CircleCheck } from 'lucide-react';
+import { Wallet, RotateCcw, BadgeCheck, Download, RefreshCw, Receipt, CircleCheck, FileText } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { useApiData, useAction } from '../../hooks/useApi';
+import { useApiData, useAction, useLiveRefresh } from '../../hooks/useApi';
 import { api, query } from '../../services/api';
 import {
   Button, Card, StatCard, BarChart, DonutChart, StatusBadge, EmptyState, TableSkeleton, Pager, TextInput, Modal, TextArea, Tabs
 } from '../../components/ui';
 import { rupees, rupeesShort, number, date, monthLabel, isoDaysAgo, todayIso, downloadCsv, ago, toPaisa } from '../../utils/format';
 import type { PaymentAttemptRow, PlatformPayment } from '../../types/platform';
+import { InvoiceDialog } from '../../components/invoice';
 
 interface IncomeReply {
   range: { from: string; to: string };
@@ -37,9 +38,12 @@ export default function Income() {
   const [tab, setTab] = useState<Tab>('payments');
   const [verifying, setVerifying] = useState<PaymentAttemptRow | null>(null);
   const [refunding, setRefunding] = useState<PlatformPayment | null>(null);
+  const [invoiceId, setInvoiceId] = useState<string | null>(null);
 
   const { data, loading, reload } = useApiData<IncomeReply>(`/platform/income${query({ from, to, page })}`, [from, to, page]);
   const pending = useApiData<{ data: PaymentAttemptRow[] }>('/platform/payments/attempts?status=open');
+  useLiveRefresh(reload, ['subscription']);
+  useLiveRefresh(pending.reload, ['subscription']);
 
   const reconcile = () => run(
     () => api.post<{ checked: number; settled: number; expired: number }>('/platform/payments/reconcile'),
@@ -128,6 +132,9 @@ export default function Income() {
                                 <td data-label="Amount" className="t-right num t-semi">{rupees(row.amount_paisa)}</td>
                                 <td data-label="Actions">
                                   <div className="row-actions">
+                                    {(row.status === 'succeeded' || row.status === 'refunded') && (
+                                      <button className="icon-btn" onClick={() => setInvoiceId(row.id)} aria-label="Invoice" title="Invoice"><FileText size={16} /></button>
+                                    )}
                                     {row.status === 'succeeded' && (row.refunded_paisa ?? 0) < row.amount_paisa && (
                                       <button className="icon-btn" onClick={() => setRefunding(row)} aria-label="Refund" title="Refund"><RotateCcw size={16} /></button>
                                     )}
@@ -228,6 +235,7 @@ export default function Income() {
 
       <ConfirmTransfer attempt={verifying} onClose={() => setVerifying(null)} onDone={() => { setVerifying(null); void pending.reload(true); void reload(true); }} />
       <Refund payment={refunding} onClose={() => setRefunding(null)} onDone={() => { setRefunding(null); void reload(true); }} />
+      <InvoiceDialog paymentId={invoiceId} source="platform" onClose={() => setInvoiceId(null)} />
     </>
   );
 }

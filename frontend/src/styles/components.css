@@ -767,7 +767,9 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
     flex: 0 0 auto;
   }
   .modal-foot { padding-bottom: calc(var(--s-4) + env(safe-area-inset-bottom, 0px)); flex-wrap: wrap; }
-  .modal-foot .btn { flex: 1 1 140px; }
+  /* Sized by its label (a .btn hides overflow, so a fixed basis let a long
+     label shrink and clip); two that do not fit side by side take a line each. */
+  .modal-foot .btn { flex: 1 1 auto; min-width: min(140px, 100%); }
 }
 
 .drawer-backdrop {

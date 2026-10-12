@@ -147,6 +147,10 @@ export const col = {
   sales: c<T.Sale>('sales'),
   expenses: c<T.Expense>('expenses'),
   dayClosings: c<T.DayClosing>('day_closings'),
+  incomeEntries: c<T.IncomeEntry>('income_entries'),
+  salaryPayments: c<T.SalaryPayment>('salary_payments'),
+  supplierPayments: c<T.SupplierPayment>('supplier_payments'),
+  directory: c<T.DirectoryMedicine>('medicine_directory'),
 
   notifications: c<T.Notification>('notifications'),
   activityLogs: c<T.ActivityLog>('activity_logs'),

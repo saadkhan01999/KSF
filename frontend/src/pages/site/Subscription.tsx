@@ -2,16 +2,14 @@
    how renewal works, what happens when a payment fails, and exactly what
    does and does not happen to your data. */
 
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Clock, CreditCard, RefreshCw, ShieldCheck, Database } from 'lucide-react';
 import { SitePage, SiteCta } from '../../components/SiteChrome';
 import { PlanCard, StatusNote } from '../../components/account-ui';
 import { CardSkeleton, Alert } from '../../components/ui';
 import { useReveal, useViewMode } from '../../hooks/useParallax';
-import { api } from '../../services/api';
+import { usePublicPlans } from '../../hooks/usePublicPlans';
 import { FEATURE_NAMES } from './content';
-import type { Plan } from '../../types';
 
 const LIFECYCLE = [
   {
@@ -45,16 +43,7 @@ export default function Subscription() {
   useViewMode('site');
   useReveal([]);
 
-  const [plans, setPlans] = useState<Plan[] | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    api.get<{ data: Plan[] }>('/public/plans')
-      .then((reply) => { if (live) setPlans(reply.data); })
-      .catch((error: Error) => { if (live) setProblem(error.message); });
-    return () => { live = false; };
-  }, []);
+  const { plans, problem } = usePublicPlans();
 
   return (
     <SitePage>

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, Wallet, TrendingUp, LifeBuoy, Users, Receipt, ArrowRight, CreditCard, Sparkles, RefreshCw
 } from 'lucide-react';
-import { useApiData } from '../../hooks/useApi';
+import { useApiData, useLiveRefresh } from '../../hooks/useApi';
 import { Button, Card, StatCard, BarChart, DonutChart, StatusBadge, EmptyState, CardSkeleton, Badge } from '../../components/ui';
 import { rupees, rupeesShort, number, monthLabel, ago, date } from '../../utils/format';
 import type { PlatformOverview } from '../../types/platform';
@@ -15,6 +15,7 @@ const change = (now: number, before: number): number | null => (before > 0 ? Mat
 export default function Overview() {
   const navigate = useNavigate();
   const { data, loading, reload } = useApiData<PlatformOverview>('/platform/overview');
+  useLiveRefresh(reload);
 
   if (loading && !data) return <><div className="page-head"><h1>Platform overview</h1></div><CardSkeleton count={8} /></>;
   if (!data) return null;

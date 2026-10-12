@@ -67,13 +67,43 @@ export function unitsToPaisa(units: unknown): number | null {
 export interface ProviderOutcome {
   ok: boolean; reason?: string; reference?: string; providerReference?: string; amountPaisa?: number | null;
   currency?: string; status?: PaymentStatus; providerStatus?: string; method?: string | null; feePaisa?: number | null;
+  /** A provider that renews by itself (Stripe) says which of its subscriptions this payment started. */
+  recurring?: { subscriptionId: string | null; customerId: string | null };
 }
 
 export interface RedirectRequest { url: string; method: 'POST' | 'GET'; fields: Record<string, string> }
 
 export interface BuiltRequest {
   ok: boolean; reason?: string; redirect?: RedirectRequest; instructions?: Record<string, unknown>; expiresAt?: string;
+  /** The provider's own id for the request (a Stripe Checkout Session), kept for lookups. */
+  providerReference?: string;
 }
+
+/** What the server asks a provider for. The amount comes from the plan, never a browser. */
+export interface PaymentRequest {
+  reference: string; amountPaisa: number; currency: string; description: string; returnUrl: string; cancelUrl: string;
+  plan: { key: string; name: string; period: string };
+  /** Renew automatically at the provider (Stripe subscription mode) rather than one payment. */
+  recurring: boolean;
+  customerEmail?: string | null;
+  metadata: Record<string, string>;
+}
+
+/**
+ * One verified event from a provider that bills on its own schedule (Stripe),
+ * reduced to what KSF acts on. The adapter only reads and verifies; what the
+ * event does to a subscription is decided in payments/index.ts.
+ */
+export type ProviderEvent =
+  | { ok: false; reason: string }
+  | { ok: true; id: string; type: string; kind: 'checkout'; outcome: ProviderOutcome }
+  | {
+    ok: true; id: string; type: string; kind: 'renewal'; subscriptionId: string; invoiceId: string;
+    amountPaisa: number; currency: string; paid: boolean; failure?: string;
+  }
+  | { ok: true; id: string; type: string; kind: 'renewal-setting'; subscriptionId: string; renews: boolean }
+  | { ok: true; id: string; type: string; kind: 'ended'; subscriptionId: string }
+  | { ok: true; id: string; type: string; kind: 'ignored' };
 
 export interface CallbackInput {
   body?: Record<string, any>; query?: Record<string, string>; raw?: Buffer | string | null; headers?: Record<string, unknown>;
@@ -86,8 +116,14 @@ export interface Adapter {
   capabilities: { redirect: boolean; lookup: boolean; refund: boolean; webhook: boolean };
   configured(): { ok: boolean; missing: string[] };
   describe(): { key: string; label: string; configured: boolean; missing: string[]; mode: string; verified: boolean; note: string };
-  createRequest(input: { reference: string; amountPaisa: number; currency: string; description: string; returnUrl: string }): BuiltRequest;
+  createRequest(input: PaymentRequest): BuiltRequest | Promise<BuiltRequest>;
   verifyCallback(input: CallbackInput): ProviderOutcome;
   lookup?(input: { reference: string; providerReference: string | null }): Promise<ProviderOutcome>;
   refund?(input: { providerReference: string | null; currency: string; amountPaisa: number; reason: string }): Promise<ProviderOutcome>;
+  /** A provider whose webhook carries many kinds of event: verify one and say what it means. */
+  parseEvent?(input: CallbackInput): ProviderEvent;
+  /** Stop, or resume, the provider's own renewals: at the period's end, or at once. */
+  setRenewal?(providerSubscriptionId: string, renew: boolean, immediately?: boolean): Promise<ProviderOutcome>;
+  /** The provider's page where a customer changes their card. */
+  portal?(customerId: string, returnUrl: string): Promise<{ ok: boolean; url?: string; reason?: string }>;
 }

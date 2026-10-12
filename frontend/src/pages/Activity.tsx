@@ -29,7 +29,7 @@ const SEVERITY_TONE: Record<string, 'ok' | 'warn' | 'danger' | 'info'> = {
 };
 
 export default function Activity() {
-  const { ok } = useApp();
+  const { ok, hasFeature } = useApp();
   const { busy, run } = useAction();
 
   const [term, setTerm] = useState('');
@@ -69,13 +69,15 @@ export default function Activity() {
             from inside the application.
           </p>
         </div>
-        <Allow permission="audit.export">
-          <div className="actions">
-            <Button variant="outline" icon={<Download size={17} />} onClick={exportCsv} loading={busy}>
-              Export the trail
-            </Button>
-          </div>
-        </Allow>
+        {hasFeature('reports.export') && (
+          <Allow permission="audit.export">
+            <div className="actions">
+              <Button variant="outline" icon={<Download size={17} />} onClick={exportCsv} loading={busy}>
+                Export the trail
+              </Button>
+            </div>
+          </Allow>
+        )}
       </div>
 
       <div className="grid grid-4 mb-5">

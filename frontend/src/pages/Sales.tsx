@@ -48,8 +48,10 @@ export default function Sales() {
   const search = useDebounced(term);
   const [status, setStatus] = useState('all');
   const [method, setMethod] = useState('all');
-  const [from, setFrom] = useState(isoDaysAgo(29));
-  const [to, setTo] = useState(todayIso());
+  /* A link can open one day or one period (the accounts link a day's takings here). */
+  const day = (key: string) => (/^\d{4}-\d{2}-\d{2}$/.test(params.get(key) ?? '') ? params.get(key)! : null);
+  const [from, setFrom] = useState(day('from') ?? isoDaysAgo(29));
+  const [to, setTo] = useState(day('to') ?? todayIso());
   const [mine, setMine] = useState(false);
   /* The Admin can look at one person's till, or every till in one role. */
   const [staff, setStaff] = useState('');

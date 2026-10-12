@@ -249,6 +249,8 @@
    ========================================================================== */
 
 :root[data-theme='dark'] {
+  /* The logo tile's outline against a dark surface (components/Brand.tsx). */
+  --brand-mark-edge: rgba(255, 255, 255, 0.16);
   color-scheme: dark;
 
   --canvas: #0B0F17;

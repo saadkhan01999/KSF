@@ -1,6 +1,6 @@
 # Taking subscription payments
 
-**KSF 2.0**
+**KSF 2.1**
 
 This is about the money KSF collects for itself — the subscription a pharmacy
 pays to use it. Money a pharmacy takes over its own counter is a different
@@ -39,11 +39,12 @@ Read these before changing anything in `backend/src/services/payments/`.
 
 | Provider | State | What it needs |
 |---|---|---|
+| **Stripe** (cards on Stripe Checkout) | Implemented and tested against a stand-in that speaks Stripe's API: Checkout, signed webhooks, renewals, failed renewals, refunds, the card page, cancellation | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and the webhook endpoint registered in the Stripe Dashboard (§4) |
 | **Bank transfer / Raast** | Implemented and tested. Works with no provider account at all | The pharmacy's own bank details in the environment |
 | **Aggregator** (Safepay, PayFast, Paymob, Keenu, or a bank's own gateway) | Implemented, and the real adapter is tested against a stub that speaks the documented shape | A merchant account and its keys |
 | **JazzCash** | Implemented from the published integration shape. **Never run against JazzCash's sandbox** | Merchant ID, password, integrity salt, and the sandbox cases in §6 |
 | **Easypaisa** | Same: implemented, never run against a sandbox. The hash field order is configurable because it differs between merchant packs | Store ID, hash key, and the sandbox cases in §6 |
-| **Card in the application** | Deliberately not built | — |
+| **A card form inside KSF** | Deliberately not built: cards are typed on Stripe's own page | — |
 
 `GET /api/v1/billing/providers` is the truth at runtime: it reports
 `configured` and `verified` per provider, and `missing` lists the settings that
@@ -102,6 +103,54 @@ schedule.
 
 Every setting is an environment variable. None of them has a default that
 points at a live provider, and nothing below is a real credential.
+
+### Stripe — cards, and plans that renew themselves
+
+```bash
+PAYMENT_PROVIDER=stripe                 # offer it first on the Billing screen
+STRIPE_SECRET_KEY="sk_test_…"           # sk_live_… for real money
+STRIPE_WEBHOOK_SECRET="whsec_…"         # from the webhook endpoint below
+STRIPE_RECURRING=true                   # false: one payment per period, no auto-renewal
+STRIPE_EXPIRY_MINUTES=60                # how long a Checkout page stays open
+STRIPE_TIMEOUT_MS=15000
+```
+
+In the Stripe Dashboard › Developers › Webhooks, add the endpoint
+`https://<your API>/api/v1/payments/webhook/stripe` with these events, and put
+its signing secret in `STRIPE_WEBHOOK_SECRET`:
+
+```
+checkout.session.completed            checkout.session.expired
+checkout.session.async_payment_succeeded
+checkout.session.async_payment_failed
+invoice.paid                          invoice.payment_succeeded
+invoice.payment_failed
+customer.subscription.updated         customer.subscription.deleted
+```
+
+How it works:
+
+- **Paying.** `POST /api/v1/billing/checkout` with `provider: "stripe"`
+  creates a Checkout Session for the plan's price — read from the plan row,
+  never from the browser — in subscription mode (a Stripe subscription that
+  renews every period) or, with `STRIPE_RECURRING=false`, a single payment.
+  The request carries an idempotency key, so a double click is one session.
+- **Coming back.** The browser returns to `/api/v1/payments/return/stripe`;
+  KSF asks Stripe about the session before saying anything, then sends the
+  person to Billing with the result.
+- **The webhook settles it.** The `Stripe-Signature` header is checked
+  (HMAC-SHA256 over the raw body, five minutes' tolerance) and each event id
+  is applied once. The amount and currency must match the attempt.
+- **Renewals.** `invoice.paid` for a new period extends the subscription
+  once, and only when the amount is the plan's price; `invoice.payment_failed`
+  starts the grace period, and nothing is switched off at once.
+- **Invoices and receipts.** Every successful payment gets an invoice number
+  (`KSF-INV-2026-000001`), a receipt by e-mail and a notification; the
+  pharmacy sees and prints its invoices on Billing, the platform on Income.
+- **Changing the card, stopping renewal.** Billing › Change card opens
+  Stripe's customer portal. Turning auto-renew off, cancelling, moving to
+  Basic or to another plan tells Stripe first, and only then says it is done.
+- **Refunds** go back through Stripe, on the payment behind the invoice.
 
 ### Bank transfer — works with no merchant account
 
@@ -174,7 +223,7 @@ Webhook (server to server):  https://your-domain/api/v1/payments/webhook/<provid
 Return (the browser):        https://your-domain/api/v1/payments/return/<provider>
 ```
 
-`<provider>` is `jazzcash`, `easypaisa`, `gateway` or `bank-transfer`. Both must
+`<provider>` is `stripe`, `jazzcash`, `easypaisa`, `gateway` or `bank-transfer`. Both must
 be reachable over HTTPS from the internet. `PUBLIC_APP_URL` must be set
 correctly or the redirect back into the application will not work.
 
@@ -204,7 +253,7 @@ anybody here holds. Confirm these, in writing, with the provider:
 ## 6. The sandbox cases to run before setting `*_VERIFIED=true`
 
 Run each against the provider's sandbox, with a real merchant account, and keep
-the evidence. The automated suite (`npm run test:payments`) already proves the
+the evidence. The automated suites (`npm test`) already prove the
 adapter code handles each of these correctly against a stub — what this proves
 is that the provider behaves the way its documentation says.
 
@@ -247,7 +296,10 @@ truth.
 |---|---|
 | `backend/src/services/payments/provider.ts` | The status vocabulary, the legal transitions, HMAC helpers, and the adapter contract |
 | `backend/src/services/payments/adapters.ts` | The four adapters: the generic gateway, JazzCash (`pp_SecureHash`), Easypaisa (configurable hash order) and bank transfer (its `verifyCallback()` always refuses — a transfer is confirmed by a person) |
+| `backend/src/services/payments/stripe.ts` | Stripe: Checkout Sessions, the `Stripe-Signature` check, events, lookups, refunds, renewal and the customer portal |
 | `backend/src/services/payments/index.ts` | Creating an attempt, settling from a provider, reconciling, refunding, confirming a transfer by hand |
 | `backend/src/modules/billing.ts` | The pharmacy's Billing endpoints and the public callback routes |
 | `backend/src/modules/platform.ts` | The Super Admin's side: confirming transfers, refunds, recording offline payments, income |
+| `backend/src/modules/invoices.ts` | Invoices and receipts for the pharmacy and the platform |
 | `tests/unit.test.mjs` | Transition rules, money conversion and signature checks |
+| `tests/stripe.test.mjs` | Stripe end to end against a stand-in for its API |

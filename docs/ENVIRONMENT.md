@@ -27,6 +27,7 @@ Only **three** settings are required: `MONGODB_URI`, the two JWT secrets, and
 |---|---|---|
 | `NODE_ENV` | `development` | `production` turns on HSTS, refuses console e-mail, hides internals from the health check and requires distinct JWT secrets |
 | `PORT` | `8790` | Port the API (and, after a build, the website) listens on |
+| `KSF_EDITION` | `commercial` | `university` marks an isolated copy made for academic submission (`npm run university:copy`): online payments are switched off, the edition is shown beside the logo, and `npm run seed:demo` may fill an empty database with a demonstration pharmacy |
 | `PUBLIC_APP_URL` | `http://localhost:5180` | The address people type. Used in e-mails, referral links and payment returns |
 | `PUBLIC_ALLOWED_ORIGINS` | `http://localhost:5180,http://localhost:4180` | Comma-separated origins allowed to call the API from another origin. A page calling the API on its own address (Vercel forwarding `/api`, or the API's own site) needs no entry: current browsers mark those requests `Sec-Fetch-Site: same-origin`. The origin of `PUBLIC_APP_URL` is always allowed. `*` stands for one run of letters and digits, so `https://ksf-x86j-*-ssam1.vercel.app` covers every Vercel deployment address of that project. In development any localhost port is accepted as well |
 | `STATIC_DIR` | `frontend/dist` | The built website the API serves in production |
@@ -126,8 +127,13 @@ the new parameters.
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `PAYMENT_PROVIDER` | `manual` | The provider offered first: `bank-transfer`, `gateway`, `jazzcash`, `easypaisa` |
+| `PAYMENT_PROVIDER` | `manual` | The provider offered first: `stripe`, `bank-transfer`, `gateway`, `jazzcash`, `easypaisa`. When it is not set up, the first one that is (Stripe first) |
 | `PAYMENT_WEBHOOK_SECRET` | — | Shared secret for signed provider callbacks |
+| `STRIPE_SECRET_KEY` | — | Stripe's secret key (`sk_test_…` while testing, `sk_live_…` for real money). With the webhook secret, it switches card payments on |
+| `STRIPE_WEBHOOK_SECRET` | — | The signing secret (`whsec_…`) of the webhook endpoint `https://<your API>/api/v1/payments/webhook/stripe` |
+| `STRIPE_RECURRING` | `true` | `false` takes one payment per period instead of a Stripe subscription that renews itself |
+| `STRIPE_EXPIRY_MINUTES` | `60` | How long a Checkout page stays open (30 minutes to 24 hours) |
+| `STRIPE_TIMEOUT_MS` | `15000` | How long to wait for Stripe's API |
 | `BANK_*`, `GATEWAY_*`, `JAZZCASH_*`, `EASYPAISA_*` | — | Each provider's account details. A provider stays switched off until its own settings are filled in |
 
 The full list per provider, and how a payment moves from *pending* to

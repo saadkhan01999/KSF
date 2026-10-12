@@ -14,6 +14,7 @@ import {
   api, ApiError, refreshAccessToken, setAccessToken, setSessionLostHandler, setStepUpHandler, setSupportPharmacy, supportPharmacy
 } from '../services/api';
 import type { Bootstrap, SessionUser, SubscriptionState, LoginOutcome, Device } from '../types';
+import { subscribeLive } from '../services/live';
 
 /* ------------------------------- toasts ------------------------------- */
 
@@ -85,6 +86,11 @@ interface AppValue {
   subscription: SubscriptionState | null;
   hasFeature: (key: string) => boolean;
   refreshSubscription: () => Promise<void>;
+
+  /** Bumped whenever the live feed says the plans, or this pharmacy's (or,
+      in the console, any pharmacy's) subscription, changed. A screen that
+      shows either reloads when its number moves (hooks/useApi useLiveRefresh). */
+  live: { plans: number; subscription: number };
 
   /* workspace */
   workspace: Bootstrap | null;
@@ -297,6 +303,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setStepUpOpen(false);
   }, []);
 
+  /* ----------------------------- live updates ---------------------------
+     One stream per signed-in tab. A plan or subscription change refreshes
+     what every screen relies on — the entitlements and the workspace — and
+     bumps a counter the screens showing plans or billing reload on. */
+  const [live, setLive] = useState({ plans: 0, subscription: 0 });
+  useEffect(() => {
+    if (!user) return undefined;
+    let settle = 0;
+    const refreshAll = () => {
+      window.clearTimeout(settle);
+      settle = window.setTimeout(() => { void refreshSubscription(); void refreshWorkspace(); }, 150);
+    };
+    const stop = subscribeLive('/events', (event) => {
+      setLive((current) => ({
+        plans: current.plans + (event.type === 'subscription.changed' ? 0 : 1),
+        subscription: current.subscription + (event.type === 'plans.changed' ? 0 : 1)
+      }));
+      refreshAll();
+    });
+    /* Back to a tab after a long time away: the feed may have been dropped
+       by the phone, so look again rather than trust it. */
+    let hiddenAt = 0;
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      if (hiddenAt && Date.now() - hiddenAt > 5 * 60_000) {
+        setLive((current) => ({ plans: current.plans + 1, subscription: current.subscription + 1 }));
+        refreshAll();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { stop(); window.clearTimeout(settle); document.removeEventListener('visibilitychange', onVisibility); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.pharmacyId, user?.supportMode]);
+
   /* ----------------------------- appearance ---------------------------- */
   useEffect(() => { applyTheme(theme); }, [theme]);
 
@@ -332,14 +372,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     user, loading, signIn, completeTwoFactor, adoptSession, signOut, refreshSession, endedBecause,
     isPlatform, enterSupport, leaveSupport,
     can, canAny,
-    subscription, hasFeature, refreshSubscription,
+    subscription, hasFeature, refreshSubscription, live,
     workspace, refreshWorkspace, setting,
     toasts, toast, ok, fail, dismissToast,
     theme, setTheme, brand: workspace?.theme ?? DEFAULT_BRAND, previewBrand,
     stepUpOpen, resolveStepUp
   }), [
     user, loading, signIn, completeTwoFactor, adoptSession, signOut, refreshSession, endedBecause,
-    isPlatform, enterSupport, leaveSupport, can, canAny, subscription, hasFeature, refreshSubscription,
+    isPlatform, enterSupport, leaveSupport, can, canAny, subscription, hasFeature, refreshSubscription, live,
     workspace, refreshWorkspace, setting, toasts, toast, ok, fail, dismissToast, theme, setTheme, previewBrand,
     stepUpOpen, resolveStepUp
   ]);

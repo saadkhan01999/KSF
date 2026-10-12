@@ -51,7 +51,7 @@ const STEP_ICON: Record<string, React.ReactNode> = {
 
 export default function Setup() {
   const navigate = useNavigate();
-  const { ok, fail, refreshSession } = useApp();
+  const { ok, fail, refreshSession, live } = useApp();
 
   const [state, setState] = useState<SetupState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -82,13 +82,14 @@ export default function Setup() {
     });
   }, []);
 
+  /* Loaded again when the plans change, so the prices offered are the platform's current ones. */
   useEffect(() => {
     let live = true;
     api.get<{ data: SetupState }>('/setup/state')
       .then((reply) => { if (live) adopt(reply.data); })
       .catch((problem) => { if (live) fail(problem, 'The setup checklist could not be loaded.'); });
     return () => { live = false; };
-  }, [adopt, fail]);
+  }, [adopt, fail, live.plans]);
 
   const save = async (what: string, path: string, body: unknown) => {
     setBusy(what);

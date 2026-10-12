@@ -7,15 +7,19 @@ export async function startServer() {
   const { bootstrap } = await import('../../backend/src/db/bootstrap.ts');
   await import('../../backend/src/modules/index.ts');
   const { createApp } = await import('../../backend/src/http/app.ts');
+  const { startLiveFeed } = await import('../../backend/src/services/live.ts');
 
   await connect();
   await bootstrap({ silent: true });
+  const stopLiveFeed = startLiveFeed();
   const server = await new Promise((resolve) => { const listening = createApp().listen(0, '127.0.0.1', () => resolve(listening)); });
   const base = `http://127.0.0.1:${server.address().port}`;
 
   return {
     base,
     async stop() {
+      await stopLiveFeed();
+      server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
       await db().dropDatabase();
       await disconnect();
@@ -74,4 +78,29 @@ export async function codeFor(client, address) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`No code arrived for ${address}.`);
+}
+
+export const TEST_PASSWORD = 'Strong#Pass2026x';
+export const SUPER_ADMIN = { email: 'superadmin@ksf.test', password: 'Platform#Owner2026' };
+
+/** Sign a new pharmacy up through the real flow; returns its Admin's client and the pharmacy id. */
+export async function registerPharmacy(base, firstName, email) {
+  const client = new Client(base);
+  await client.post('/api/v1/register/start', { firstName, lastName: 'Test', email, password: TEST_PASSWORD, mobile: '0300 1234567' });
+  const reply = await client.post('/api/v1/register/verify-email', { code: await codeFor(client, email) }, 201);
+  client.token = reply.accessToken;
+  return { client, pharmacyId: reply.data.pharmacyId, user: reply.user };
+}
+
+/** Add a staff member with a built-in role (by key) and return their signed-in client. */
+export async function addStaff(base, admin, { name, email, roleKey }) {
+  const roles = await admin.get('/api/v1/roles');
+  const role = roles.data.find((row) => row.key === roleKey);
+  if (!role) throw new Error(`No role ${roleKey}.`);
+  /* A pharmacist must carry a Pharmacy Council registration number. */
+  const extra = roleKey === 'pharmacist' ? { pharmacistRegNo: 'PCP-2026-0412' } : {};
+  await admin.post('/api/v1/staff', { fullName: name, email, roleId: role.id, password: TEST_PASSWORD, ...extra }, 201);
+  const client = new Client(base);
+  const reply = await client.signIn(email, TEST_PASSWORD);
+  return { client, id: reply.user.id };
 }

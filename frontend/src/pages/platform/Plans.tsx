@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { CreditCard, Pencil, Plus, Users, Building2, Pill, Monitor, Smartphone } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { useApiData, useAction } from '../../hooks/useApi';
+import { useApiData, useAction, useLiveRefresh } from '../../hooks/useApi';
 import { api } from '../../services/api';
 import { Button, Card, Badge, Modal, TextInput, TextArea, SelectInput, Checkbox, Switch, CardSkeleton, Alert } from '../../components/ui';
 import { rupees, number, toPaisa } from '../../utils/format';
@@ -17,6 +17,7 @@ const PERIOD: Record<string, string> = { week: 'week', month: 'month', year: 'ye
 
 export default function Plans() {
   const { data, loading, reload } = useApiData<PlansReply>('/platform/plans');
+  useLiveRefresh(reload, ['plans']);
   const [editing, setEditing] = useState<PlanRow | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -25,7 +26,11 @@ export default function Plans() {
       <div className="page-head">
         <div>
           <h1>Plans</h1>
-          <p className="sub">What pharmacies can subscribe to: prices, limits and the features each plan unlocks.</p>
+          <p className="sub">
+            What pharmacies can subscribe to. A saved change reaches the pricing page, every pharmacy's billing and the
+            checkout at once; features and limits apply to subscribers straight away, while a new price applies to new
+            subscriptions and plan changes.
+          </p>
         </div>
         <div className="actions">
           <Button variant="primary" icon={<Plus size={18} />} onClick={() => setCreating(true)}>New plan</Button>

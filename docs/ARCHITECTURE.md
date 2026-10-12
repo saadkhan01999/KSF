@@ -34,26 +34,32 @@ backend/src/
   http/
     app.ts           Express app: Helmet, CORS by allow-list, body limits,
                      the access check for every route, error envelope
-    router.ts        publicRoute / accountRoute / platformRoute / route(perm)
+    router.ts        publicRoute / accountRoute / platformRoute / route(perm),
+                     and the plan feature a pharmacy route needs
     authenticate.ts  Bearer token → session → person → device → pharmacy → role
     context.ts       the typed context every handler receives
     cookies.ts       refresh and device cookies
   modules/           one file per area; each registers its routes on import
     auth, account, people, catalogue, inventory, purchasing, selling,
-    cashbook, reporting, messaging, billing, setup, migrate, support,
-    platform, admin, shared (helpers used by several modules)
+    cashbook, accounting, reporting, messaging, billing, invoices,
+    directory, live, setup, migrate, support, platform, team, admin,
+    shared (helpers used by several modules)
   services/          logic used by more than one module
-    subscriptions, payments/ (provider, adapters, index), referrals,
-    mailer, migration (+ tabular parsing, reconciliation report)
+    subscriptions, payments/ (provider, adapters, stripe, index),
+    live (Server-Sent Events from change streams), referrals, mailer,
+    avatars, migration (+ tabular parsing, reconciliation report)
   security/          password (scrypt), sessions (JWT), devices, otp, totp, crypto
-  domain/            permissions and built-in roles, plan catalogue
+  domain/            permissions and built-in roles, plan catalogue, the
+                     platform team's permissions, the starter medicine directory
   db/
     mongo.ts         client, typed collections, tx() transactions
     types.ts         one interface per collection
-    bootstrap.ts     indexes, plans, the Super Admin
+    bootstrap.ts     indexes, plans, the Super Admin, new permissions for the
+                     Admin role, the starter medicine directory
     pipeline.ts      shared aggregation stages
   core/              errors, utilities (money, dates, ids), audit trails
-  cli/               db:check, db:backup / verify, db:restore, db:reset, secrets
+  cli/               db:check, db:backup / verify, db:restore, db:reset, secrets,
+                     seed:demo (university edition)
 ```
 
 ### A request, end to end
@@ -64,8 +70,10 @@ backend/src/
    audience, expiry), loads the **session** (revoked? idle? past absolute
    expiry?), the person (active?), the device (still registered?), the
    pharmacy (suspended?) and the role's permissions — fresh, on every request.
-4. `platform` routes require the Super Admin; `pharmacy` routes require a
-   pharmacy context and the named permission.
+4. `platform` routes require the Super Admin or a team member whose role
+   holds the named platform permission; `pharmacy` routes require a
+   pharmacy context, the named permission and — when the route names one —
+   a plan that includes the feature (`402 feature_locked` otherwise).
 5. The handler receives a typed context: `ctx.user`, `ctx.pharmacyId`,
    `ctx.body`, `ctx.query`, `ctx.params`, `ctx.ip`. Every pharmacy query is
    written with `ctx.pharmacyId`.
@@ -98,11 +106,12 @@ notifications) have `pharmacy_id: null`.
 | Catalogue and stock | `categories`, `medicines`, `batches`, `stock_movements` |
 | Buying | `suppliers`, `purchases` (items embedded) |
 | Selling | `sales` (items and payments embedded), `customers`, `customer_payments`, `prescriptions` (items embedded) |
-| Money | `expenses`, `day_closings` |
+| Money | `expenses`, `day_closings`, `income_entries`, `salary_payments`, `supplier_payments` |
 | Communication | `conversations` (members embedded), `messages`, `notifications`, `support_tickets` (messages embedded), `mail_deliveries` |
 | Records | `activity_logs`, `audit_logs` + `audit_heads` (hash chain), `security_events` |
 | Subscriptions | `subscription_plans`, `subscriptions`, `subscription_payments`, `payment_attempts`, `payment_refunds`, `webhook_events`, `trials` |
 | Referrals | `referral_codes`, `referrals` |
+| Reference | `medicine_directory` (platform-wide, kept by the platform team) |
 | Data import | `migration_jobs`, `migration_items` |
 
 Embedding is used where the child never lives without the parent and is
@@ -222,5 +231,7 @@ move to a bottom bar.
 
 ## 8. Tests
 
-`tests/unit.test.mjs` (no database) and `tests/api.test.mjs` (the whole API
-over HTTP against a throwaway MongoDB database). See `tests/README.md`.
+`tests/unit.test.mjs` (no database), and the API suites against a throwaway
+MongoDB database: `api` (the whole platform over HTTP), `accounting`, `live`,
+`stripe`, `directory` and `access` (every route as every kind of caller).
+See `tests/README.md`.

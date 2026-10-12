@@ -6,7 +6,7 @@
 
 import type { Document, Filter } from 'mongodb';
 import { col, s, tx } from '../db/mongo.js';
-import type { Medicine, Purchase, PurchaseItem, Supplier } from '../db/types.js';
+import type { Medicine, Purchase, PurchaseItem, Supplier, SupplierPayment } from '../db/types.js';
 import { bad, missing } from '../core/errors.js';
 import { logActivity, nextNumber, notify } from '../core/trails.js';
 import { contains, isEmail, isPkPhone, nowIso, randomUUID, today, toInt, toStr, uid } from '../core/util.js';
@@ -16,6 +16,34 @@ import type { PharmacyCtx } from '../http/context.js';
 import { pageResult, paging, recordMovement, refreshStockAlerts } from './shared.js';
 
 const rupees = (paisa: number): string => (paisa / 100).toLocaleString('en-PK');
+
+/* Ways a supplier is paid. 'credit' is absent: credit is the unpaid balance. */
+const SUPPLIER_METHODS = ['cash', 'bank-transfer', 'cheque', 'card', 'easypaisa', 'jazzcash'];
+
+/**
+ * Write a payment to the supplier ledger. The order keeps its running total
+ * (paid_paisa); the ledger keeps when each rupee left, which is what the
+ * accounts' cash flow is built from. Call it inside the order's transaction.
+ */
+async function recordSupplierPayment(ctx: PharmacyCtx, purchase: Purchase, amount: number, details: { paidOn?: string; method?: string; reference?: string | null } = {}): Promise<void> {
+  if (amount <= 0) return;
+  const id = uid('SPY');
+  const payment: SupplierPayment = {
+    _id: id, id, pharmacy_id: ctx.pharmacyId, supplier_id: purchase.supplier_id, purchase_id: purchase.id, amount_paisa: amount,
+    paid_on: details.paidOn || today(), payment_method: details.method || 'cash', reference: details.reference ?? null,
+    created_by: ctx.user.id, created_at: nowIso()
+  };
+  await col.supplierPayments().insertOne(payment, s());
+}
+
+/** The payment details a request may carry, checked. */
+function paymentDetails(ctx: PharmacyCtx): { paidOn: string; method: string; reference: string | null } {
+  const paidOn = toStr(ctx.body.paidOn, 10) || today();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn) || paidOn > today()) bad('Give the payment date as YYYY-MM-DD, not in the future.', 'paidOn');
+  const method = toStr(ctx.body.paymentMethod, 20) || 'cash';
+  if (!SUPPLIER_METHODS.includes(method)) bad('Choose how the supplier was paid.', 'paymentMethod');
+  return { paidOn, method, reference: toStr(ctx.body.paymentReference, 80) || null };
+}
 
 /* =============================== SUPPLIERS =============================== */
 
@@ -292,9 +320,11 @@ route('POST', '/api/v1/purchases', 'purchases.write', async (ctx) => {
     approved_by: null, approved_at: null, created_at: at, updated_at: at
   };
 
+  const paidWith = paidNow ? paymentDetails(ctx) : null;
   await tx(async () => {
     await col.purchases().insertOne(purchase, s());
     if (receiveNow) await receiveStock(ctx, purchase, lines);
+    if (paidWith) await recordSupplierPayment(ctx, purchase, total, paidWith);
   });
   await logActivity(ctx, {
     action: receiveNow ? 'purchase.received' : 'purchase.created', entity: 'purchase', entityId: id,
@@ -358,6 +388,7 @@ route('POST', '/api/v1/purchases/:id/receive', 'purchases.write', async (ctx) =>
 
   const at = nowIso();
   const markPaid = ctx.body.markPaid === true;
+  const paidWith = markPaid ? paymentDetails(ctx) : null;
   const updated = await tx(async () => {
     /* Claim the order first: two people pressing Receive at once cannot both
        take the stock in. */
@@ -374,6 +405,7 @@ route('POST', '/api/v1/purchases/:id/receive', 'purchases.write', async (ctx) =>
     );
     if (!claimed) bad('That order has already been received.');
     await receiveStock(ctx, purchase, lines);
+    if (paidWith) await recordSupplierPayment(ctx, purchase, purchase.total_paisa - purchase.paid_paisa, paidWith);
     return claimed;
   });
 
@@ -428,18 +460,24 @@ route('POST', '/api/v1/purchases/:id/payment', 'purchases.write', async (ctx) =>
   if (outstanding <= 0) bad('That order is already paid in full.');
   if (amount > outstanding) bad(`Only Rs ${rupees(outstanding)} is outstanding on this order.`, 'amountPaisa');
 
+  const details = paymentDetails(ctx);
+
   /* Applied against what the database holds now, never what was read. */
-  const updated = await col.purchases().findOneAndUpdate(
-    { _id: purchase.id, paid_paisa: { $lte: purchase.total_paisa - amount } },
-    [{
-      $set: {
-        paid_paisa: { $add: ['$paid_paisa', amount] }, updated_at: nowIso(),
-        payment_status: { $cond: [{ $gte: [{ $add: ['$paid_paisa', amount] }, '$total_paisa'] }, 'paid', 'part-paid'] }
-      }
-    }],
-    { returnDocument: 'after' }
-  );
-  if (!updated) bad('Another payment was recorded against this order a moment ago. Refresh and check the balance.');
+  const updated = await tx(async () => {
+    const paid = await col.purchases().findOneAndUpdate(
+      { _id: purchase.id, paid_paisa: { $lte: purchase.total_paisa - amount } },
+      [{
+        $set: {
+          paid_paisa: { $add: ['$paid_paisa', amount] }, updated_at: nowIso(),
+          payment_status: { $cond: [{ $gte: [{ $add: ['$paid_paisa', amount] }, '$total_paisa'] }, 'paid', 'part-paid'] }
+        }
+      }],
+      { returnDocument: 'after', ...s() }
+    );
+    if (!paid) bad('Another payment was recorded against this order a moment ago. Refresh and check the balance.');
+    await recordSupplierPayment(ctx, purchase, amount, details);
+    return paid;
+  });
   await logActivity(ctx, { action: 'purchase.paid', entity: 'purchase', entityId: purchase.id, summary: `Rs ${rupees(amount)} paid against ${purchase.reference}` });
   return { data: updated };
 });

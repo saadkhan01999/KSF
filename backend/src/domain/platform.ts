@@ -31,6 +31,8 @@ export const PLATFORM_PERMISSIONS: ReadonlyArray<readonly [string, string, strin
 
   ['platform.plans.manage', 'Create plans and change their prices, limits and features', 'Plans'],
 
+  ['platform.medicines.manage', 'Keep the medicine directory: add and correct entries, and verify them as a pharmacist', 'Medicine directory'],
+
   ['platform.activity', 'Read the platform activity log and security events', 'Records']
 ];
 
@@ -95,6 +97,11 @@ export const PLATFORM_ROLE_TEMPLATES: ReadonlyArray<{ key: string; name: string;
     key: 'operations', name: 'Operations manager',
     description: 'Looks after pharmacies and plans day to day: plans, suspensions, extensions and the records.',
     permissions: ['platform.overview', 'platform.pharmacies.view', 'platform.pharmacies.manage', 'platform.plans.manage', 'platform.support', 'platform.activity']
+  },
+  {
+    key: 'clinical', name: 'Clinical pharmacist',
+    description: 'Keeps the medicine directory accurate: writes and corrects entries and verifies them against their references.',
+    permissions: ['platform.medicines.manage']
   },
   {
     key: 'viewer', name: 'Read only',

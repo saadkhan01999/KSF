@@ -177,6 +177,7 @@ export const PAYMENT_LABELS: Record<string, string> = {
   easypaisa: 'Easypaisa',
   jazzcash: 'JazzCash',
   'bank-transfer': 'Bank transfer',
+  cheque: 'Cheque',
   credit: 'On account (udhaar)'
 };
 
@@ -205,7 +206,10 @@ export function downloadCsv(filename: string, rows: Record<string, unknown>[]): 
   if (!rows.length) return;
   const columns = Object.keys(rows[0]);
   const escape = (value: unknown) => {
-    const text = value === null || value === undefined ? '' : String(value);
+    let text = value === null || value === undefined ? '' : String(value);
+    /* Typed text that begins like a formula ("=HYPERLINK(...)") would run as
+       one when the file is opened in Excel. A quote in front keeps it text. */
+    if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   const csv = [

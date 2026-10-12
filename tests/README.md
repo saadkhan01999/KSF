@@ -3,17 +3,22 @@
 ```bash
 npm test            # everything
 npm run test:unit   # pure logic — no database needed
-npm run test:api    # the whole platform over HTTP — needs MongoDB
+npm run test:api    # every API suite over HTTP — needs MongoDB
 ```
 
 | File | What it proves |
 |---|---|
-| `unit.test.mjs` | File import parsing and formula neutralising, rupee and date reading, column mapping, payment state rules and signatures, password hashing, authenticator codes, stock and expiry rules, roles and themes |
+| `unit.test.mjs` | File import parsing and formula neutralising, rupee and date reading, column mapping, payment state rules and signatures (Stripe's included), password hashing, authenticator codes, stock and expiry rules, roles and themes, who hears which live event, the counter calculator, that every signed-in screen is guarded by a real permission, and that `README.md` lists every route |
 | `api.test.mjs` | One run of the real API against a real MongoDB: Super Admin only on a fresh install, refresh-token rotation and replay detection, sign-up with an e-mail code, setup checklist, catalogue, purchasing, FEFO selling, prescriptions, udhaar, refunds, day close, reports, staff and own-figures scoping, messaging, themes, support tickets, the platform console, support mode, data import and rollback, tenant isolation, suspension, and the Super Admin changing their own e-mail and password |
+| `accounting.test.mjs` | The accounts: supplier payments in the ledger, other income, salaries once a month, profit and loss and cash flow to the rupee, the ledger filters, downloads only on plans with exports, access by role, one pharmacy seeing nothing of another, deletions in the audit trail |
+| `live.test.mjs` | The live feed: a price change reaching a visitor, a subscription change reaching its own pharmacy and no other, the private feed refused to visitors, replay after a reconnect, features locking and unlocking on the server with the plan |
+| `stripe.test.mjs` | Stripe against a stand-in for its API: Checkout at the plan's price, a returning browser believed only after asking Stripe, a payment applied once, forged / stale / unsigned events refused, renewals, a failed renewal's grace period, invoices, refunds, the card page, cancellation |
+| `directory.test.mjs` | The medicine directory: the starter set, search, who may keep it, secure references only, verification and its reset, drafts and archived entries kept from pharmacies, imports |
+| `access.test.mjs` | Every route in the route table: anonymous callers turned away, each pharmacy role refused what it does not hold, every built-in role's screens, the platform console per team role, support mode, and no pharmacy reading or changing another's records |
 | `setup.mjs` | The configuration every test run uses. Tests never read `.env` |
 | `support/server.mjs` | Starts the API inside the test process on a free port and drops its database afterwards |
 
-The API suite uses `TEST_MONGODB_URI` when it is set, otherwise the `MONGODB_URI` in `.env` —
+The API suites use `TEST_MONGODB_URI` when it is set, otherwise the `MONGODB_URI` in `.env` —
 always in a fresh database called `ksf_test_<random>`, which is dropped when the suite ends,
 so it never touches the data the pharmacies use. Without any MongoDB it is skipped and says why.
 

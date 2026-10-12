@@ -275,7 +275,9 @@ route('GET', '/api/v1/notifications/recent', null, async (ctx) => {
 });
 
 route('POST', '/api/v1/notifications/:id/read', null, async (ctx) => {
-  await col.notifications().updateOne({ _id: ctx.params.id, pharmacy_id: ctx.pharmacyId }, { $set: { is_read: 1 } });
+  /* Only a notice this person can see: the pharmacy's, or one addressed to them. */
+  const result = await col.notifications().updateOne({ _id: toStr(ctx.params.id, 60), ...mine(ctx.pharmacyId, ctx.user.id) }, { $set: { is_read: 1 } });
+  if (!result.matchedCount) return missing('That notification could not be found.');
   return { ok: true };
 });
 

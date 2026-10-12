@@ -1,7 +1,7 @@
 {
   "name": "ksf-pharmacy",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "description": "KSF Pharmacy Management System — multi-pharmacy SaaS for Pakistan. React + TypeScript client, Express + TypeScript API, MongoDB.",
   "workspaces": [
@@ -21,9 +21,11 @@
     "db:restore": "npm run db:restore -w backend --",
     "db:reset": "npm run db:reset -w backend --",
     "secrets": "npm run secrets -w backend --",
-    "test": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/unit.test.mjs tests/api.test.mjs",
+    "seed:demo": "npm run seed:demo -w backend --",
+    "university:copy": "node scripts/university-copy.mjs",
+    "test": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/unit.test.mjs tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/directory.test.mjs tests/access.test.mjs",
     "test:unit": "node --import tsx --import ./tests/setup.mjs --test tests/unit.test.mjs",
-    "test:api": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/api.test.mjs"
+    "test:api": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/directory.test.mjs tests/access.test.mjs"
   },
   "engines": {
     "node": ">=20.11.0"

@@ -42,6 +42,8 @@ const Sales = lazy(() => import('./pages/Sales'));
 const Customers = lazy(() => import('./pages/Customers'));
 const Prescriptions = lazy(() => import('./pages/Prescriptions'));
 const Expenses = lazy(() => import('./pages/Expenses'));
+const Accounts = lazy(() => import('./pages/Accounts'));
+const MedicineDirectory = lazy(() => import('./pages/MedicineDirectory'));
 const DayClose = lazy(() => import('./pages/DayClose'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Staff = lazy(() => import('./pages/Staff'));
@@ -113,6 +115,8 @@ function Protected() {
             <Route path="/platform/plans" element={<Guard permission="platform.plans.manage"><Plans /></Guard>} />
             <Route path="/platform/team" element={<Guard permission="platform.team.manage"><Team /></Guard>} />
             <Route path="/platform/activity" element={<Guard permission="platform.activity"><PlatformActivity /></Guard>} />
+            <Route path="/platform/directory" element={<MedicineDirectory />} />
+            <Route path="/platform/directory/:id" element={<MedicineDirectory />} />
             <Route path="/platform/notifications" element={<Notifications />} />
             <Route path="/account" element={<Account />} />
             <Route path="*" element={<Navigate to={home} replace />} />
@@ -133,6 +137,8 @@ function Protected() {
           <Route path="/messages" element={<Guard permission="messages.read"><Messages /></Guard>} />
           <Route path="/medicines" element={<Guard permission="medicines.read"><Medicines /></Guard>} />
           <Route path="/categories" element={<Guard permission="medicines.read"><Categories /></Guard>} />
+          <Route path="/directory" element={<MedicineDirectory />} />
+          <Route path="/directory/:id" element={<MedicineDirectory />} />
           <Route path="/inventory" element={<Guard permission="inventory.read"><Inventory /></Guard>} />
           <Route path="/expiry" element={<Guard permission="inventory.read"><Expiry /></Guard>} />
           <Route path="/suppliers" element={<Guard permission="suppliers.read"><Suppliers /></Guard>} />
@@ -140,6 +146,7 @@ function Protected() {
           <Route path="/customers" element={<Guard permission="customers.read"><Customers /></Guard>} />
           <Route path="/prescriptions" element={<Guard permission="prescriptions.read"><Prescriptions /></Guard>} />
           <Route path="/expenses" element={<Guard permission="expenses.read"><Expenses /></Guard>} />
+          <Route path="/accounts" element={<Guard permission="accounting.view"><Accounts /></Guard>} />
           <Route path="/day-close" element={<Guard permission="day-close.manage"><DayClose /></Guard>} />
           <Route path="/reports" element={<Guard permission="reports.view"><Reports /></Guard>} />
           <Route path="/staff" element={<Guard permission="staff.read"><Staff /></Guard>} />
@@ -226,7 +233,8 @@ export default function App() {
       '/messages': 'Messages',
       '/medicines': 'Medicines', '/categories': 'Categories', '/inventory': 'Inventory',
       '/expiry': 'Expiry Control', '/suppliers': 'Suppliers', '/purchases': 'Purchases',
-      '/customers': 'Customers', '/prescriptions': 'Prescriptions', '/expenses': 'Expenses',
+      '/customers': 'Customers', '/prescriptions': 'Prescriptions', '/expenses': 'Expenses', '/accounts': 'Accounts',
+      '/directory': 'Medicine directory', '/platform/directory': 'Medicine directory',
       '/reports': 'Reports', '/staff': 'Staff', '/roles': 'Roles & Access',
       '/notifications': 'Notifications', '/activity': 'Activity Log', '/settings': 'Settings',
       '/login': 'Sign in', '/setup': 'Finish setting up', '/account': 'My account',
@@ -237,7 +245,8 @@ export default function App() {
     const name = titles[location.pathname]
       ?? (location.pathname.startsWith('/support') ? 'Help & Support'
         : location.pathname.startsWith('/platform/pharmacies/') ? 'Pharmacy'
-          : location.pathname.startsWith('/platform/support/') ? 'Support desk' : undefined);
+          : location.pathname.startsWith('/platform/support/') ? 'Support desk'
+            : /^\/(platform\/)?directory\//.test(location.pathname) ? 'Medicine directory' : undefined);
     document.title = name ? `${name} · KSF` : 'KSF';
   }, [location.pathname]);
 

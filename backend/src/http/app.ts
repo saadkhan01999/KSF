@@ -21,6 +21,7 @@ import { nowIso, rateLimit } from '../core/util.js';
 import { isElevated } from '../security/sessions.js';
 import { platformAllows } from '../domain/platform.js';
 import { sendAvatar } from '../services/avatars.js';
+import { requireFeature } from '../services/subscriptions.js';
 import { authenticate } from './authenticate.js';
 import type { Ctx, HandlerResult } from './context.js';
 import { routes, type RouteDef } from './router.js';
@@ -111,6 +112,9 @@ async function handle(def: RouteDef, req: Request, res: Response): Promise<void>
         throw new HttpError(400, 'Open a pharmacy first: this screen belongs to one pharmacy.', undefined, 'pharmacy_required');
       }
       if (def.permission) ctx.require(def.permission);
+      /* The platform team in support mode sees what the pharmacy has, locked
+         or not: they are there to help, and the plan is not theirs. */
+      if (def.options.feature && !ctx.supportMode) await requireFeature(ctx.pharmacyId, def.options.feature);
     }
 
     /* A person at a counter cannot make 240 changes a minute; a stuck tab or
@@ -127,6 +131,7 @@ async function handle(def: RouteDef, req: Request, res: Response): Promise<void>
 
   const result: HandlerResult = await def.handler(ctx);
   if (ctx.setCookie.length) res.append('Set-Cookie', ctx.setCookie);
+  if (result?.__stream) { result.__stream(res); return; }
 
   if (result && result.__redirect) {
     /* Only to this application: an open redirect on a payment return URL is
@@ -142,6 +147,14 @@ async function handle(def: RouteDef, req: Request, res: Response): Promise<void>
   const status = result?.__status ?? 200;
   if (result) delete result.__status;
   sendJson(res, status, result ?? { ok: true });
+}
+
+/** The origins of the hosted checkout pages a payment form may post to. */
+function checkoutOrigins(): string[] {
+  const origins = ['GATEWAY_CHECKOUT_URL', 'JAZZCASH_POST_URL', 'EASYPAISA_POST_URL'].map((name) => {
+    try { return new URL(String(process.env[name] ?? '')).origin; } catch { return ''; }
+  });
+  return [...new Set(origins.filter((origin) => origin.startsWith('https://')))];
 }
 
 export function createApp(): express.Express {
@@ -162,7 +175,10 @@ export function createApp(): express.Express {
         imgSrc: ["'self'", 'data:', 'blob:'],
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         connectSrc: ["'self'"],
-        formAction: ["'self'"],
+        /* Hosted checkouts that are reached by posting a signed form (JazzCash,
+           Easypaisa, a gateway) must be allowed as form targets; Stripe is a
+           plain link and needs nothing here. */
+        formAction: ["'self'", ...checkoutOrigins()],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
         objectSrc: ["'none'"],

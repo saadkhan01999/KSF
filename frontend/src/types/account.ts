@@ -89,6 +89,10 @@ export interface Payment {
   period_end: string | null;
   paid_at: string | null;
   created_at: string;
+  refunded_paisa?: number | null;
+  /** Set on every payment that succeeded. */
+  invoice_no?: string | null;
+  plan_name?: string | null;
 }
 
 /* ----------------------------------------------------------- referrals --- */
@@ -111,12 +115,27 @@ export interface ReferralSummary {
   }[];
 }
 
+export interface PaymentProvider { key: string; label: string; mode: string; note: string; methods: string[] }
+
 export interface BillingOverview {
   subscription: SubscriptionState;
   plans: Plan[];
   payments: Payment[];
   referrals: ReferralSummary;
   canManage: boolean;
+  /** The ways this installation can take a payment right now. */
+  providers: PaymentProvider[];
+  defaultProvider: string;
+  /** The card on file, when a provider (Stripe) renews the plan by itself. */
+  card: { provider: string; canChange: boolean } | null;
+}
+
+/** What /billing/checkout answers: go to the provider, or follow instructions (bank transfer). */
+export interface CheckoutReply {
+  reference: string; provider: string; amountPaisa: number; currency: string; plan: { key: string; name: string };
+  redirect: { url: string; method: 'GET' | 'POST'; fields: Record<string, string> } | null;
+  instructions: Record<string, unknown> | null;
+  note: string;
 }
 
 /* ------------------------------------------------------------- devices --- */

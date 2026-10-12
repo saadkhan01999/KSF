@@ -425,7 +425,7 @@ route('POST', '/api/v1/roles', 'roles.manage', async (ctx) => {
   await logActivity(ctx, { action: 'role.created', entity: 'role', entityId: id, severity: 'warn', summary: `Role "${name}" created with ${permissions.length} permission(s)`, meta: { permissions } });
   await auditLog(ctx, { action: 'role.created', entity: 'role', entityId: id, summary: `Role "${name}" created`, after: { permissions } });
   return { data: { ...role, member_count: 0 }, __status: 201 };
-});
+}, { feature: 'staff.roles' });
 
 route('PATCH', '/api/v1/roles/:id', 'roles.manage', async (ctx) => {
   const role = await col.roles().findOne({ _id: ctx.params.id, pharmacy_id: ctx.pharmacyId });
@@ -450,7 +450,7 @@ route('PATCH', '/api/v1/roles/:id', 'roles.manage', async (ctx) => {
   await logActivity(ctx, { action: 'role.updated', entity: 'role', entityId: role.id, severity: 'warn', summary: `Role "${name}" updated${permissions ? ` — now ${permissions.length} permission(s)` : ''}`, meta: { permissions } });
   if (permissions) await auditLog(ctx, { action: 'role.permissions-changed', entity: 'role', entityId: role.id, summary: `Permissions of "${name}" changed`, before: { permissions: role.permissions }, after: { permissions } });
   return { data: await roleOut(role.id) };
-});
+}, { feature: 'staff.roles' });
 
 route('DELETE', '/api/v1/roles/:id', 'roles.manage', async (ctx) => {
   const role = await col.roles().findOne({ _id: ctx.params.id, pharmacy_id: ctx.pharmacyId });
@@ -463,7 +463,7 @@ route('DELETE', '/api/v1/roles/:id', 'roles.manage', async (ctx) => {
   await logActivity(ctx, { action: 'role.deleted', entity: 'role', entityId: role.id, severity: 'danger', summary: `Role "${role.name}" deleted` });
   await auditLog(ctx, { action: 'role.deleted', entity: 'role', entityId: role.id, summary: `Role "${role.name}" deleted`, before: { permissions: role.permissions } });
   return { ok: true };
-});
+}, { feature: 'staff.roles' });
 
 route('POST', '/api/v1/roles/:id/duplicate', 'roles.manage', async (ctx) => {
   const source = await col.roles().findOne({ _id: ctx.params.id, pharmacy_id: ctx.pharmacyId });
@@ -481,7 +481,7 @@ route('POST', '/api/v1/roles/:id/duplicate', 'roles.manage', async (ctx) => {
   await col.roles().insertOne(role);
   await logActivity(ctx, { action: 'role.duplicated', entity: 'role', entityId: id, severity: 'warn', summary: `Role "${name}" created from "${source.name}"` });
   return { data: { ...role, member_count: 0 }, __status: 201 };
-});
+}, { feature: 'staff.roles' });
 
 /** Give a new pharmacy its built-in roles. */
 export async function installRoles(pharmacyId: string): Promise<Map<string, string>> {

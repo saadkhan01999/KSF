@@ -17,3 +17,7 @@ import './migrate.js';
 import './support.js';
 import './platform.js';
 import './team.js';
+import './accounting.js';
+import './live.js';
+import './invoices.js';
+import './directory.js';
