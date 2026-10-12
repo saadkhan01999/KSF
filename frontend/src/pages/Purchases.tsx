@@ -17,7 +17,7 @@ import {
   SelectInput, Checkbox, ConfirmDialog, EmptyState, TableSkeleton, Pager,
   Allow, Alert, Segmented, Badge
 } from '../components/ui';
-import { rupees, rupeesShort, toPaisa, number, date, todayIso, downloadCsv } from '../utils/format';
+import { rupees, rupeesShort, toPaisa, number, date, todayIso, downloadCsv, PAYMENT_LABELS } from '../utils/format';
 import type { Medicine, Paged, Purchase, Supplier } from '../types';
 
 interface PurchaseResponse extends Paged<Purchase> {
@@ -55,7 +55,7 @@ export default function Purchases() {
 
   const path = `/purchases${query({ q: search, status, page, size: 20 })}`;
   const { data, loading, reload } = useApiData<PurchaseResponse>(path, [search, status, page]);
-  const { data: detail } = useApiData<{ data: Purchase }>(viewing ? `/purchases/${viewing}` : null, [viewing]);
+  const { data: detail, reload: reloadDetail } = useApiData<{ data: Purchase }>(viewing ? `/purchases/${viewing}` : null, [viewing]);
 
   useEffect(() => { setPage(1); }, [search, status]);
 
@@ -191,6 +191,7 @@ export default function Purchases() {
         purchase={detail?.data ?? null}
         open={!!viewing}
         onClose={() => setViewing(null)}
+        onPaid={() => { void reloadDetail(true); void reload(true); }}
       />
 
       <ConfirmDialog
@@ -452,7 +453,59 @@ function PurchaseForm({ open, onClose, onSaved }: { open: boolean; onClose: () =
 
 /* ------------------------------ the detail ------------------------------ */
 
-function PurchaseDetail({ purchase, open, onClose }: { purchase: Purchase | null; open: boolean; onClose: () => void }) {
+const SUPPLIER_METHODS = ['cash', 'bank-transfer', 'cheque', 'card', 'easypaisa', 'jazzcash'];
+
+/** Pay a supplier against a received order, in part or in full. */
+function PayPurchase({ purchase, open, onClose, onPaid }: { purchase: Purchase; open: boolean; onClose: () => void; onPaid: () => void }) {
+  const { ok } = useApp();
+  const { busy, run } = useAction();
+  const outstanding = purchase.total_paisa - purchase.paid_paisa;
+  const [form, setForm] = useState({ amount: '', method: 'cash', paidOn: todayIso(), reference: '' });
+  useEffect(() => {
+    if (open) setForm({ amount: String(outstanding / 100), method: 'cash', paidOn: todayIso(), reference: '' });
+  }, [open, outstanding]);
+  const amount = toPaisa(form.amount);
+
+  const pay = () => run(
+    () => api.post(`/purchases/${purchase.id}/payment`, { amountPaisa: amount, paymentMethod: form.method, paidOn: form.paidOn, paymentReference: form.reference }),
+    () => { ok('Payment recorded', `${rupees(amount)} paid to ${purchase.supplier_name}.`); onClose(); onPaid(); }
+  );
+
+  return (
+    <Modal
+      open={open} onClose={onClose} size="sm" icon={<Coins />} title="Record a payment"
+      subtitle={`${purchase.reference} · ${rupees(outstanding)} outstanding`}
+      footer={(
+        <>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={busy} onClick={pay} disabled={amount <= 0 || amount > outstanding}>Record {rupees(Math.max(0, amount))}</Button>
+        </>
+      )}
+    >
+      <div className="form-grid">
+        <TextInput
+          label="Amount" required type="number" inputMode="decimal" prefix="Rs" min={0} step="0.01" wrapClass="span-2"
+          value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })}
+          error={amount > outstanding ? `Only ${rupees(outstanding)} is outstanding.` : undefined}
+        />
+        <SelectInput
+          label="Paid by" value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}
+          options={SUPPLIER_METHODS.map((value) => ({ value, label: PAYMENT_LABELS[value] ?? value }))}
+        />
+        <TextInput label="Paid on" type="date" max={todayIso()} value={form.paidOn} onChange={(e) => setForm({ ...form, paidOn: e.target.value })} />
+        <TextInput
+          label="Reference" wrapClass="span-2" placeholder="Cheque or transfer number"
+          value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })}
+        />
+      </div>
+    </Modal>
+  );
+}
+
+function PurchaseDetail({ purchase, open, onClose, onPaid }: { purchase: Purchase | null; open: boolean; onClose: () => void; onPaid: () => void }) {
+  const { can } = useApp();
+  const [paying, setPaying] = useState(false);
+  const payable = !!purchase && purchase.status === 'received' && purchase.paid_paisa < purchase.total_paisa && can('purchases.write');
   return (
     <Modal
       open={open}
@@ -464,10 +517,12 @@ function PurchaseDetail({ purchase, open, onClose }: { purchase: Purchase | null
       footer={
         <>
           <Button variant="outline" onClick={onClose}>Close</Button>
+          {payable && <Button variant="primary" icon={<Coins size={17} />} onClick={() => setPaying(true)}>Record payment</Button>}
           <Button variant="secondary" icon={<Printer size={17} />} onClick={() => window.print()}>Print</Button>
         </>
       }
     >
+      {purchase && payable && <PayPurchase purchase={purchase} open={paying} onClose={() => setPaying(false)} onPaid={onPaid} />}
       {!purchase
         ? <TableSkeleton rows={5} columns={4} />
         : (

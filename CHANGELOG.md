@@ -3,7 +3,102 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
-## Unreleased
+## [2.1.0] — 2026-10-12
+
+The ten points of the October update: accounts, card payments that renew
+themselves, a shared medicine directory, plans and prices that change live
+everywhere, every role tested route by route, and a university edition.
+
+### Accounts
+- **Accounts** (new screen, `accounting.view` / `accounting.manage`): income
+  and expenses in one place — sales, other income, purchases, salaries and
+  every other cost. Overview with net profit, cash in and out, receivables,
+  payables, stock value and twelve months' trend; a profit-and-loss
+  statement; one ledger of every movement; other income; salaries (a person
+  is paid once a month; advances and bonuses are kept as what they are).
+- Profit is computed from what each sale cost when it was sold, GST is kept
+  out of income, and write-offs count as a cost.
+- Supplier payments are dated, with a method (cash, bank transfer, cheque,
+  card, Easypaisa, JazzCash) and
+  a reference, so cash out is exact; Purchases has **Record payment**.
+- Any period (this month, last month, quarter, year, or two dates); A4
+  statements to print or save as PDF; CSV downloads on plans with exports.
+- The Regional Manager can now read the accounts (granted once, on upgrade).
+
+### Payments, invoices and receipts
+- **Stripe**: cards on Stripe Checkout, and plans that renew themselves
+  through Stripe. The amount is the plan's, the webhook is signature-checked
+  and applied once, a returning browser is believed only after asking Stripe,
+  renewals are applied only at the plan's price, a failed renewal starts the
+  grace period, refunds go back through Stripe, and **Change card** opens
+  Stripe's customer portal. Turning renewal off, cancelling or changing plan
+  tells Stripe first.
+- Every successful payment gets an **invoice number** (`KSF-INV-2026-000001`),
+  a receipt by e-mail and a notification. Pharmacies see and print their
+  invoices on Billing; the platform opens any of them from Income. Payments
+  made before this release are numbered too.
+- The Billing screen offers every configured way to pay, with the default
+  first, and says where a payment stands when the person comes back.
+
+### Plans and prices, live
+- A change to a plan's price, limits or features reaches every open screen
+  at once — the public pricing page, every pharmacy's dashboard and billing,
+  and the checkout — over Server-Sent Events fed by MongoDB change streams
+  (a 15-second poll where there is no replica set).
+- A pharmacy's features follow its subscription the moment it changes, **on
+  the server**: advanced reports, exports, custom roles and messaging answer
+  `402 feature_locked` on a plan without them, and the screen shows what is
+  locked and which plans include it. A banner says when a subscription needs
+  attention.
+
+### Medicine directory
+- One directory for the whole platform: names, other names, brands and their
+  companies, category, forms, uses, precautions, side effects, interactions,
+  and references (secure addresses only). Search by the start of a name, an
+  other name, a brand or a category; browse by letter.
+- Kept by the platform team (`platform.medicines.manage`, and a ready-made
+  **Clinical pharmacist** team role): drafts, archive and restore, imports,
+  and **verification** under a pharmacist's name — cleared whenever what an
+  entry says changes. A starter set of 34 common medicines arrives
+  unverified, with search links to DailyMed and the NHS, for the team to
+  check.
+- A pharmacy adds a directory medicine to its own catalogue in one step.
+
+### Access, tested
+- `tests/access.test.mjs` calls **every route** as nobody, as each built-in
+  role and as the platform team: refused without the permission, every
+  screen each role is allowed, the platform console kept apart, and no
+  pharmacy reading or changing another's records.
+- Fixed: marking a notification read by id did not check whose it was. It
+  now answers 404 for anybody else's.
+- New permissions are added to the Admin role on every start.
+
+### Logo
+- The approved mark is used everywhere from one source: the app, the
+  website, e-mails (as an image), the home-screen icons (192, 512 and Apple
+  touch) and printed statements and invoices. In dark mode the tile has a
+  hairline edge so it does not melt into the background.
+  `docs/BRAND_GUIDE.md` says where each copy lives and how to replace it.
+
+### University edition
+- `npm run university:copy` makes a separate, independently working copy for
+  academic submission: its own folder and git history, its own `.env` and
+  keys, its own Super Admin, e-mail written to files, online payments off
+  (`KSF_EDITION=university`), and no commercial deployment settings or
+  client documents. Its `UNIVERSITY.md` explains how to run and demonstrate it.
+- `npm run seed:demo` (university edition only, empty database only) makes a
+  demonstration pharmacy through the real API: every role, stock, sales,
+  purchases, accounts and a prescription.
+
+### Checked again
+- Pharmacies (list and detail) at phone, tablet and desktop widths, with no
+  sideways scrolling; the counter calculator's sums and its staying open
+  beside the sale.
+
+### Documentation
+- `README.md` lists every endpoint — who may call it, the plan feature it
+  needs and what it does — with the API's conventions and status codes; a
+  test fails if a route is missing.
 
 ### The Super Admin's team
 - **My team** (platform console): the Super Admin adds the people who help

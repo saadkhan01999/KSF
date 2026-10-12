@@ -10,12 +10,13 @@ import {
   Users, Package, ShoppingBag, Boxes, Wallet, Percent, Receipt
 } from 'lucide-react';
 import { StaffPicker, isRoleValue } from '../components/StaffPicker';
+import { FeatureLocked } from '../components/plan';
 import { useApp } from '../context/AppContext';
 import { useApiData, useAction } from '../hooks/useApi';
 import { api } from '../services/api';
 import {
   Button, StatCard, Card, Tabs, BarChart, DonutChart, EmptyState,
-  TableSkeleton, CardSkeleton, Allow, Segmented, Alert
+  TableSkeleton, CardSkeleton, Segmented, Alert
 } from '../components/ui';
 import {
   rupees, rupeesShort, number, percent, date, monthLabel,
@@ -43,7 +44,10 @@ interface DiscountRow {
 type Tab = 'money' | 'products' | 'people' | 'stock';
 
 export default function Reports() {
-  const { ok, can } = useApp();
+  const { ok, can, hasFeature } = useApp();
+  /* What the plan includes: the server refuses the rest with 402 either way. */
+  const advanced = hasFeature('reports.advanced');
+  const exportable = hasFeature('reports.export') && can('reports.export');
   const { run } = useAction();
 
   const [tab, setTab] = useState<Tab>('money');
@@ -59,22 +63,22 @@ export default function Reports() {
     `/reports/sales-trend?${range}&grain=${grain}`, [from, to, grain, staffFilter]
   );
   const { data: topMedicines } = useApiData<{ data: { medicine_id: string; medicine_name: string; units: number; revenue: number; cost: number; profit: number; invoices: number }[] }>(
-    tab === 'products' ? `/reports/top-medicines?${range}` : null, [tab, from, to, staffFilter]
+    tab === 'products' && advanced ? `/reports/top-medicines?${range}` : null, [tab, from, to, staffFilter]
   );
   const { data: categoryMix } = useApiData<{ data: { category: string; units: number; revenue: number; profit: number }[] }>(
-    tab === 'products' ? `/reports/category-mix?${range}` : null, [tab, from, to, staffFilter]
+    tab === 'products' && advanced ? `/reports/category-mix?${range}` : null, [tab, from, to, staffFilter]
   );
   const { data: staff } = useApiData<{ data: { user_id: string; name: string; role: string | null; invoices: number; revenue: number; profit: number; discount: number; average_basket: number }[] }>(
-    tab === 'people' ? `/reports/staff-performance?${range}` : null, [tab, from, to, staffFilter]
+    tab === 'people' && advanced ? `/reports/staff-performance?${range}` : null, [tab, from, to, staffFilter]
   );
   const { data: valuation } = useApiData<{ data: { category: string; medicines: number; units: number; cost_value: number; retail_value: number }[]; totals: { units: number; costValue: number; retailValue: number } }>(
-    tab === 'stock' ? '/reports/stock-valuation' : null, [tab]
+    tab === 'stock' && advanced ? '/reports/stock-valuation' : null, [tab]
   );
   const { data: expenseReport } = useApiData<{ byCategory: { category: string; amount: number; entries: number }[]; byMonth: { period: string; amount: number }[] }>(
     tab === 'money' ? `/reports/expenses?${range}` : null, [tab, from, to, staffFilter]
   );
   const { data: discounts } = useApiData<{ data: DiscountRow[] }>(
-    tab === 'money' || tab === 'people' ? `/reports/discounts?${range}` : null, [tab, from, to, staffFilter]
+    (tab === 'money' || tab === 'people') && advanced ? `/reports/discounts?${range}` : null, [tab, from, to, staffFilter]
   );
   const everyone = can('reports.everyone');
   /* Several people on screen: the whole pharmacy, or everybody in one role. */
@@ -113,7 +117,7 @@ export default function Reports() {
                 : 'Everything below is calculated from your real invoices, purchases and expenses — nothing is estimated.'}
           </p>
         </div>
-        <Allow permission="reports.export">
+        {exportable && (
           <div className="actions">
             <Button variant="outline" icon={<Download size={17} />} onClick={() => exportKind('sales', 'ksf-sales')}>
               Export sales
@@ -122,7 +126,7 @@ export default function Reports() {
               Export item lines
             </Button>
           </div>
-        </Allow>
+        )}
       </div>
 
       <div className="toolbar">
@@ -238,11 +242,11 @@ export default function Reports() {
                         title="Expenses by category"
                         subtitle={`${overview.expenseEntries} entries`}
                         actions={
-                          <Allow permission="reports.export">
+                          exportable && (
                             <Button size="sm" variant="ghost" icon={<Download size={15} />} onClick={() => exportKind('expenses', 'ksf-expenses')}>
                               Export
                             </Button>
-                          </Allow>
+                          )
                         }
                       >
                         {(expenseReport?.byCategory ?? []).length === 0
@@ -259,7 +263,9 @@ export default function Reports() {
                     )
                     : (
                       <Card title="Discounts given" subtitle="Each one, how much and why" pad={false}>
-                        <DiscountsTable rows={discounts?.data} showStaff={false} />
+                        {advanced
+                          ? <DiscountsTable rows={discounts?.data} showStaff={false} />
+                          : <FeatureLocked name="The discount register" />}
                       </Card>
                     )}
                 </div>
@@ -267,7 +273,8 @@ export default function Reports() {
             )}
 
             {/* =========================== PRODUCTS =========================== */}
-            {tab === 'products' && (
+            {tab === 'products' && !advanced && <FeatureLocked name="Best sellers and category mix" description="Best sellers, category mix, each person's sales and profit, and the value of the stock come with the Weekly, Monthly and Annual plans. Nothing has been deleted." />}
+            {tab === 'products' && advanced && (
               <>
                 <div className="grid grid-2 mb-5">
                   <Card title="Sales by category" subtitle="Where the revenue comes from">
@@ -297,11 +304,11 @@ export default function Reports() {
                   subtitle="Ranked by revenue"
                   pad={false}
                   actions={
-                    <Allow permission="reports.export">
+                    exportable && (
                       <Button size="sm" variant="ghost" icon={<Download size={15} />} onClick={() => exportKind('items', 'ksf-sold-items')}>
                         Export
                       </Button>
-                    </Allow>
+                    )
                   }
                 >
                   {!topMedicines
@@ -342,7 +349,8 @@ export default function Reports() {
             )}
 
             {/* ============================ PEOPLE ============================ */}
-            {tab === 'people' && (
+            {tab === 'people' && !advanced && <FeatureLocked name="Staff performance" description="Best sellers, category mix, each person's sales and profit, and the value of the stock come with the Weekly, Monthly and Annual plans. Nothing has been deleted." />}
+            {tab === 'people' && advanced && (
               <>
               <Card
                 title="Sales by staff member"
@@ -410,7 +418,8 @@ export default function Reports() {
             )}
 
             {/* ============================= STOCK ============================= */}
-            {tab === 'stock' && (
+            {tab === 'stock' && !advanced && <FeatureLocked name="Stock valuation" description="Best sellers, category mix, each person's sales and profit, and the value of the stock come with the Weekly, Monthly and Annual plans. Nothing has been deleted." />}
+            {tab === 'stock' && advanced && (
               <>
                 {valuation && (
                   <div className="grid grid-3 mb-5">
@@ -425,11 +434,11 @@ export default function Reports() {
                   subtitle="Live, based on in-date sellable batches only"
                   pad={false}
                   actions={
-                    <Allow permission="reports.export">
+                    exportable && (
                       <Button size="sm" variant="ghost" icon={<Download size={15} />} onClick={() => exportKind('inventory', 'ksf-inventory')}>
                         Export
                       </Button>
-                    </Allow>
+                    )
                   }
                 >
                   {!valuation

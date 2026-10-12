@@ -17,6 +17,7 @@ import { runSubscriptionMaintenance } from './services/subscriptions.js';
 import { drainMailQueue } from './services/mailer.js';
 import { pruneSessions } from './security/sessions.js';
 import { pruneCodes } from './security/otp.js';
+import { startLiveFeed } from './services/live.js';
 
 async function maintenance(): Promise<void> {
   try {
@@ -40,11 +41,13 @@ async function start(): Promise<void> {
   await maintenance();
   setInterval(maintenance, 60 * 60 * 1000).unref();
 
+  const stopLiveFeed = startLiveFeed();
   const app = createApp();
   const server = app.listen(env.PORT, () => {
     console.log(`KSF API v${VERSION} listening on http://127.0.0.1:${env.PORT}`);
     console.log(`Database: ${describeDatabase()}${supportsTransactions() ? ' · transactions on' : ' · standalone (no transactions)'}`);
     console.log(`Ready in ${Date.now() - startedAt}ms`);
+    if (env.KSF_EDITION === 'university') console.log('[KSF] University edition: an isolated copy, with online payments switched off.');
     if (env.SHOW_SIGNUP_CODE) {
       console.warn('[KSF] SHOW_SIGNUP_CODE is on: sign-up codes are shown on screen, so e-mail addresses are not really checked.');
       console.warn('      Testing only. Remove it (or set it to false) before real customers sign up.');
@@ -53,7 +56,9 @@ async function start(): Promise<void> {
 
   const stop = (signal: string) => {
     console.log(`[KSF] ${signal} received, shutting down`);
-    server.close(() => { void disconnect().finally(() => process.exit(0)); });
+    server.close(() => { void stopLiveFeed().then(disconnect).finally(() => process.exit(0)); });
+    /* Open live streams would hold the close up; they reconnect elsewhere. */
+    server.closeAllConnections?.();
     setTimeout(() => process.exit(0), 5000).unref();
   };
   process.on('SIGINT', () => stop('SIGINT'));

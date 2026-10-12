@@ -275,7 +275,7 @@ route('GET', '/api/v1/reports/top-medicines', 'reports.view', async (ctx) => {
     { $limit: 25 }
   ]).toArray();
   return { data: rows, range: { from, to } };
-});
+}, { feature: 'reports.advanced' });
 
 route('GET', '/api/v1/reports/category-mix', 'reports.view', async (ctx) => {
   const { from, to } = range(ctx);
@@ -295,7 +295,7 @@ route('GET', '/api/v1/reports/category-mix', 'reports.view', async (ctx) => {
     { $sort: { revenue: -1 } }
   ]).toArray();
   return { data: rows, range: { from, to } };
-});
+}, { feature: 'reports.advanced' });
 
 route('GET', '/api/v1/reports/staff-performance', 'reports.view', async (ctx) => {
   const { from, to } = range(ctx);
@@ -317,7 +317,7 @@ route('GET', '/api/v1/reports/staff-performance', 'reports.view', async (ctx) =>
     { $sort: { revenue: -1 } }
   ]).toArray();
   return { data: rows, range: { from, to } };
-});
+}, { feature: 'reports.advanced' });
 
 /* Every discount in the period: who gave it, how much, and why. */
 route('GET', '/api/v1/reports/discounts', 'reports.view', async (ctx) => {
@@ -337,7 +337,7 @@ route('GET', '/api/v1/reports/discounts', 'reports.view', async (ctx) => {
     })),
     range: { from, to }
   };
-});
+}, { feature: 'reports.advanced' });
 
 /* The people whose figures can be opened one by one, and the roles that can
    be opened combined ("all the cashiers"). */
@@ -411,7 +411,7 @@ route('GET', '/api/v1/reports/stock-valuation', 'reports.view', async (ctx) => {
     { units: 0, costValue: 0, retailValue: 0 }
   );
   return { data: rows, totals };
-});
+}, { feature: 'reports.advanced' });
 
 /* Export rows. Sent as JSON so the download logic (filename, encoding, CSV
    escaping) lives in one place on the client. */
@@ -467,4 +467,4 @@ route('GET', '/api/v1/reports/export', 'reports.export', async (ctx) => {
 
   const build = datasets[kind];
   return { data: build ? await build() : [], kind, range: { from, to } };
-});
+}, { feature: 'reports.export' });

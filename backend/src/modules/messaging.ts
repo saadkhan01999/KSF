@@ -107,7 +107,7 @@ route('GET', '/api/v1/messages/summary', 'messages.read', async (ctx) => {
     { $group: { _id: null, threads: { $sum: 1 }, unread: { $sum: '$unread' } } }
   ]).toArray();
   return { threads: row?.threads ?? 0, unread: row?.unread ?? 0 };
-});
+}, { feature: 'messaging.internal' });
 
 /* The top-bar dropdown: the last five threads, with a one-line preview. */
 route('GET', '/api/v1/messages/recent', 'messages.read', async (ctx) => {
@@ -121,7 +121,7 @@ route('GET', '/api/v1/messages/recent', 'messages.read', async (ctx) => {
   ]).toArray();
   /* Trimmed here, so the whole message body stays off the wire. */
   return { data: rows.map((row) => ({ ...row, last_body: row.last_body ? String(row.last_body).replace(/\s+/g, ' ').slice(0, 120) : null })) };
-});
+}, { feature: 'messaging.internal' });
 
 /* Who this person may write to: everyone active in the pharmacy, built on
    the server so it never includes archived accounts. */
@@ -154,7 +154,7 @@ route('GET', '/api/v1/messages/directory', 'messages.write', async (ctx) => {
     { $sort: { level: -1 } }
   ]).toArray();
   return { people, roles, canBroadcast: ctx.can('messages.broadcast') };
-});
+}, { feature: 'messaging.internal' });
 
 /* ========================== LIST CONVERSATIONS ========================== */
 route('GET', '/api/v1/messages/conversations', 'messages.read', async (ctx) => {
@@ -208,7 +208,7 @@ route('GET', '/api/v1/messages/conversations', 'messages.read', async (ctx) => {
     ]).toArray()
   ]);
   return { ...pageResult(rows, total, { page, size }), counts: counts ?? { total: 0, open: 0, resolved: 0, urgent: 0 } };
-});
+}, { feature: 'messaging.internal' });
 
 /* =========================== ONE CONVERSATION =========================== */
 route('GET', '/api/v1/messages/conversations/:id', 'messages.read', async (ctx) => {
@@ -247,7 +247,7 @@ route('GET', '/api/v1/messages/conversations/:id', 'messages.read', async (ctx) 
       my_last_read_at: memberOf(conversation, ctx.user.id)?.last_read_at ?? null
     }
   };
-});
+}, { feature: 'messaging.internal' });
 
 /* ========================== START A CONVERSATION ========================== */
 route('POST', '/api/v1/messages/conversations', 'messages.write', async (ctx) => {
@@ -318,7 +318,7 @@ route('POST', '/api/v1/messages/conversations', 'messages.write', async (ctx) =>
   }
   const { members: _members, ...thread } = saved ?? conversation;
   return { data: { ...thread, member_count: recipients + 1 }, __status: 201 };
-});
+}, { feature: 'messaging.internal' });
 
 /* ============================== REPLY ============================== */
 route('POST', '/api/v1/messages/conversations/:id/messages', 'messages.write', async (ctx) => {
@@ -344,14 +344,14 @@ route('POST', '/api/v1/messages/conversations/:id/messages', 'messages.write', a
   });
   const { _id, pharmacy_id: _p, conversation_id: _c, deleted_at: _d, ...data } = message;
   return { data, __status: 201 };
-});
+}, { feature: 'messaging.internal' });
 
 /* ============================ READ RECEIPTS ============================ */
 route('POST', '/api/v1/messages/conversations/:id/read', 'messages.read', async (ctx) => {
   const conversation = await requireMember(ctx, ctx.params.id);
   await col.conversations().updateOne({ _id: conversation.id, 'members.user_id': ctx.user.id }, { $set: { 'members.$.last_read_at': nowIso() } });
   return { ok: true };
-});
+}, { feature: 'messaging.internal' });
 
 route('POST', '/api/v1/messages/read-all', 'messages.read', async (ctx) => {
   const result = await col.conversations().updateMany(
@@ -360,7 +360,7 @@ route('POST', '/api/v1/messages/read-all', 'messages.read', async (ctx) => {
     { arrayFilters: [{ 'me.user_id': ctx.user.id }] }
   );
   return { ok: true, threads: result.modifiedCount };
-});
+}, { feature: 'messaging.internal' });
 
 /* =========================== THREAD LIFECYCLE =========================== */
 route('POST', '/api/v1/messages/conversations/:id/resolve', 'messages.write', async (ctx) => {
@@ -377,14 +377,14 @@ route('POST', '/api/v1/messages/conversations/:id/resolve', 'messages.write', as
     summary: `${ctx.user.full_name} ${reopen ? 'reopened' : 'resolved'} "${conversation.subject}"`
   });
   return { data: updated };
-});
+}, { feature: 'messaging.internal' });
 
 route('POST', '/api/v1/messages/conversations/:id/mute', 'messages.read', async (ctx) => {
   const conversation = await requireMember(ctx, ctx.params.id);
   const muted = memberOf(conversation, ctx.user.id)?.is_muted ? 0 : 1;
   await col.conversations().updateOne({ _id: conversation.id, 'members.user_id': ctx.user.id }, { $set: { 'members.$.is_muted': muted } });
   return { ok: true, muted: !!muted };
-});
+}, { feature: 'messaging.internal' });
 
 /* Withdrawing your own message. Tombstoned rather than deleted, so a thread
    can never be silently rewritten after the fact. */
@@ -396,4 +396,4 @@ route('DELETE', '/api/v1/messages/messages/:id', 'messages.write', async (ctx) =
   await col.messages().updateOne({ _id: message.id }, { $set: { deleted_at: nowIso(), body: '' } });
   await logActivity(ctx, { action: 'message.withdrawn', entity: 'conversation', entityId: message.conversation_id, severity: 'warn', summary: `${ctx.user.full_name} withdrew a message` });
   return { ok: true };
-});
+}, { feature: 'messaging.internal' });

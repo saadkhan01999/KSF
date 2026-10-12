@@ -115,6 +115,11 @@ const schema = z.object({
   REFERRAL_MAX_PER_IP_PER_DAY: int(3, 1),
   REGISTER_MAX_PER_IP: int(20, 1),
 
+  /* -------------------------------------------------------------- edition */
+  /* "university" is the isolated copy made by scripts/university-copy.mjs:
+     online payments are off, and the app says which edition it is. */
+  KSF_EDITION: z.enum(['commercial', 'university']).default('commercial'),
+
   /* ------------------------------------------------------------- payments */
   PAYMENT_PROVIDER: z.string().default('manual'),
   PAYMENT_WEBHOOK_SECRET: z.string().default(''),
@@ -212,6 +217,8 @@ export function originAllowed(origin: string | undefined, host: string | undefin
   if (IS_PROD) return false;
   return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
 }
+
+export const IS_UNIVERSITY = env.KSF_EDITION === 'university';
 
 /** Facts about whoever sells this installation. Every field is optional. */
 export const BUSINESS = {

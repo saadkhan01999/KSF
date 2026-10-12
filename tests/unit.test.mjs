@@ -14,6 +14,12 @@ const { barcodeVariants } = await import('../backend/src/modules/catalogue.ts');
 const { SYSTEM_ROLES, PERMISSION_KEYS, THEMES, PHARMACY_ADMIN_ROLE } = await import('../backend/src/domain/permissions.ts');
 const { trustProxySetting, ALLOWED_ORIGINS, originMatcher, originAllowed } = await import('../backend/src/config/env.ts');
 const { databaseHint } = await import('../backend/src/db/mongo.ts');
+const { formEncode, verifyStripeSignature, parseStripeEvent, sessionOutcome } = await import('../backend/src/services/payments/stripe.ts');
+const { concerns } = await import('../backend/src/services/live.ts');
+const { createHmac } = await import('node:crypto');
+const { readFileSync } = await import('node:fs');
+const { PLATFORM_PERMISSION_KEYS, TEAM_MANAGE } = await import('../backend/src/domain/platform.ts');
+const calc = await import('../frontend/src/utils/calculator.ts');
 
 describe('reading imported files', () => {
   it('detects semicolons and keeps quoted commas and newlines', () => {
@@ -224,5 +230,164 @@ describe('the platform team', () => {
     assert.throws(() => readImage('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='));
     assert.throws(() => readImage('data:image/png;base64,PHN2Zz48L3N2Zz4='));
     assert.throws(() => readImage(`data:image/jpeg;base64,${'A'.repeat(500_000)}`));
+  });
+});
+
+describe('Stripe', () => {
+  const secret = 'whsec_unit';
+  const sign = (raw, at) => `t=${at},v1=${createHmac('sha256', secret).update(`${at}.${raw}`).digest('hex')}`;
+  const now = 1_790_000_000;
+
+  it("encodes nested parameters the way Stripe's API expects", () => {
+    const encoded = formEncode({ mode: 'subscription', line_items: [{ quantity: 1, price_data: { unit_amount: 390000, recurring: { interval: 'month' } } }], skip: undefined, flag: false });
+    assert.equal(encoded.get('line_items[0][price_data][unit_amount]'), '390000');
+    assert.equal(encoded.get('line_items[0][price_data][recurring][interval]'), 'month');
+    assert.equal(encoded.get('flag'), 'false');
+    assert.equal(encoded.has('skip'), false);
+  });
+
+  it('accepts a correctly signed event and refuses a forged, rolled or stale one', () => {
+    const raw = '{"id":"evt_1","type":"invoice.paid"}';
+    assert.equal(verifyStripeSignature(raw, sign(raw, now), secret, now).ok, true);
+    /* While a secret is rolled Stripe sends two signatures; either may match. */
+    assert.equal(verifyStripeSignature(raw, `t=${now},v1=${'0'.repeat(64)},${sign(raw, now).split(',')[1]}`, secret, now).ok, true);
+    assert.equal(verifyStripeSignature(raw.replace('paid', 'void'), sign(raw, now), secret, now).ok, false);
+    assert.equal(verifyStripeSignature(raw, sign(raw, now - 301), secret, now).ok, false);
+    assert.equal(verifyStripeSignature(raw, 'v1=abc', secret, now).ok, false);
+  });
+
+  it('reads a paid Checkout session as a payment against its reference and invoice', () => {
+    const outcome = sessionOutcome({ id: 'cs_1', client_reference_id: 'KSFPAY-1', status: 'complete', payment_status: 'paid', amount_total: 390000, currency: 'pkr', invoice: 'in_1', subscription: { id: 'sub_1' }, customer: 'cus_1' });
+    assert.equal(outcome.status, 'succeeded');
+    assert.equal(outcome.providerReference, 'in_1');
+    assert.equal(outcome.currency, 'PKR');
+    assert.deepEqual(outcome.recurring, { subscriptionId: 'sub_1', customerId: 'cus_1' });
+    assert.equal(sessionOutcome({ id: 'cs_2', status: 'open', payment_status: 'unpaid', invoice: 'in_2' }).providerReference, 'cs_2');
+  });
+
+  it('tells renewals from first payments, in either invoice shape', () => {
+    const event = (object, type = 'invoice.paid') => {
+      const raw = JSON.stringify({ id: 'evt_2', type, data: { object } });
+      return parseStripeEvent(raw, sign(raw, now), secret, now);
+    };
+    assert.equal(event({ id: 'in_1', subscription: 'sub_1', billing_reason: 'subscription_create' }).kind, 'ignored');
+    const renewal = event({ id: 'in_2', parent: { subscription_details: { subscription: 'sub_1' } }, billing_reason: 'subscription_cycle', amount_paid: 390000, currency: 'pkr' });
+    assert.equal(renewal.kind, 'renewal');
+    assert.equal(renewal.subscriptionId, 'sub_1');
+    assert.equal(renewal.amountPaisa, 390000);
+    assert.equal(event({ id: 'in_3', subscription: 'sub_1', billing_reason: 'subscription_cycle', amount_due: 390000 }, 'invoice.payment_failed').paid, false);
+    assert.equal(event({ id: 'sub_1', cancel_at_period_end: true, status: 'active' }, 'customer.subscription.updated').renews, false);
+  });
+});
+
+describe('live updates', () => {
+  it("sends plan changes to everyone and a subscription only to its pharmacy and the platform team", () => {
+    const plans = { type: 'plans.changed' };
+    const mine = { type: 'subscription.changed', pharmacyId: 'PH-1' };
+    assert.equal(concerns({ pharmacyId: null, platform: false }, plans), true);
+    assert.equal(concerns({ pharmacyId: null, platform: false }, mine), false);
+    assert.equal(concerns({ pharmacyId: 'PH-1', platform: false }, mine), true);
+    assert.equal(concerns({ pharmacyId: 'PH-2', platform: false }, mine), false);
+    assert.equal(concerns({ pharmacyId: null, platform: true }, mine), true);
+  });
+});
+
+describe('screens and their guards', () => {
+  const app = readFileSync(new URL('../frontend/src/App.tsx', import.meta.url), 'utf8');
+  const signedIn = app.slice(app.indexOf('function Protected()'), app.indexOf('function NotFound'));
+  const screens = [...signedIn.matchAll(/<Route path="([^"]+)" element=\{(<Guard permission="([^"]+)">)?/g)]
+    .map(([, path, guarded, permission]) => ({ path, guarded: !!guarded, permission }));
+
+  it('puts every signed-in screen behind a permission, except the ones everybody has', () => {
+    /* Open to everybody signed in: their own account and notices, the
+       directory, setup, and the redirects. */
+    const open = new Set(['/', '/login', '/register', '/forgot-password', '/subscription', '/setup', '/notifications', '/account', '*',
+      '/platform/*', '/platform/notifications', '/directory', '/directory/:id', '/platform/directory', '/platform/directory/:id']);
+    assert.ok(screens.length > 40);
+    assert.deepEqual(screens.filter((screen) => !screen.guarded && !open.has(screen.path)).map((screen) => screen.path), []);
+  });
+
+  it('guards each screen with a permission that exists', () => {
+    const known = new Set([...PERMISSION_KEYS, ...PLATFORM_PERMISSION_KEYS, TEAM_MANAGE]);
+    assert.deepEqual(screens.filter((screen) => screen.guarded && !known.has(screen.permission)).map((screen) => `${screen.path}: ${screen.permission}`), []);
+  });
+});
+
+describe('the REST API reference in README.md', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const listed = new Set([...readme.matchAll(/^\| `(GET|POST|PATCH|PUT|DELETE) (\/api\/v1\/[^`]*)` \|/gm)].map(([, method, path]) => `${method} ${path}`));
+
+  it('lists every route the server registers, and nothing it does not', async () => {
+    await import('../backend/src/modules/index.ts');
+    const { routes } = await import('../backend/src/http/router.ts');
+    const registered = new Set([...routes.map((route) => `${route.method} ${route.path}`), 'GET /api/v1/health', 'GET /api/v1/avatars/:id']);
+    assert.deepEqual([...registered].filter((key) => !listed.has(key)), [], 'routes missing from README.md');
+    assert.deepEqual([...listed].filter((key) => !registered.has(key)), [], 'README.md lists routes that do not exist');
+  });
+});
+
+describe('the counter calculator', () => {
+  /** Press keys as a person would, e.g. "1250×3+18%=", and read the display. */
+  const run = (keys) => {
+    let state = calc.initialCalc;
+    for (const key of keys) state = calc.press(state, calc.keyAction(key) ?? key).state;
+    return calc.displayValue(state);
+  };
+  const plain = (value) => calc.toPlain(value);
+
+  it('adds money exactly, where floating point would not', () => {
+    assert.equal(plain(calc.add(calc.dec('0.1'), calc.dec('0.2'))), '0.3');
+    assert.equal(plain(calc.mul(calc.dec('1.15'), calc.dec(100))), '115');
+    assert.equal(run('0.1+0.2='), '0.3');
+  });
+
+  it('multiplies and divides before it adds and subtracts', () => {
+    assert.equal(run('2+3*4='), '14');
+    assert.equal(run('100-20/4='), '95');
+    assert.equal(run('1250*3+675='), '4,425');
+  });
+
+  it('works out percentages the way a shop calculator does', () => {
+    assert.equal(run('200+10%='), '220');
+    assert.equal(run('200*10%='), '20');
+    assert.equal(run('1250*3+18%='), '4,425');
+    assert.equal(run('500-20%='), '400');
+  });
+
+  it('rounds a recurring division and refuses division by zero', () => {
+    assert.match(run('10/3='), /^3\.3333333333/);
+    assert.equal(run('2/3*3='), '2');
+    assert.throws(() => calc.div(calc.dec(1), calc.ZERO), calc.DivisionByZero);
+    assert.notEqual(run('5/0='), '0');
+  });
+
+  it('carries a result into the next sum, and corrects a mistyped operator', () => {
+    assert.equal(run('12+3=*2='), '30');
+    assert.equal(run('9+*2='), '18');
+  });
+
+  it('gets the pharmacy tools right to the paisa', () => {
+    const discount = calc.discountTool('35', '10', '3');
+    assert.deepEqual([plain(discount.gross), plain(discount.discount), plain(discount.payable)], ['105', '10.5', '94.5']);
+    const added = calc.taxTool('1000', '17', false);
+    assert.deepEqual([plain(added.net), plain(added.tax), plain(added.gross)], ['1000', '170', '1170']);
+    const inside = calc.taxTool('1170', '17', true);
+    assert.deepEqual([plain(inside.net), plain(inside.tax)], ['1000', '170']);
+    const margin = calc.marginTool('80', '100');
+    assert.deepEqual([plain(margin.profit), plain(margin.margin), plain(margin.markup)], ['20', '20', '25']);
+    assert.deepEqual(Object.values(calc.changeTool('450', '500')).map(plain), ['50', '0']);
+    assert.deepEqual(Object.values(calc.changeTool('500', '450')).map(plain), ['0', '50']);
+    const unit = calc.unitTool('120', '10', '3');
+    assert.deepEqual([plain(unit.perUnit), plain(unit.total)], ['12', '36']);
+    assert.equal(calc.unitTool('120', '0', '3'), null);
+    assert.equal(calc.discountTool('abc', '10', '1'), null);
+  });
+
+  it('reads typed amounts with commas and a rupee prefix, and refuses nonsense', () => {
+    assert.equal(plain(calc.parseDec('Rs 1,250.75')), '1250.75');
+    assert.equal(calc.parseDec('12.3.4'), null);
+    assert.equal(calc.keyAction('Enter'), '=');
+    assert.equal(calc.keyAction('x'), '×');
+    assert.equal(calc.keyAction('a'), null);
   });
 });

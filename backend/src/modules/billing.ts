@@ -23,24 +23,34 @@ import {
   cancelSubscription, changePlan, currentSubscription, getPlan, handleWebhook, listPlans, STATUSES, subscriptionState
 } from '../services/subscriptions.js';
 import {
-  adapterFor, attemptsFor, createAttempt, defaultProviderKey, listProviders, refundsFor, settleFromProvider
+  adapterFor, attemptsFor, availableProviders, confirmReturn, createAttempt, defaultProviderKey, listProviders, providerPortal, receiveEvent,
+  refundsFor, setProviderRenewal, settleFromProvider
 } from '../services/payments/index.js';
 import { referralSummary } from '../services/referrals.js';
 
 const PAYMENT_FIELDS = {
   _id: 0, id: 1, amount_paisa: 1, currency: 1, status: 1, kind: 1, provider: 1, provider_reference: 1, method: 1,
-  failure_code: 1, failure_message: 1, period_start: 1, period_end: 1, paid_at: 1, refunded_paisa: 1, created_at: 1
+  failure_code: 1, failure_message: 1, period_start: 1, period_end: 1, paid_at: 1, refunded_paisa: 1, created_at: 1,
+  invoice_no: 1, plan_name: 1
 };
 
 /* ------------------------------------------------------------ what we have */
 route('GET', '/api/v1/billing', 'settings.read', async (ctx) => {
-  const [subscription, plans, payments, referrals] = await Promise.all([
+  const [subscription, current, plans, payments, referrals] = await Promise.all([
     subscriptionState(ctx.pharmacyId),
+    currentSubscription(ctx.pharmacyId),
     listPlans(),
     col.subscriptionPayments().find({ pharmacy_id: ctx.pharmacyId }, { projection: PAYMENT_FIELDS }).sort({ created_at: -1 }).limit(50).toArray(),
     referralSummary(ctx.pharmacyId, ctx.user.id)
   ]);
-  return { subscription, plans, payments, referrals, canManage: ctx.can('settings.write') };
+  /* The card on file, when a provider renews the plan by itself. */
+  const renewer = current?.provider_customer_id ? adapterFor(current.provider) : null;
+  return {
+    subscription, plans, payments, referrals, canManage: ctx.can('settings.write'),
+    providers: availableProviders().map(({ key, label, mode, note, methods }) => ({ key, label, mode, note, methods })),
+    defaultProvider: defaultProviderKey(),
+    card: renewer ? { provider: renewer.label, canChange: !!renewer.portal } : null
+  };
 });
 
 route('GET', '/api/v1/billing/payments', 'settings.read', async (ctx) => ({
@@ -76,6 +86,8 @@ route('POST', '/api/v1/billing/auto-renew', 'settings.write', async (ctx) => {
   if (!subscription) return missing('There is no subscription on this pharmacy.');
   if (subscription.is_free) bad('The Basic plan is free and has nothing to renew.');
   const enabled = !!ctx.body.enabled;
+  /* A card the provider renews (Stripe) is told first; if it cannot be, nothing changes here either. */
+  await setProviderRenewal(subscription, enabled).catch((error: Error) => bad(`${error.message} Nothing was changed.`));
   await col.subscriptions().updateOne({ _id: subscription.id }, { $set: { auto_renew: enabled ? 1 : 0, updated_at: nowIso() } });
   await auditLog(ctx, { action: 'billing.auto-renew', entity: 'subscription', entityId: subscription.id, summary: `Automatic renewal turned ${enabled ? 'on' : 'off'}` });
   return {
@@ -89,6 +101,8 @@ route('POST', '/api/v1/billing/cancel', 'settings.write', async (ctx) => {
   const current = await currentSubscription(ctx.pharmacyId);
   if (current?.is_free) bad('The Basic plan is free — there is nothing to cancel.');
   if (current?.status === STATUSES.CANCELLED) bad('This subscription is already cancelled.');
+  /* Stop the card renewing at the end of the paid period before saying it is cancelled. */
+  if (current) await setProviderRenewal(current, false).catch((error: Error) => bad(`${error.message} Nothing was cancelled.`));
   const result = await cancelSubscription({ pharmacyId: ctx.pharmacyId, reason: toStr(ctx.body.reason, 300) });
   if (!result.ok) bad(result.reason ?? 'The subscription could not be cancelled.');
   const endsOn = String(result.endsAt).slice(0, 10);
@@ -124,6 +138,15 @@ route('POST', '/api/v1/billing/checkout', 'settings.write', async (ctx) => {
   };
 });
 
+/* The provider's own page for changing the card (Stripe's billing portal). */
+route('POST', '/api/v1/billing/portal', 'settings.write', async (ctx) => {
+  const subscription = await currentSubscription(ctx.pharmacyId);
+  if (!subscription) return missing('There is no subscription on this pharmacy.');
+  const portal = await providerPortal(subscription, `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/settings?tab=billing`);
+  if (!portal.ok || !portal.url) bad(portal.reason ?? 'The card page could not be opened.');
+  return { url: portal.url };
+});
+
 /* What this installation can actually take payment with. */
 route('GET', '/api/v1/billing/providers', 'settings.read', async () => ({ data: listProviders(), default: defaultProviderKey() }));
 
@@ -146,7 +169,7 @@ async function returnFromProvider(ctx: Ctx, withBody: boolean) {
   const providerKey = toStr(ctx.params.provider, 40).toLowerCase();
   const adapter = adapterFor(providerKey);
   if (!adapter) return bad('Unknown payment provider.');
-  const applied = await settleFromProvider({ providerKey, outcome: adapter.verifyCallback(callbackInput(ctx, withBody)), source: 'return' });
+  const applied = await confirmReturn(adapter, toStr(ctx.query.get('ref'), 80), callbackInput(ctx, withBody));
   const status = applied.ok && 'applied' in applied && applied.applied ? 'paid' : 'mismatch' in applied && applied.mismatch ? 'mismatch' : 'pending';
   return { __redirect: `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/settings?tab=billing&payment=${status}`, ok: applied.ok };
 }
@@ -165,6 +188,18 @@ publicRoute('POST', '/api/v1/payments/webhook/:provider', async (ctx) => {
   const providerKey = toStr(ctx.params.provider, 40).toLowerCase();
   const adapter = adapterFor(providerKey);
   if (!adapter) return { received: true, applied: false, reason: 'unknown provider', __status: 404 };
+
+  /* A provider with many kinds of event (Stripe) is handled whole: verified,
+     recorded once under its event id, then applied. A forged one is answered
+     400, which Stripe shows in its dashboard rather than retrying for days. */
+  if (adapter.parseEvent) {
+    const result = await receiveEvent(adapter, callbackInput(ctx, true));
+    if (!result.ok) {
+      await securityEvent({ type: 'payment.callback-rejected', severity: 'warn', outcome: 'blocked', ip: ctx.ip, userAgent: ctx.userAgent, detail: `${providerKey}: ${result.detail}` });
+      return { received: false, reason: result.detail, __status: 400 };
+    }
+    return { received: true, status: result.status, duplicate: !!result.duplicate, detail: result.detail ?? null };
+  }
 
   const outcome = adapter.verifyCallback(callbackInput(ctx, true));
   if (!outcome.ok) {
@@ -219,8 +254,7 @@ route('GET', '/api/v1/billing/plans', null, async () => ({ data: await listPlans
 route('GET', '/api/v1/billing/entitlements', null, async (ctx) => {
   const state = await subscriptionState(ctx.pharmacyId);
   return {
-    plan: state?.plan, status: state?.status, entitled: state?.entitled, features: state?.features, limits: state?.limits,
-    trial: state?.trial, daysLeft: state?.daysLeft,
+    ...state,
     needsAttention: ([STATUSES.PAST_DUE, STATUSES.GRACE, STATUSES.PAYMENT_PENDING] as string[]).includes(String(state?.status))
   };
 });

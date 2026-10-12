@@ -9,7 +9,7 @@ import {
   Receipt, Boxes, TrendingUp, BadgeCheck, RotateCcw, AlertTriangle, Phone, Mail, MapPin
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { useApiData, useAction } from '../../hooks/useApi';
+import { useApiData, useAction, useLiveRefresh } from '../../hooks/useApi';
 import { api } from '../../services/api';
 import {
   Button, Card, Tabs, StatCard, StatusBadge, Badge, Modal, TextInput, TextArea, SelectInput, ConfirmDialog,
@@ -31,6 +31,7 @@ export default function PharmacyDetail() {
   const { busy, run } = useAction();
   const [tab, setTab] = useState<Tab>('overview');
   const { data, loading, reload } = useApiData<Detail>(`/platform/pharmacies/${id}`, [id]);
+  useLiveRefresh(reload, ['subscription']);
 
   const [editOpen, setEditOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);

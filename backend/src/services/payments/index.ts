@@ -20,24 +20,31 @@
    provider reference twice: the ledger is unique on (provider, reference).
    ========================================================================== */
 
-import { env } from '../../config/env.js';
+import { env, IS_UNIVERSITY } from '../../config/env.js';
 import { col } from '../../db/mongo.js';
-import type { PaymentAttempt } from '../../db/types.js';
-import { auditLog } from '../../core/trails.js';
+import type { PaymentAttempt, Subscription } from '../../db/types.js';
+import { auditLog, securityEvent } from '../../core/trails.js';
 import { nowIso, plusDays, randomUUID, toInt, toStr } from '../../core/util.js';
 import { secureReference } from '../../security/crypto.js';
-import { getPlan, recordPayment } from '../subscriptions.js';
+import { cancelSubscription, getPlan, recordPayment } from '../subscriptions.js';
 import { bankTransfer, easypaisa, gateway, jazzcash } from './adapters.js';
-import { canMoveTo, PAYMENT_STATUS, setting, type Adapter, type ProviderOutcome } from './provider.js';
+import { stripe } from './stripe.js';
+import { canMoveTo, PAYMENT_STATUS, setting, type Adapter, type CallbackInput, type ProviderEvent, type ProviderOutcome } from './provider.js';
 
 export { PAYMENT_STATUS };
 
-const ADAPTERS: Adapter[] = [gateway, jazzcash, easypaisa, bankTransfer];
+/* Stripe first: when it is configured it is the default way to pay. */
+const ADAPTERS: Adapter[] = [stripe, gateway, jazzcash, easypaisa, bankTransfer];
+const APP_URL = env.PUBLIC_APP_URL.replace(/\/$/, '');
 const byKey = new Map(ADAPTERS.map((adapter) => [adapter.key, adapter]));
 
 export const adapterFor = (key: unknown): Adapter | null => byKey.get(String(key ?? '').toLowerCase()) ?? null;
 
-export const listProviders = () => ADAPTERS.map((adapter) => ({ ...adapter.describe(), methods: adapter.methods, capabilities: adapter.capabilities }));
+/* The university edition takes no money: every provider reads as not set up. */
+export const listProviders = () => ADAPTERS.map((adapter) => {
+  const described = adapter.describe();
+  return { ...described, configured: described.configured && !IS_UNIVERSITY, methods: adapter.methods, capabilities: adapter.capabilities };
+});
 export const availableProviders = () => listProviders().filter((provider) => provider.configured);
 
 /** The configured default, or the first provider that is usable. */
@@ -55,6 +62,7 @@ export interface PaymentActor { id: string; full_name: string; role_name?: strin
 export async function createAttempt(input: {
   pharmacyId: string; subscriptionId: string; planKey: string; providerKey: string; actorId?: string | null; purpose?: string;
 }) {
+  if (IS_UNIVERSITY) return { ok: false as const, reason: 'Online payments are switched off in the university edition.' };
   const adapter = adapterFor(input.providerKey);
   if (!adapter) return { ok: false as const, reason: 'That payment method is not one this installation offers.' };
   const state = adapter.configured();
@@ -65,9 +73,20 @@ export async function createAttempt(input: {
   if (plan.isFree) return { ok: false as const, reason: 'The Basic plan is free — there is nothing to pay.' };
 
   const reference = secureReference('KSFPAY');
-  const built = adapter.createRequest({
+  const pharmacy = await col.pharmacies().findOne({ _id: input.pharmacyId }, { projection: { email: 1, name: 1 } });
+  const built = await adapter.createRequest({
     reference, amountPaisa: plan.pricePaisa, currency: plan.currency || 'PKR', description: `KSF ${plan.name} plan`,
-    returnUrl: `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/api/v1/payments/return/${adapter.key}`
+    /* The reference rides on the return address so a provider that is
+       confirmed by lookup (Stripe) knows which payment to look up. */
+    returnUrl: `${APP_URL}/api/v1/payments/return/${adapter.key}?ref=${encodeURIComponent(reference)}`,
+    cancelUrl: `${APP_URL}/settings?tab=billing&payment=cancelled`,
+    plan: { key: plan.key, name: plan.name, period: plan.period },
+    recurring: plan.autoRenew,
+    customerEmail: pharmacy?.email ?? null,
+    metadata: {
+      ksf_reference: reference, ksf_pharmacy_id: input.pharmacyId, ksf_subscription_id: input.subscriptionId, ksf_plan: plan.key,
+      ...(pharmacy?.name ? { ksf_pharmacy: pharmacy.name.slice(0, 120) } : {})
+    }
   });
   if (!built.ok) return { ok: false as const, reason: built.reason ?? 'The payment could not be started.' };
 
@@ -76,7 +95,7 @@ export async function createAttempt(input: {
   const attempt: PaymentAttempt = {
     _id: id, id, reference, pharmacy_id: input.pharmacyId, subscription_id: input.subscriptionId, purpose: input.purpose ?? 'subscription',
     plan_key: plan.key, provider: adapter.key, method: adapter.methods[0] ?? null, amount_paisa: plan.pricePaisa, currency: plan.currency || 'PKR',
-    status: PAYMENT_STATUS.CREATED, provider_reference: null, provider_status: null, redirect_url: built.redirect?.url ?? null,
+    status: PAYMENT_STATUS.CREATED, provider_reference: built.providerReference ?? null, provider_status: null, redirect_url: built.redirect?.url ?? null,
     request_payload: JSON.stringify({ redirect: built.redirect ?? null, instructions: built.instructions ?? null }).slice(0, 8000),
     last_checked_at: null, check_count: 0, failure_reason: null, created_by: input.actorId ?? null, created_at: at, updated_at: at,
     expires_at: built.expiresAt ?? plusDays(1)
@@ -151,6 +170,7 @@ export async function settleFromProvider(input: { providerKey: string; outcome: 
   }
 
   if (!attempt.subscription_id) return { ok: true, applied: false, status };
+  if (outcome.recurring?.subscriptionId) await linkRecurring(adapter, attempt.subscription_id, outcome.recurring);
   const result = await recordPayment({
     pharmacyId: attempt.pharmacy_id, subscriptionId: attempt.subscription_id, amountPaisa: attempt.amount_paisa, currency: attempt.currency,
     status: 'succeeded', kind: attempt.purpose === 'subscription' ? 'checkout' : attempt.purpose, provider: adapter.key,
@@ -162,6 +182,160 @@ export async function settleFromProvider(input: { providerKey: string; outcome: 
     });
   }
   return { ok: true, applied: !result.duplicate, duplicate: !!result.duplicate, status };
+}
+
+/**
+ * A payment that started a renewing subscription at the provider (Stripe):
+ * remember which one, so its renewals find their way to this subscription.
+ * A pharmacy that changed plan has its old provider subscription stopped at
+ * once — otherwise it would be charged for both.
+ */
+async function linkRecurring(adapter: Adapter, subscriptionId: string, recurring: NonNullable<ProviderOutcome['recurring']>): Promise<void> {
+  const subscription = await col.subscriptions().findOne({ _id: subscriptionId });
+  if (!subscription || subscription.provider_subscription_id === recurring.subscriptionId) return;
+  const previous = subscription.provider === adapter.key ? subscription.provider_subscription_id : null;
+  await col.subscriptions().updateOne({ _id: subscriptionId }, {
+    $set: {
+      provider: adapter.key, provider_subscription_id: recurring.subscriptionId,
+      provider_customer_id: recurring.customerId ?? subscription.provider_customer_id ?? null, updated_at: nowIso()
+    }
+  });
+  if (previous && adapter.setRenewal) {
+    await adapter.setRenewal(previous, false, true).catch((error: Error) => {
+      console.error(`[KSF] ${adapter.key}: the replaced subscription ${previous} could not be stopped — stop it by hand: ${error.message}`);
+    });
+  }
+}
+
+/**
+ * Stop — or resume — a provider's own renewals for a subscription, at the end
+ * of the paid period or at once. A subscription the provider does not renew
+ * (a bank transfer, a one-off payment) has nothing to stop. Throws when the
+ * provider refuses, so a pharmacy is never told renewals stopped when they
+ * did not.
+ */
+export async function setProviderRenewal(subscription: Pick<Subscription, 'id' | 'provider' | 'provider_subscription_id'>, renew: boolean, immediately = false): Promise<void> {
+  const adapter = adapterFor(subscription.provider);
+  if (!subscription.provider_subscription_id || !adapter?.setRenewal) return;
+  try {
+    await adapter.setRenewal(subscription.provider_subscription_id, renew, immediately);
+  } catch (error) {
+    throw new Error(`${adapter.label} could not be told to ${renew ? 'resume' : 'stop'} renewing: ${(error as Error).message}`);
+  }
+  if (immediately) {
+    await col.subscriptions().updateOne({ _id: subscription.id }, { $set: { provider_subscription_id: null, updated_at: nowIso() } });
+  }
+}
+
+/** The provider's page where the pharmacy changes its card, when it has one. */
+export async function providerPortal(subscription: Pick<Subscription, 'provider' | 'provider_customer_id'>, returnUrl: string) {
+  const adapter = adapterFor(subscription.provider);
+  if (!adapter?.portal || !subscription.provider_customer_id) return { ok: false, reason: 'This subscription is not paid by card, so there is no card to change.' };
+  return adapter.portal(subscription.provider_customer_id, returnUrl);
+}
+
+/**
+ * A browser back from the provider's page. For a provider confirmed by
+ * lookup (Stripe) the server asks the provider itself; for the others the
+ * signed fields on the return are checked. Either way the browser's word is
+ * never what moves money.
+ */
+export async function confirmReturn(adapter: Adapter, reference: string, input: CallbackInput) {
+  if (adapter.parseEvent && adapter.lookup) {
+    const attempt = reference ? await col.paymentAttempts().findOne({ reference, provider: adapter.key }) : null;
+    if (!attempt) return { ok: false, reason: 'No payment request matches that reference.' };
+    if (attempt.status === PAYMENT_STATUS.SUCCEEDED) return { ok: true, applied: true, status: attempt.status };
+    try {
+      const outcome = await adapter.lookup({ reference, providerReference: attempt.provider_reference });
+      return settleFromProvider({ providerKey: adapter.key, outcome, source: 'lookup' });
+    } catch (error) {
+      return { ok: false, reason: `${adapter.label} could not be asked: ${(error as Error).message}` };
+    }
+  }
+  return settleFromProvider({ providerKey: adapter.key, outcome: adapter.verifyCallback(input), source: 'return' });
+}
+
+/** A renewal the provider charged — or failed to — for a subscription it renews. */
+async function applyRenewal(adapter: Adapter, event: Extract<ProviderEvent, { kind: 'renewal' }>): Promise<string> {
+  const subscription = await col.subscriptions().findOne({ provider: adapter.key, provider_subscription_id: event.subscriptionId });
+  if (!subscription) return `ignored: no KSF subscription is linked to ${event.subscriptionId}`;
+  if (!event.paid) {
+    await recordPayment({
+      pharmacyId: subscription.pharmacy_id, subscriptionId: subscription.id, amountPaisa: event.amountPaisa || subscription.price_paisa,
+      currency: subscription.currency, status: 'failed', kind: 'renewal', provider: adapter.key, providerEventId: event.id,
+      providerReference: `${event.invoiceId}:failed:${event.id}`, failureMessage: toStr(event.failure, 200)
+    });
+    return 'processed: renewal failed, grace period started';
+  }
+  /* The amount is checked against what this subscription costs, never taken from the event. */
+  if (event.amountPaisa !== subscription.price_paisa || event.currency !== subscription.currency) {
+    await securityEvent({
+      type: 'payment.amount-mismatch', severity: 'danger', outcome: 'blocked', ip: '', userAgent: adapter.key,
+      detail: `${adapter.key} ${event.invoiceId}: renewal of ${event.amountPaisa} ${event.currency}, subscription costs ${subscription.price_paisa} ${subscription.currency}`
+    });
+    return 'ignored: the amount does not match the subscription';
+  }
+  const result = await recordPayment({
+    pharmacyId: subscription.pharmacy_id, subscriptionId: subscription.id, amountPaisa: subscription.price_paisa, currency: subscription.currency,
+    status: 'succeeded', kind: 'renewal', provider: adapter.key, providerReference: event.invoiceId, providerEventId: event.id, method: 'card'
+  });
+  return result.duplicate ? 'processed: already applied' : 'processed: subscription renewed';
+}
+
+/**
+ * One webhook delivery from a provider with rich events (Stripe): verified,
+ * written down once under its event id, then applied. A repeated delivery
+ * answers as before and changes nothing.
+ */
+export async function receiveEvent(adapter: Adapter, input: CallbackInput): Promise<{ ok: boolean; status: string; detail?: string; duplicate?: boolean }> {
+  const event = adapter.parseEvent!(input);
+  if (!event.ok) return { ok: false, status: 'rejected', detail: event.reason };
+
+  const seen = await col.webhookEvents().findOne({ provider: adapter.key, event_id: event.id });
+  if (seen) return { ok: true, status: seen.status, detail: seen.result ?? undefined, duplicate: true };
+  const id = randomUUID();
+  try {
+    await col.webhookEvents().insertOne({
+      _id: id, id, provider: adapter.key, event_id: event.id, event_type: toStr(event.type, 80), signature_valid: 1,
+      payload: toStr(input.raw, 20_000), status: 'received', result: null, received_at: nowIso(), processed_at: null
+    });
+  } catch (error) {
+    if ((error as { code?: number }).code === 11000) return { ok: true, status: 'received', duplicate: true };
+    throw error;
+  }
+
+  let detail: string;
+  switch (event.kind) {
+    case 'checkout': {
+      const applied = await settleFromProvider({ providerKey: adapter.key, outcome: event.outcome, source: 'webhook' });
+      detail = applied.ok ? `processed: ${'status' in applied ? applied.status : 'settled'}` : `ignored: ${applied.reason}`;
+      break;
+    }
+    case 'renewal':
+      detail = await applyRenewal(adapter, event);
+      break;
+    case 'renewal-setting': {
+      const changed = await col.subscriptions().updateOne(
+        { provider: adapter.key, provider_subscription_id: event.subscriptionId },
+        { $set: { auto_renew: event.renews ? 1 : 0, updated_at: nowIso() } }
+      );
+      detail = changed.matchedCount ? `processed: renewal ${event.renews ? 'on' : 'off'}` : 'ignored: no linked subscription';
+      break;
+    }
+    case 'ended': {
+      const subscription = await col.subscriptions().findOne({ provider: adapter.key, provider_subscription_id: event.subscriptionId });
+      if (subscription && subscription.status !== 'cancelled') {
+        await cancelSubscription({ pharmacyId: subscription.pharmacy_id, reason: 'Ended at the payment provider' });
+      }
+      detail = subscription ? 'processed: cancelled, the paid period runs to its end' : 'ignored: no linked subscription';
+      break;
+    }
+    default:
+      detail = `ignored: nothing to do for ${event.type}`;
+  }
+  const status = detail.startsWith('processed') ? 'processed' : 'ignored';
+  await col.webhookEvents().updateOne({ _id: id }, { $set: { status, result: toStr(detail, 300), processed_at: nowIso() } });
+  return { ok: true, status, detail };
 }
 
 /* --------------------------------------------------------- reconciliation */

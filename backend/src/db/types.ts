@@ -186,6 +186,40 @@ export interface Expense extends Base {
   approved_by: Id | null; approved_at: When | null; created_by: Id | null; created_at: When; updated_at: When;
 }
 
+/* ---------------------------------------------------- medicine directory */
+/** One medicine in the platform-wide reference directory every pharmacy can search. */
+export interface DirectoryMedicine extends Base {
+  name: string; name_key: string; synonyms: string[]; category: string; forms: string[];
+  brands: Array<{ name: string; manufacturer: string | null }>; prescription: 'otc' | 'prescription' | 'controlled';
+  uses: string[]; precautions: string[]; side_effects: string[]; interactions: string[];
+  references: Array<{ source: string; title: string | null; url: string }>;
+  status: 'published' | 'draft' | 'archived'; source: 'starter' | 'team';
+  verified_by: Id | null; verified_by_name: string | null; verified_at: When | null;
+  created_by: Id | null; created_at: When; updated_by: Id | null; updated_at: When;
+}
+
+/* ------------------------------------------------------------ accounting */
+/** Money that came in other than from a sale: a supplier's bonus, shelf rent. */
+export interface IncomeEntry extends Base {
+  pharmacy_id: Id; branch_id: Id | null; category: string; description: string; amount_paisa: number;
+  received_on: string; payment_method: string; reference: string | null; payer: string | null;
+  created_by: Id | null; created_at: When; updated_at: When;
+}
+
+/** One payment to one person for one month: a salary, an advance or a bonus. */
+export interface SalaryPayment extends Base {
+  pharmacy_id: Id; branch_id: Id | null; staff_id: Id | null; staff_name: string; kind: 'salary' | 'advance' | 'bonus';
+  period: string; basic_paisa: number; allowances_paisa: number; deductions_paisa: number; net_paisa: number;
+  paid_on: string; payment_method: string; reference: string | null; note: string | null;
+  created_by: Id | null; created_at: When; updated_at: When;
+}
+
+/** A payment to a supplier against a purchase order, dated, for the cash book. */
+export interface SupplierPayment extends Base {
+  pharmacy_id: Id; supplier_id: Id; purchase_id: Id; amount_paisa: number; paid_on: string;
+  payment_method: string; reference: string | null; created_by: Id | null; created_at: When;
+}
+
 export interface DayClosing extends Base {
   pharmacy_id: Id; branch_id: Id | null; business_date: string; opening_float_paisa: number;
   expected_cash_paisa: number; counted_cash_paisa: number; variance_paisa: number;
@@ -276,6 +310,8 @@ export interface Subscription extends Base {
   auto_renew: Flag; started_at: When; current_period_start: When; current_period_end: When;
   renewal_at: When | null; grace_until: When | null; cancelled_at: When | null; cancel_reason: string | null;
   ended_at: When | null; source: string; provider: string | null; provider_reference: string | null;
+  /** A provider that renews on its own schedule (Stripe): its subscription and customer. */
+  provider_subscription_id?: string | null; provider_customer_id?: string | null;
   failed_payments: number; reminder_sent_for?: string | null; dunning_sent_for?: string | null;
   created_at: When; updated_at: When;
 }
@@ -287,6 +323,8 @@ export interface SubscriptionPayment extends Base {
   paid_at: When | null; provider_status: string | null; fee_paisa: number | null; settled_at: When | null;
   refunded_paisa: number | null; cancelled_at: When | null; expires_at: When | null; verified_by: Id | null;
   verified_at: When | null; statement_reference: string | null; attempt_id: Id | null; created_at: When; updated_at: When | null;
+  /** Set on every payment that succeeded: the invoice number and what was bought. */
+  invoice_no?: string | null; plan_key?: string | null; plan_name?: string | null;
 }
 
 export interface PaymentAttempt extends Base {

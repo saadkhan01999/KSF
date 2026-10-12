@@ -29,20 +29,47 @@ it from there. If it ever changes again, that file and the e-mail wording in
 
 ## 2. What the mark is now
 
-A **capsule set on the diagonal inside a rounded square tile**. The tile is an
-emerald gradient; the capsule is white on the upper half and gold on the
-lower, with a hairline seam where the two halves of a real capsule meet.
+**The geometric K from the approved print artwork, in a rounded emerald
+tile, with a small gold capsule lying in the crook above the K's arm.** The
+letterforms are the outlined vector paths taken from the print artwork
+(KSF-print-artwork.pdf), not a typeface, so the K and the KSF wordmark are
+the same shape on a screen, a receipt and a printed sheet.
 
-The reasoning, which the replacement should keep:
+The reasoning, which any replacement should keep:
 
-- **A capsule, not a cross.** A medical cross says clinic, hospital, first aid
-  and about four hundred other health products. A capsule says pharmacy.
-- **Two shapes, one angle, no thin strokes.** It survives being shrunk to a
-  16px favicon, which is where most logos die.
-- **It works in one colour.** A receipt printer has no gradients.
-- **It is not a letterform.** "KSF" as a monogram in a tile reads as an
-  abbreviation nobody knows; the capsule carries the meaning and the wordmark
-  carries the name.
+- **The K carries the name; the capsule says pharmacy.** At 16 pixels three
+  letters are unreadable and a lone K could be anything; the gold capsule is
+  what makes it a pharmacy's mark — small on purpose, a tick of gold rather
+  than a second focal point.
+- **Two shapes, one angle, no thin strokes.** The capsule sits on the same 45°
+  as the K's diagonals, and both survive being shrunk to a 16px favicon.
+- **It works in one colour.** A receipt printer has no gradients; the mono
+  lock-up is the tile's outline and the K.
+
+### Where it appears — one source
+
+Every place the mark appears reads it from the same vector paths:
+
+| Where | From |
+|---|---|
+| Sidebar, sign-in, website header and footer, loading screen, printed statements and invoices | `frontend/src/components/Brand.tsx` (`BrandMark`, `BrandLogo`, `KsfWordmark`) |
+| Browser tab | `frontend/public/favicon.svg` (+ `favicon-32.png`) |
+| Installed app (Android, desktop) | `frontend/public/icons/icon-192.svg`, `icon-512.svg`, `icon-192.png`, `icon-512.png` |
+| iPhone and iPad home screen | `frontend/public/icons/apple-touch-icon.png` (180 × 180 — iOS ignores SVG here) |
+| E-mails | `frontend/public/brand/ksf-email-logo.png`, on the brand green header |
+| Documents and the designer's pack | `docs/brand/` |
+
+**Light and dark.** The tile and the capsule are the same in both modes —
+the brand does not change colour with the theme. The wordmark beside it uses
+the text token (`--text`), so it is dark on light and light on dark, and in
+dark mode the tile gets a hairline edge (`--brand-mark-edge`) so its deep
+corner does not disappear into a dark sidebar. A pharmacy's colour theme
+(Ocean Blue, Royal Purple…) changes the interface, never the mark.
+
+**Replacing it with new approved artwork** is one edit: put the new outlines
+in the four path constants at the top of `Brand.tsx`, update the static files
+in the table above from the same outlines (any SVG-to-PNG tool, at the sizes
+listed), and every screen, document and e-mail follows.
 
 ---
 
@@ -53,8 +80,8 @@ The reasoning, which the replacement should keep:
 | Brand 400 | `#2ED6A0` | Gradient start (top-left of the tile) |
 | Brand 600 | `#0E7A50` | **Primary brand colour.** Buttons, links, the gradient's middle |
 | Brand 950 | `#052A1B` | Gradient end (bottom-right), deep shadow |
-| Gold 500 | `#E7B84A` | The capsule's lower half. Money, ownership, the accent |
-| White | `#FFFFFF` | The capsule's upper half; text on any brand fill |
+| Gold 500 | `#E7B84A` | The capsule. Money, ownership, the accent |
+| White | `#FFFFFF` | The K; text on any brand fill |
 | Ink 900 | `#101828` | Wordmark in light mode |
 | Slate 050 | `#F8FAFC` | Wordmark in dark mode |
 
@@ -73,17 +100,19 @@ end of the gradient.
 
 Drawn on a **64 × 64 grid**:
 
-- Tile: `0,0` to `64,64`, corner radius **16** (a squircle, not a circle)
-- Capsule: a `44 × 20` rounded rectangle, radius **10**, centred at `32,32`,
-  rotated **−45°**
-- Seam: a `2.2` wide bar at the capsule's centre, 22% black
-- Sheen: a soft white shape across the top-left corner at 11% opacity — it
+- Tile: `0,0` to `64,64`, corner radius **14**, emerald gradient
+  `#12996A → #0E7A50 → #172A24` from top-left to bottom-right
+- K: the print artwork's K, scaled to sit in the tile with optical margins
+  (`K_ICON_PATH` in `Brand.tsx`), white
+- Capsule: a `15 × 7` rounded rectangle, radius **3.5**, gold `#E7B84A`,
+  rotated **−45°** about `49,14`, with a hairline seam at 30% of the deep green
+- Sheen: a soft white shape across the top-left corner at 10% opacity — it
   stops the tile reading flat at large sizes
 
-The maskable app icon (`frontend/public/icons/icon-192.svg`, `icon-512.svg`)
-uses a **full-bleed background with no corner radius** and a capsule scaled to
-sit inside the 80% safe circle, because Android crops the corners to whatever
-shape the launcher wants.
+The maskable app icons (`icons/icon-192.svg`, `icon-512.svg` and their PNGs)
+and the iPhone icon use a **full-bleed background with no corner radius**,
+and the K and capsule scaled to 80% so they sit inside the safe circle,
+because Android and iOS crop the corners to whatever shape they want.
 
 ---
 
@@ -163,12 +192,12 @@ not scale in the application.
 
 ## 10. If you are generating it with an image tool instead
 
-> A minimal flat vector logo mark: a rounded square tile, 16px corner radius
-> on a 64px grid, filled with a smooth emerald gradient from #2ED6A0 to
-> #052A1B. Centred inside it, a pharmaceutical capsule rotated 45 degrees —
-> upper half white, lower half warm gold #E7B84A, with a thin dark seam where
-> the halves meet. Flat, geometric, no shadow, no outline, no text, no
-> gradient mesh, no 3D. Must read clearly at 16 pixels.
+> A minimal flat vector logo mark: a rounded square tile, 14px corner radius
+> on a 64px grid, filled with a smooth emerald gradient from #12996A to
+> #172A24. Inside it, a bold geometric white capital K with straight-cut
+> diagonals, and a small warm-gold (#E7B84A) pharmaceutical capsule lying on
+> the same 45° diagonal in the space above the K's upper arm. Flat,
+> geometric, no shadow, no outline, no 3D. Must read clearly at 16 pixels.
 
 Then trace the result into real vector geometry before shipping it — an image
 generator's output is a picture of a logo, not a logo.

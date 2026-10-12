@@ -15,6 +15,8 @@ import './styles/account.css';
 import './styles/auth.css';
 import './styles/calculator.css';
 import './styles/support.css';
+import './styles/accounts.css';
+import './styles/directory.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Eye, LogIn, Phone, Mail, Download } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { useApiData, useDebounced } from '../../hooks/useApi';
+import { useApiData, useDebounced, useLiveRefresh } from '../../hooks/useApi';
 import { query } from '../../services/api';
 import {
   Button, SearchField, SelectInput, StatusBadge, Badge, EmptyState, TableSkeleton, Pager
@@ -27,9 +27,10 @@ export default function Pharmacies() {
   const [plan, setPlan] = useState('all');
   const [page, setPage] = useState(1);
 
-  const { data, loading } = useApiData<PharmacyList>(
+  const { data, loading, reload } = useApiData<PharmacyList>(
     `/platform/pharmacies${query({ q: search, status, plan, page })}`, [search, status, plan, page]
   );
+  useLiveRefresh(reload, ['subscription']);
 
   const support = async (row: PharmacyRow) => {
     try {

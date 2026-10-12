@@ -39,6 +39,22 @@ export function useApiData<T>(path: string | null, deps: unknown[] = []) {
   return { data, loading, error, reload: load, setData };
 }
 
+/**
+ * Reload quietly when the live feed says the plans or the subscription
+ * changed — a price edited in the console, a payment that cleared — so the
+ * screen is right without anybody pressing reload.
+ */
+export function useLiveRefresh(reload: (quiet?: boolean) => unknown, what: Array<'plans' | 'subscription'> = ['plans', 'subscription']) {
+  const { live } = useApp();
+  const key = what.map((name) => live[name]).join(':');
+  const seen = useRef(key);
+  useEffect(() => {
+    if (seen.current === key) return;
+    seen.current = key;
+    void reload(true);
+  }, [key, reload]);
+}
+
 /** Delays a value so a search box does not fire a request per keystroke. */
 export function useDebounced<T>(value: T, delay = 320): T {
   const [settled, setSettled] = useState(value);

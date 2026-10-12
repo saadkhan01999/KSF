@@ -110,6 +110,9 @@ export function BrandMark({
       </defs>
 
       <rect width="64" height="64" rx="14" fill={`url(#${tile})`} />
+      {/* In dark mode the tile's deep corner meets a dark sidebar: a hairline
+          edge (transparent in light mode) keeps its outline. */}
+      <rect x=".5" y=".5" width="63" height="63" rx="13.5" fill="none" stroke="var(--brand-mark-edge, transparent)" />
       {/* A sheen across the top-left corner. Without it the tile reads flat at
           the sizes where a logo is actually judged. */}
       <path d="M14 0h30C29 6 14 19 8 38 3 34 0 28 0 22V14C0 6.3 6.3 0 14 0Z" fill="#FFFFFF" opacity=".10" />

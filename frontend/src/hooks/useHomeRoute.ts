@@ -12,7 +12,8 @@ const PLATFORM_HOMES: Array<[string, string]> = [
   ['platform.help', '/platform/help'],
   ['platform.finance.view', '/platform/income'],
   ['platform.plans.manage', '/platform/plans'],
-  ['platform.activity', '/platform/activity']
+  ['platform.activity', '/platform/activity'],
+  ['platform.medicines.manage', '/platform/directory']
 ];
 
 export function useHomeRoute(): string {

@@ -2,7 +2,7 @@
    The counter calculator
    --------------------------------------------------------------------------
    The arithmetic behind the calculator in the top bar, kept free of React so
-   it can be tested on its own (tests/handover.mjs imports this file directly).
+   it can be tested on its own (tests/unit.test.mjs imports this file directly).
 
    Why not plain JavaScript numbers. 0.1 + 0.2 is 0.30000000000000004 in
    floating point, and 1.15 × 100 is 114.99999999999999. A calculator at a

@@ -20,16 +20,10 @@ import { SitePage, SiteCta } from '../../components/SiteChrome';
 import { PlanCard } from '../../components/account-ui';
 import { Alert, CardSkeleton, Segmented } from '../../components/ui';
 import { useParallax, useReveal, useViewMode } from '../../hooks/useParallax';
-import { api } from '../../services/api';
+import { usePublicPlans } from '../../hooks/usePublicPlans';
 import { rupees } from '../../utils/format';
 import { FEATURE_NAMES, FAQ, TRIAL_POINTS, RENEWAL_POINTS, SUBSCRIPTION_TERMS } from './content';
 import type { Plan } from '../../types';
-
-interface PlansReply {
-  data: Plan[];
-  trialDays: number;
-  passwordMinLength: number;
-}
 
 type Cycle = 'week' | 'month' | 'year';
 
@@ -51,22 +45,9 @@ export default function Pricing() {
   const location = useLocation();
   const glow = useParallax<HTMLDivElement>({ speed: 0.26, max: 120 });
 
-  const [plans, setPlans] = useState<Plan[] | null>(null);
-  const [trialDays, setTrialDays] = useState(15);
-  const [problem, setProblem] = useState<string | null>(null);
+  /* The Super Admin's current prices, redrawn the moment they change. */
+  const { plans, trialDays, problem } = usePublicPlans();
   const [cycle, setCycle] = useState<Cycle>('month');
-
-  useEffect(() => {
-    let live = true;
-    api.get<PlansReply>('/public/plans')
-      .then((reply) => {
-        if (!live) return;
-        setPlans(reply.data);
-        setTrialDays(reply.trialDays ?? 15);
-      })
-      .catch((error: Error) => { if (live) setProblem(error.message); });
-    return () => { live = false; };
-  }, []);
 
   useEffect(() => {
     if (!location.hash) return;

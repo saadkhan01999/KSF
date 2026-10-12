@@ -288,7 +288,7 @@ export function readDevOutbox(limit = 10): Array<{ name: string; to: string; sub
 const shell = (heading: string, lines: string[], footer = ''): string => `
 <div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#F4F7F5;padding:32px">
   <div style="max-width:520px;margin:0 auto;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E2E8E5">
-    <div style="background:#0E7C5A;padding:20px 28px;color:#FFFFFF;font-weight:700;letter-spacing:.02em">KSF</div>
+    <div style="background:#0E7A50;padding:16px 28px;color:#FFFFFF;font-weight:700;font-size:20px;letter-spacing:.02em"><img src="${APP_URL}/brand/ksf-email-logo.png" width="154" height="40" alt="KSF" style="display:block;border:0;height:40px;width:154px;color:#FFFFFF;font-weight:700;font-size:20px"></div>
     <div style="padding:28px">
       <h1 style="margin:0 0 12px;font-size:20px;color:#132A22">${heading}</h1>
       ${lines.map((line) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#3A4A44">${line}</p>`).join('')}
@@ -300,9 +300,9 @@ const shell = (heading: string, lines: string[], footer = ''): string => `
 </div>`;
 
 const codeBlock = (code: string) =>
-  `<span style="display:inline-block;font-size:30px;letter-spacing:.32em;font-weight:700;color:#0E7C5A;background:#EAF6F1;padding:12px 20px;border-radius:12px">${code}</span>`;
+  `<span style="display:inline-block;font-size:30px;letter-spacing:.32em;font-weight:700;color:#0E7A50;background:#EAF6F1;padding:12px 20px;border-radius:12px">${code}</span>`;
 const button = (href: string, label: string) =>
-  `<a href="${href}" style="display:inline-block;background:#0E7C5A;color:#FFFFFF;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:600">${label}</a>`;
+  `<a href="${href}" style="display:inline-block;background:#0E7A50;color:#FFFFFF;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:600">${label}</a>`;
 
 export const templates = {
   verifyEmail: ({ code, name, minutes }: { code: string; name?: string; minutes: number }) => ({
@@ -378,6 +378,17 @@ export const templates = {
       'After that the account moves to the free Basic plan. <strong>Nothing is deleted</strong>, and picking the plan back up puts everything back.',
       button(`${APP_URL}/settings?tab=billing`, 'Pay now')
     ])
+  }),
+  paymentReceipt: ({ name, pharmacy, invoiceNo, amount, plan, period, paidOn }: { name?: string; pharmacy: string; invoiceNo: string; amount: string; plan: string; period: string; paidOn: string }) => ({
+    subject: `KSF receipt ${invoiceNo} — ${amount} received`,
+    text: `Assalam-o-alaikum ${name || ''},\n\nThank you. We received ${amount} for the ${plan} plan of ${pharmacy} on ${paidOn}${period ? ` (${period})` : ''}.\n\nInvoice: ${invoiceNo}\n\nThe receipt can be printed or saved as a PDF under Settings > Billing and Subscription.\n\n${APP_URL}/settings?tab=billing\n\nKSF`,
+    html: shell('Payment received — thank you', [
+      `Assalam-o-alaikum ${name || ''},`,
+      `We received <strong>${amount}</strong> for the <strong>${plan}</strong> plan of <strong>${pharmacy}</strong> on ${paidOn}${period ? ` (${period})` : ''}.`,
+      `Invoice number: <strong>${invoiceNo}</strong>`,
+      'The receipt can be printed or saved as a PDF under <strong>Settings &rsaquo; Billing and Subscription</strong>.',
+      button(`${APP_URL}/settings?tab=billing`, 'View the receipt')
+    ], 'You are receiving this because you manage this pharmacy on KSF.')
   }),
   supportReply: ({ name, reference, subject, reply, status }: { name?: string; reference: string; subject: string; reply: string; status: string }) => ({
     subject: `[${reference}] ${subject}`,

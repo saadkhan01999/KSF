@@ -501,7 +501,7 @@
 
 .billing-summary {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 220px minmax(0, 1fr);
   gap: var(--s-6);
   align-items: start;
   margin-bottom: var(--s-5);
@@ -523,14 +523,14 @@
 .detail-list { display: grid; gap: 0; }
 .detail-row {
   display: grid;
-  grid-template-columns: 190px 1fr;
+  grid-template-columns: 190px minmax(0, 1fr);
   gap: var(--s-4);
   padding: 9px 0;
   border-bottom: 1px solid var(--line-faint);
 }
 .detail-row:last-child { border-bottom: 0; }
 .detail-row dt { color: var(--text-dim); font-size: var(--fs-sm); }
-.detail-row dd { margin: 0; font-weight: 500; }
+.detail-row dd { margin: 0; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
 .detail-row.tone-warn dd { color: var(--warn-text); }
 
 .feature-check-list { list-style: none; padding: 0; display: grid; gap: 8px; margin-bottom: var(--s-5); }

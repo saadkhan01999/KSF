@@ -31,11 +31,13 @@ export interface Business {
   ntn: string;
   strn: string;
   supportHours: string;
+  /** "university" in the isolated copy made for a university submission. */
+  edition: 'commercial' | 'university';
 }
 
 export const EMPTY_BUSINESS: Business = {
   legalName: '', address: '', city: '', country: '', phone: '', whatsapp: '',
-  supportEmail: '', salesEmail: '', website: '', ntn: '', strn: '', supportHours: ''
+  supportEmail: '', salesEmail: '', website: '', ntn: '', strn: '', supportHours: '', edition: 'commercial'
 };
 
 let cache: Business | null = null;
@@ -47,8 +49,8 @@ export function loadBusiness(): Promise<Business> {
 
   inFlight = fetch(`${API_BASE_URL}/public/brand`)
     .then((response) => (response.ok ? response.json() : null))
-    .then((body: { business?: Partial<Business> } | null) => {
-      cache = { ...EMPTY_BUSINESS, ...(body?.business ?? {}) };
+    .then((body: { business?: Partial<Business>; edition?: Business['edition'] } | null) => {
+      cache = { ...EMPTY_BUSINESS, ...(body?.business ?? {}), edition: body?.edition === 'university' ? 'university' : 'commercial' };
       return cache;
     })
     .catch(() => {

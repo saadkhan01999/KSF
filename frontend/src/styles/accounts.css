@@ -1,0 +1,134 @@
+/* ==========================================================================
+   Accounts, the period picker, statements, and printing on A4
+   ========================================================================== */
+
+/* ------------------------------------------------------------ the period */
+.accounts-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--s-3); margin-bottom: var(--s-4);
+}
+.period-picker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); min-width: 0; max-width: 100%; }
+.period-dates { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.period-dates .input { width: auto; min-width: 0; flex: 1 1 140px; }
+
+.toolbar-end { margin-left: auto; }
+
+/* ------------------------------------------------------------- layout */
+.stack { display: grid; gap: var(--s-5); align-content: start; min-width: 0; }
+.accounts-grid {
+  display: grid; gap: var(--s-5); align-items: start;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+}
+@media (max-width: 1080px) { .accounts-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.ledger-totals {
+  display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); align-items: center;
+  margin: 0 0 var(--s-3); padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2);
+  font-size: var(--fs-sm); color: var(--text-dim);
+}
+.ledger-totals b { color: var(--text); margin-left: 4px; }
+
+/* ---------------------------------------------------------- statements */
+.statement { display: grid; font-size: var(--fs-base); }
+.statement-head {
+  margin-top: var(--s-4); padding-bottom: var(--s-2);
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim);
+}
+.statement-head:first-child { margin-top: 0; }
+.statement-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4);
+  padding: 7px 0; border-bottom: 1px solid var(--line-faint);
+}
+.statement-label { min-width: 0; overflow-wrap: anywhere; }
+.statement-amt { flex: 0 0 auto; white-space: nowrap; font-weight: 600; }
+.statement-amt.is-neg { color: var(--danger-text); }
+.statement-row.is-sub { padding-left: var(--s-3); color: var(--text-soft); }
+.statement-row.is-sub .statement-amt { font-weight: 500; }
+.statement-row.is-total { font-weight: 700; border-bottom-color: var(--line-strong); }
+.statement-row.is-total .statement-amt { font-weight: 700; }
+.statement-row.is-result {
+  margin-top: var(--s-3); padding: var(--s-3) var(--s-4); border: 0; border-radius: var(--r-md);
+  background: var(--accent-soft); font-size: var(--fs-md); font-weight: 800;
+}
+.statement-row.is-result .statement-amt { font-weight: 800; }
+.statement-row.is-note { color: var(--text-dim); font-size: var(--fs-sm); border-bottom-style: dashed; }
+.statement-notes { margin-top: var(--s-3); }
+
+/* -------------------------------------------------- twelve-month chart */
+.trend-chart { display: grid; gap: var(--s-3); }
+.trend-legend { display: flex; gap: var(--s-4); font-size: var(--fs-sm); color: var(--text-dim); }
+.trend-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.trend-legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.swatch.is-income, .trend-bars .is-income { background: var(--chart-1); }
+.swatch.is-costs, .trend-bars .is-costs { background: var(--gold-500); }
+/* Twelve months need about 560px; a phone scrolls the chart sideways
+   rather than squeezing a month into a sliver. */
+.trend-cols {
+  display: grid; grid-template-columns: repeat(12, minmax(42px, 1fr)); gap: var(--s-2);
+  overflow-x: auto; padding-bottom: var(--s-1);
+}
+.trend-col { display: grid; grid-template-rows: 180px auto auto; gap: 4px; justify-items: center; min-width: 0; }
+.trend-bars { display: flex; align-items: flex-end; gap: 3px; height: 100%; width: 100%; justify-content: center; }
+.trend-bars i { display: block; width: 40%; max-width: 18px; min-height: 2px; border-radius: 4px 4px 0 0; }
+.trend-profit { font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.trend-profit.is-neg { color: var(--danger-text); }
+.trend-label { font-size: var(--fs-xs); color: var(--text-dim); }
+@media (max-width: 640px) { .trend-col { grid-template-rows: 140px auto auto; } }
+
+/* ---------------------------------------------------------- salary form */
+.salary-net {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--accent-soft);
+}
+.salary-net b { font-size: var(--fs-xl); }
+.salary-net.is-neg { background: var(--danger-100); color: var(--danger-text); }
+
+/* ----------------------------------------------------- printing on A4
+   The till's slip owns the default print rules (screens.css). A document
+   printed with printSheet() sets data-print="sheet" on <html>: the app is
+   taken out of the layout and the sheet, rendered outside it, flows onto
+   as many A4 pages as it needs, in black on white whatever the theme. */
+.print-sheet { display: none; }
+@media print {
+  html[data-print='sheet'], html[data-print='sheet'] body { width: auto; height: auto; overflow: visible; background: #fff; }
+  html[data-print='sheet'] #root { display: none !important; }
+  html[data-print='sheet'] .print-sheet {
+    display: block; visibility: visible !important; color: #111; font-size: 11pt; line-height: 1.45;
+    --text: #111; --text-soft: #222; --text-dim: #555; --line: #bbb; --line-faint: #ddd; --line-strong: #888;
+    --accent-soft: #eef4f1; --danger-text: #8a1c14; --danger-100: #fbe9e7;
+  }
+  html[data-print='sheet'] .print-sheet * { visibility: visible !important; }
+  .print-sheet .ps-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-bottom: 10px; border-bottom: 2px solid #111; }
+  .print-sheet .ps-issuer { display: grid; text-align: right; font-size: 10pt; color: #333; }
+  .print-sheet .ps-title { margin: 18px 0 2px; font-size: 18pt; }
+  .print-sheet .ps-sub { margin: 0 0 14px; color: #555; }
+  .print-sheet h2 { margin: 18px 0 6px; font-size: 13pt; }
+  .print-sheet .statement { font-size: 10.5pt; }
+  .print-sheet .statement-row { break-inside: avoid; }
+  .print-sheet .ps-foot { display: grid; gap: 4px; margin-top: 24px; padding-top: 8px; border-top: 1px solid #bbb; font-size: 9pt; color: #555; }
+}
+
+/* ------------------------------------------------- invoices and receipts */
+.invoice { display: grid; gap: var(--s-5); }
+.invoice-parties { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-5); }
+.invoice-parties > div { display: grid; align-content: start; gap: 2px; font-size: var(--fs-sm); color: var(--text-soft); min-width: 0; overflow-wrap: anywhere; }
+.invoice-parties strong { font-size: var(--fs-md); color: var(--text); }
+.invoice-lbl { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
+.invoice-totals { display: grid; gap: 6px; justify-self: end; min-width: min(100%, 280px); }
+.invoice-totals > div { display: flex; justify-content: space-between; gap: var(--s-5); }
+.invoice-totals > div:first-child { font-size: var(--fs-lg); padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.invoice-note { font-size: var(--fs-xs); color: var(--text-dim); margin: 0; }
+@media (max-width: 560px) { .invoice-parties { grid-template-columns: minmax(0, 1fr); } }
+
+/* ------------------------------------------------------- how to pay */
+.pay-options { display: grid; gap: var(--s-2); margin-bottom: var(--s-4); }
+.pay-option {
+  display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) var(--s-4); cursor: pointer;
+  border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface);
+}
+.pay-option.is-on { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--ring); }
+.pay-option input { margin-top: 4px; accent-color: var(--brand-600); }
+.pay-option span { display: grid; gap: 2px; min-width: 0; }
+.pay-option strong { display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.pay-option small { color: var(--text-dim); font-size: var(--fs-xs); line-height: 1.45; }

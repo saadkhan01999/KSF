@@ -38,7 +38,10 @@ const ROLE_ICONS: Record<string, React.ReactNode> = {
 };
 
 export default function Roles() {
-  const { ok, can, user } = useApp();
+  const { ok, can, user, hasFeature } = useApp();
+  /* Built-in roles work on every plan; making and changing roles is a plan feature. */
+  const customAllowed = hasFeature('staff.roles');
+  const manage = can('roles.manage') && customAllowed;
   const { busy, run } = useAction();
 
   const { data, loading, reload } = useApiData<RolesResponse>('/roles');
@@ -143,12 +146,21 @@ export default function Roles() {
             and KSF checks it on the server every single time — hiding a button is never the only defence.
           </p>
         </div>
-        <Allow permission="roles.manage">
+        {manage && (
           <div className="actions">
             <Button variant="primary" icon={<Plus size={18} />} onClick={openNew}>Create a role</Button>
           </div>
-        </Allow>
+        )}
       </div>
+
+      {can('roles.manage') && !customAllowed && (
+        <div className="mb-5">
+          <Alert tone="info" title="Your own roles come with a paid plan">
+            The five built-in roles work on every plan. Creating, changing and duplicating roles comes with the Weekly,
+            Monthly and Annual plans — see Settings › Billing.
+          </Alert>
+        </div>
+      )}
 
       <div className="grid grid-4 mb-5">
         <StatCard label="Built-in roles" value={number(systemRoles.length)} icon={<ShieldCheck size={20} />} hint="ship with KSF" />
@@ -171,9 +183,9 @@ export default function Roles() {
                 <RoleCard
                   key={role.id}
                   role={role}
-                  canEdit={editable(role) && can('roles.manage')}
+                  canEdit={editable(role) && manage}
                   onEdit={() => openEdit(role)}
-                  onDuplicate={() => { setDuplicating(role); setDuplicateName(`${role.name} (copy)`); }}
+                  onDuplicate={manage ? () => { setDuplicating(role); setDuplicateName(`${role.name} (copy)`); } : undefined}
                 />
               ))}
             </div>
@@ -190,7 +202,7 @@ export default function Roles() {
                     icon={<ShieldCheck size={30} />}
                     title="No custom roles yet"
                     message="Build a role for anything the six built-in ones do not cover — a stock controller who never touches money, or an accountant who never touches stock."
-                    action={can('roles.manage')
+                    action={manage
                       ? <Button variant="primary" icon={<Plus size={18} />} onClick={openNew}>Create your first role</Button>
                       : undefined}
                   />
@@ -202,9 +214,9 @@ export default function Roles() {
                     <RoleCard
                       key={role.id}
                       role={role}
-                      canEdit={editable(role) && can('roles.manage')}
+                      canEdit={editable(role) && manage}
                       onEdit={() => openEdit(role)}
-                      onDuplicate={() => { setDuplicating(role); setDuplicateName(`${role.name} (copy)`); }}
+                      onDuplicate={manage ? () => { setDuplicating(role); setDuplicateName(`${role.name} (copy)`); } : undefined}
                       onDelete={() => setRemoving(role)}
                     />
                   ))}
@@ -392,7 +404,7 @@ function RoleCard({
   role, canEdit, onEdit, onDuplicate, onDelete
 }: {
   role: Role; canEdit: boolean;
-  onEdit: () => void; onDuplicate: () => void; onDelete?: () => void;
+  onEdit: () => void; onDuplicate?: () => void; onDelete?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const { data } = useApiData<RolesResponse>('/roles');
@@ -454,7 +466,7 @@ function RoleCard({
           {canEdit && (
             <Button size="sm" variant="secondary" icon={<Pencil size={14} />} onClick={onEdit}>Edit</Button>
           )}
-          <Button size="sm" variant="ghost" icon={<Copy size={14} />} onClick={onDuplicate}>Duplicate</Button>
+          {onDuplicate && <Button size="sm" variant="ghost" icon={<Copy size={14} />} onClick={onDuplicate}>Duplicate</Button>}
           {onDelete && canEdit && (
             <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={onDelete} aria-label={`Delete ${role.name}`}>
               <Trash2 size={16} />

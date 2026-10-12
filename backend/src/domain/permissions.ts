@@ -54,6 +54,8 @@ export const PERMISSIONS: ReadonlyArray<readonly [string, string, string]> = [
   ['expenses.write', 'Record and edit expenses', 'Finance'],
   ['expenses.approve', 'Approve expenses for payment', 'Finance'],
   ['day-close.manage', 'Close the day, count the drawer and explain the difference', 'Finance'],
+  ['accounting.view', 'Open the accounts: income, expenses, salaries and net profit', 'Finance'],
+  ['accounting.manage', 'Record other income and salary payments', 'Finance'],
 
   ['reports.view', 'Open reports and analytics', 'Reporting'],
   ['reports.export', 'Export report data to CSV', 'Reporting'],
@@ -80,6 +82,13 @@ export const PERMISSIONS: ReadonlyArray<readonly [string, string, string]> = [
 ];
 
 export const PERMISSION_KEYS: string[] = PERMISSIONS.map((p) => p[0]);
+
+/* Permissions a release added to a built-in role. A pharmacy created before
+   that release gets them once, at start-up (db/bootstrap.ts); after that a
+   pharmacy Admin who takes one away keeps it taken away. */
+export const ROLE_GRANTS_BY_RELEASE: ReadonlyArray<{ release: string; role: string; permissions: string[] }> = [
+  { release: '2.1.0', role: 'regional-manager', permissions: ['accounting.view'] }
+];
 
 /* --------------------------------------------------------------------------
    BUILT-IN PHARMACY ROLES
@@ -117,7 +126,7 @@ export const SYSTEM_ROLES: RoleTemplate[] = [
     permissions: [
       ...READ_ONLY_OPS, 'reports.export', 'pos.operate', 'pos.discount', 'pos.discount.override',
       'purchases.write', 'purchases.approve', 'suppliers.write',
-      'inventory.adjust', 'expiry.manage', 'expenses.write', 'expenses.approve', 'day-close.manage',
+      'inventory.adjust', 'expiry.manage', 'expenses.write', 'expenses.approve', 'day-close.manage', 'accounting.view',
       'staff.read', 'roles.read', 'audit.read', 'customers.write', 'medicines.write',
       'messages.read', 'messages.write', 'messages.broadcast', 'appearance.theme', 'support.raise'
     ]

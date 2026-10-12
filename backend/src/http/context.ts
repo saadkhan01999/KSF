@@ -55,7 +55,10 @@ export interface PharmacyCtx extends Ctx {
 }
 
 /** What a handler may return. `__status` and `__redirect` are read by the
-    router and stripped from the reply. */
-export type HandlerResult = (Record<string, any> & { __status?: number; __redirect?: string }) | void;
+    router and stripped from the reply; `__stream` takes the response over
+    for a long-lived reply (the live-updates feed) instead of JSON. */
+export type HandlerResult = (Record<string, any> & {
+  __status?: number; __redirect?: string; __stream?: (res: import('express').Response) => void;
+}) | void;
 
 export type Handler<C extends Ctx = PharmacyCtx> = (ctx: C) => Promise<HandlerResult> | HandlerResult;

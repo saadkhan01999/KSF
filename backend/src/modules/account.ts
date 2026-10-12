@@ -73,7 +73,7 @@ async function draftView(draft: Registration | null) {
 }
 
 /* ========================= PUBLIC: SIGNING UP ============================ */
-publicRoute('GET', '/api/v1/public/brand', async () => ({ business: BUSINESS }));
+publicRoute('GET', '/api/v1/public/brand', async () => ({ business: BUSINESS, edition: env.KSF_EDITION }));
 
 publicRoute('GET', '/api/v1/public/plans', async () => ({
   data: await listPlans(), trialDays: env.REFERRAL_TRIAL_DAYS, passwordMinLength: PASSWORD_MIN_LENGTH, pharmacyTypes: PHARMACY_TYPES

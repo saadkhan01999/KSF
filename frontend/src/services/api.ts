@@ -49,6 +49,14 @@ export function setAccessToken(token?: string | null): void {
 
 export const hasAccessToken = (): boolean => accessToken !== '';
 
+/** The headers that say who is asking: the token, and the pharmacy in support mode. */
+export function identityHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  if (supportPharmacyId) headers['X-Pharmacy-Id'] = supportPharmacyId;
+  return headers;
+}
+
 /** Work inside one pharmacy as the platform Super Admin, or stop (null). */
 export function setSupportPharmacy(pharmacyId: string | null): void {
   supportPharmacyId = pharmacyId ?? '';

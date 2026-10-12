@@ -20,6 +20,7 @@ import {
   Button, Modal, TextInput, TextArea, SelectInput, Checkbox, EmptyState,
   TableSkeleton, Badge, Allow, Alert, Segmented, Spinner, ConfirmDialog
 } from '../components/ui';
+import { FeatureLocked } from '../components/plan';
 import { initials, ago, dateTime, date } from '../utils/format';
 import type { Conversation, MessageDirectory, Paged } from '../types';
 
@@ -33,7 +34,14 @@ const KIND_LABEL: Record<string, string> = {
   broadcast: 'Everyone'
 };
 
+/* Internal messaging is a plan feature; the server refuses it with 402 when
+   the plan leaves it out, and this says so instead of an empty inbox. */
 export default function Messages() {
+  const { hasFeature } = useApp();
+  return hasFeature('messaging.internal') ? <MessagesScreen /> : <FeatureLocked name="Internal messaging" />;
+}
+
+function MessagesScreen() {
   const { user, ok, refreshWorkspace } = useApp();
   const { busy, run } = useAction();
   const [params, setParams] = useSearchParams();

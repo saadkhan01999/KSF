@@ -13,6 +13,8 @@ import { env } from '../config/env.js';
 import { col, db } from './mongo.js';
 import type { Plan, User } from './types.js';
 import { PLAN_SEED } from '../domain/plans.js';
+import { PERMISSION_KEYS, PHARMACY_ADMIN_ROLE, ROLE_GRANTS_BY_RELEASE } from '../domain/permissions.js';
+import { starterFields } from '../domain/medicine-directory.js';
 import { hashPassword, passwordProblem } from '../security/password.js';
 import { isEmail, nowIso, uid } from '../core/util.js';
 
@@ -41,6 +43,10 @@ const INDEXES: Record<string, IndexDescription[]> = {
   ],
   expenses: [{ key: { pharmacy_id: 1, expense_date: -1 } }],
   day_closings: [{ key: { pharmacy_id: 1, business_date: -1 } }],
+  income_entries: [{ key: { pharmacy_id: 1, received_on: -1 } }],
+  salary_payments: [{ key: { pharmacy_id: 1, paid_on: -1 } }, { key: { pharmacy_id: 1, staff_id: 1, period: 1, kind: 1 } }],
+  supplier_payments: [{ key: { pharmacy_id: 1, paid_on: -1 } }, { key: { purchase_id: 1 } }],
+  medicine_directory: [{ key: { name_key: 1 }, unique: true }, { key: { status: 1, category: 1, name_key: 1 } }],
   notifications: [{ key: { pharmacy_id: 1, created_at: -1 } }, { key: { pharmacy_id: 1, type: 1, is_read: 1 } }, { key: { pharmacy_id: 1, audience: 1, created_at: -1 } }],
   activity_logs: [{ key: { pharmacy_id: 1, created_at: -1 } }],
   audit_logs: [{ key: { pharmacy_id: 1, sequence: 1 }, unique: true }],
@@ -102,6 +108,53 @@ export async function ensurePlans(): Promise<number> {
 }
 
 /**
+ * Bring the built-in roles of pharmacies created before a release up to it.
+ * The Admin holds every permission by definition, so it gets any new one on
+ * every start. Other built-in roles get what a release added to them once —
+ * the marker makes sure an Admin who later takes one away is not overruled.
+ */
+export async function syncSystemRoles(): Promise<number> {
+  let changed = 0;
+  for (const grant of ROLE_GRANTS_BY_RELEASE) {
+    const marker = await col.counters().updateOne(
+      { _id: `release:${grant.release}:${grant.role}` },
+      { $setOnInsert: { pharmacy_id: 'platform', name: 'role-grant', value: 1 } },
+      { upsert: true }
+    );
+    if (!marker.upsertedCount) continue;
+    changed += (await col.roles().updateMany({ key: grant.role, is_system: 1 }, { $addToSet: { permissions: { $each: grant.permissions } } })).modifiedCount;
+  }
+  changed += (await col.roles().updateMany({ key: PHARMACY_ADMIN_ROLE, is_system: 1 }, { $addToSet: { permissions: { $each: PERMISSION_KEYS } } })).modifiedCount;
+  return changed;
+}
+
+/**
+ * The medicine directory's starter set, once per installation. Reference
+ * content, like the plans — not demonstration data — and every entry arrives
+ * unverified until a pharmacist on the KSF team checks it. Run once, so an
+ * entry the team archives does not come back at the next start.
+ */
+export async function ensureMedicineDirectory(): Promise<number> {
+  const marker = await col.counters().updateOne(
+    { _id: 'directory:starter-v1' }, { $setOnInsert: { pharmacy_id: 'platform', name: 'directory-starter', value: 1 } }, { upsert: true }
+  );
+  if (!marker.upsertedCount) return 0;
+  const at = nowIso();
+  let added = 0;
+  for (const fields of starterFields()) {
+    const id = uid('DIR');
+    const result = await col.directory().updateOne({ name_key: fields.name_key }, {
+      $setOnInsert: {
+        _id: id, id, ...fields, source: 'starter', verified_by: null, verified_by_name: null, verified_at: null,
+        created_by: null, created_at: at, updated_by: null, updated_at: at
+      }
+    }, { upsert: true });
+    added += result.upsertedCount;
+  }
+  return added;
+}
+
+/**
  * The platform's one Super Admin, created the first time the server starts
  * with SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD set. After that the account
  * lives in the database: the Super Admin changes their own e-mail address and
@@ -133,9 +186,13 @@ export async function ensureSuperAdmin(): Promise<'exists' | 'created' | 'missin
 export async function bootstrap({ silent = false } = {}): Promise<void> {
   await ensureIndexes();
   const plans = await ensurePlans();
+  const roles = await syncSystemRoles();
+  const directory = await ensureMedicineDirectory();
   const admin = await ensureSuperAdmin();
   if (silent) return;
   if (plans) console.log(`[KSF] added ${plans} subscription plan(s)`);
+  if (roles) console.log(`[KSF] brought ${roles} built-in role(s) up to this release`);
+  if (directory) console.log(`[KSF] added ${directory} medicine(s) to the directory's starter set — unverified until the team checks them`);
   if (admin === 'created') console.log(`[KSF] created the platform Super Admin account for ${env.SUPER_ADMIN_EMAIL}`);
   if (admin === 'missing-settings') {
     console.warn('[KSF] No Super Admin yet. Set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD in .env and restart.');

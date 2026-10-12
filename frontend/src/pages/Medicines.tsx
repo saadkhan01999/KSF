@@ -3,7 +3,7 @@
    where it sits on the shelf. */
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus, Pill, Pencil, Trash2, Download, Package, MoreVertical,
   Barcode, MapPin, ShieldAlert, Eye
@@ -47,6 +47,21 @@ export default function Medicines() {
   const [fieldError, setFieldError] = useState<{ field?: string; message: string } | null>(null);
   const [removing, setRemoving] = useState<Medicine | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
+
+  /* Opened from the medicine directory with "Add to my medicines": the form
+     starts filled in from the entry, and only the prices and stock levels are
+     left to type. The draft is read once, then cleared from the history. */
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [prefill] = useState(() => (location.state as { prefill?: Partial<typeof emptyForm> } | null)?.prefill ?? null);
+  useEffect(() => {
+    if (!prefill) return;
+    setEditing(null);
+    setForm({ ...emptyForm, ...prefill });
+    setFormOpen(true);
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
 
   const path = `/medicines${query({ q: search, category, state, rx, page, size: 25, sort, dir })}`;
   const { data, loading, reload } = useApiData<Paged<Medicine>>(path, [search, category, state, rx, page, sort, dir]);

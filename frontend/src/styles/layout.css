@@ -509,3 +509,23 @@ body { background: var(--surface); }
 .support-banner svg { flex: 0 0 auto; }
 .support-banner .grow { flex: 1 1 200px; min-width: 0; }
 .support-banner button { margin-left: auto; }
+
+/* The subscription needs the owner: waiting for payment, overdue, a trial ending. */
+.plan-banner {
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  padding: 10px var(--page-gutter); font-size: var(--fs-sm); font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+.plan-banner.tone-warn { background: var(--warn-100); color: var(--warn-text); }
+.plan-banner.tone-danger { background: var(--danger-100); color: var(--danger-text); }
+.plan-banner.tone-info { background: var(--info-100); color: var(--info-text); }
+.plan-banner svg { flex: 0 0 auto; }
+.plan-banner .grow { flex: 1 1 220px; min-width: 0; }
+.plan-banner button { margin-left: auto; }
+
+/* The university copy labels itself under the logo. */
+.sidebar-brand-stack { display: grid; justify-items: start; }
+.edition-tag {
+  display: inline-block; width: fit-content; margin-top: 6px; padding: 2px 8px; border-radius: var(--r-pill);
+  background: var(--gold-100); color: var(--gold-text); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+}

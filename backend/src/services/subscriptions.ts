@@ -18,8 +18,9 @@
 import { env } from '../config/env.js';
 import { col, tx, s } from '../db/mongo.js';
 import type { Plan, Subscription, SubscriptionPayment } from '../db/types.js';
-import { TRIAL_PLAN_KEY } from '../domain/plans.js';
-import { notify } from '../core/trails.js';
+import { FEATURES, TRIAL_PLAN_KEY } from '../domain/plans.js';
+import { HttpError } from '../core/errors.js';
+import { nextNumber, notify } from '../core/trails.js';
 import { nowIso, plusDays, randomUUID, toInt, toStr } from '../core/util.js';
 import { secureReference } from '../security/crypto.js';
 import { sendMail, templates } from './mailer.js';
@@ -143,6 +144,26 @@ export async function hasFeature(pharmacyId: string, featureKey: string): Promis
   return (await subscriptionState(pharmacyId))?.features.includes(featureKey) ?? false;
 }
 
+/**
+ * Refuse a request for something the pharmacy's plan does not include, with
+ * 402 and the plans that do include it — so the screen can offer the upgrade
+ * instead of an error. Nothing is deleted when a feature is locked; it simply
+ * cannot be reached until the plan includes it again.
+ */
+export async function requireFeature(pharmacyId: string, featureKey: string): Promise<void> {
+  if (await hasFeature(pharmacyId, featureKey)) return;
+  const name = FEATURES.find(([key]) => key === featureKey)?.[1] ?? featureKey;
+  const plans = (await listPlans()).filter((plan) => plan.features.includes(featureKey)).map((plan) => ({ key: plan.key, name: plan.name }));
+  const error = new HttpError(
+    402,
+    `${name} is not part of your current plan.${plans.length ? ` It comes with ${plans.map((plan) => plan.name).join(', ')}.` : ''} Upgrade under Settings › Billing.`,
+    undefined,
+    'feature_locked'
+  );
+  error.details = { feature: featureKey, featureName: name, plans };
+  throw error;
+}
+
 /* --------------------------------------------------------------- lifecycle */
 
 /**
@@ -216,6 +237,16 @@ export async function changePlan(input: { pharmacyId: string; planKey: string; a
   if (!subscription) {
     return { ok: true, subscription: await startSubscription({ pharmacyId: input.pharmacyId, planKey: input.planKey, source: 'upgrade', activateWithoutPayment: input.activate }) };
   }
+  /* A different plan replaces what the provider was renewing (Stripe): stop
+     it now, or the card would be charged for the old plan as well. */
+  if (subscription.plan_key !== plan.key && subscription.provider_subscription_id) {
+    const { setProviderRenewal } = await import('./payments/index.js');
+    try {
+      await setProviderRenewal(subscription, false, true);
+    } catch (error) {
+      return { ok: false, reason: `${(error as Error).message}. Nothing was changed — try again in a moment.` };
+    }
+  }
   const at = nowIso();
   if (plan.isFree || input.activate) {
     await col.subscriptions().updateOne({ _id: subscription.id }, {
@@ -268,7 +299,7 @@ export async function recordPayment(input: {
   const plan = await getPlan(subscription.plan_key);
   const at = nowIso();
 
-  return tx(async () => {
+  const recorded = await tx(async () => {
     const periodStart = status === 'succeeded' ? at : subscription.current_period_start;
     const nextEnd = status === 'succeeded' && plan ? periodEnd(plan, new Date()) : subscription.current_period_end;
     const id = randomUUID();
@@ -280,7 +311,10 @@ export async function recordPayment(input: {
       paid_at: status === 'succeeded' ? at : null, provider_status: null, fee_paisa: null, settled_at: null,
       refunded_paisa: null, cancelled_at: null, expires_at: null, verified_by: input.verifiedBy ?? null,
       verified_at: input.verifiedBy ? at : null, statement_reference: null, attempt_id: input.attemptId ?? null,
-      created_at: at, updated_at: at
+      created_at: at, updated_at: at,
+      /* Every successful payment is an invoice, numbered once, across the platform. */
+      invoice_no: status === 'succeeded' ? await invoiceNumber(at) : null,
+      plan_key: subscription.plan_key, plan_name: plan?.name ?? subscription.plan_key
     };
     await col.subscriptionPayments().insertOne(payment, s());
 
@@ -306,6 +340,50 @@ export async function recordPayment(input: {
     }
     return { ok: true, duplicate: false, payment };
   });
+  if (recorded.payment?.status === 'succeeded') await sendReceipt(recorded.payment);
+  return recorded;
+}
+
+/** KSF-INV-2026-000123: numbered per calendar year, never reused. */
+const invoiceNumber = (at: string): Promise<string> => nextNumber('platform', `invoice-${at.slice(0, 4)}`, `KSF-INV-${at.slice(0, 4)}`);
+
+/** E-mail the receipt to the pharmacy's Admin and put a note in its notifications. Once per payment. */
+async function sendReceipt(payment: SubscriptionPayment): Promise<void> {
+  try {
+    const contact = await billingContact(payment.pharmacy_id);
+    const amount = `Rs ${(payment.amount_paisa / 100).toLocaleString('en-PK')}`;
+    const period = payment.period_end ? `until ${payment.period_end.slice(0, 10)}` : '';
+    if (contact?.email) {
+      await sendMail({
+        to: contact.email, noticeKey: `receipt:${payment.id}`, pharmacyId: payment.pharmacy_id, template: 'paymentReceipt', retry: true,
+        ...templates.paymentReceipt({
+          name: contact.full_name, pharmacy: contact.pharmacy_name, invoiceNo: payment.invoice_no ?? payment.id, amount,
+          plan: payment.plan_name ?? 'KSF', period, paidOn: (payment.paid_at ?? payment.created_at).slice(0, 10)
+        })
+      });
+    }
+    await notify(payment.pharmacy_id, {
+      type: 'billing', severity: 'success', title: `Payment received — ${payment.invoice_no ?? amount}`,
+      body: `${amount} for the ${payment.plan_name ?? ''} plan${period ? `, ${period}` : ''}. The receipt is under Settings › Billing.`, link: '/settings?tab=billing'
+    });
+  } catch (error) {
+    /* The payment stands either way; a receipt that failed can be printed from Billing. */
+    console.warn(`[KSF] receipt for ${payment.id} could not be sent: ${(error as Error).message}`);
+  }
+}
+
+/** Number the successful payments recorded before invoices were numbered. Safe to repeat. */
+export async function numberPastInvoices(): Promise<number> {
+  const unnumbered = await col.subscriptionPayments()
+    .find({ status: { $in: ['succeeded', 'refunded'] }, invoice_no: null })
+    .sort({ paid_at: 1, created_at: 1 }).limit(500).toArray();
+  for (const payment of unnumbered) {
+    const plan = await col.plans().findOne({ key: (await col.subscriptions().findOne({ _id: payment.subscription_id }))?.plan_key ?? '' });
+    await col.subscriptionPayments().updateOne({ _id: payment.id, invoice_no: null }, {
+      $set: { invoice_no: await invoiceNumber(payment.paid_at ?? payment.created_at), plan_name: payment.plan_name ?? plan?.name ?? null }
+    });
+  }
+  return unnumbered.length;
 }
 
 /**
@@ -456,6 +534,12 @@ export async function runSubscriptionMaintenance() {
 
   const toBasic = async (subscriptionId: string, pharmacyId: string) => {
     if (!basic) return;
+    /* A card the provider would go on charging is stopped before the move. */
+    const current = await col.subscriptions().findOne({ _id: subscriptionId });
+    if (current?.provider_subscription_id) {
+      const { setProviderRenewal } = await import('./payments/index.js');
+      await setProviderRenewal(current, false, true).catch((error: Error) => console.error(`[KSF] ${error.message} (${subscriptionId})`));
+    }
     await col.subscriptions().updateOne({ _id: subscriptionId }, {
       $set: {
         plan_id: basic.id, plan_key: basic.key, status: STATUSES.ACTIVE, price_paisa: 0, auto_renew: 0,
@@ -504,5 +588,6 @@ export async function runSubscriptionMaintenance() {
   }
 
   await sendRenewalNotices(summary);
+  await numberPastInvoices();
   return summary;
 }

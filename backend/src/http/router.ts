@@ -12,6 +12,7 @@
                                    Super Admin alone)
      route(..., 'perm')            pharmacy endpoints — signed in, inside a
                                    pharmacy, and holding the named permission
+     route(..., { feature })       ...and on a plan that includes the feature
 
    Authorisation is never a matter of which buttons the web app drew: the
    check happens in http/app.ts before the handler runs, for every request.
@@ -26,6 +27,9 @@ export type Access = 'public' | 'account' | 'platform' | 'pharmacy';
 export interface RouteOptions {
   /** Public POSTs are refused from other origins unless this is set (webhooks). */
   allowCrossOrigin?: boolean;
+  /** Pharmacy routes: the plan feature (domain/plans.ts) the pharmacy's
+      subscription must include. Without it the answer is 402 feature_locked. */
+  feature?: string;
 }
 
 export interface RouteDef {
