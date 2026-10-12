@@ -36,7 +36,7 @@ export interface AccountsSummary {
 
 export interface LedgerRow {
   id: string; date: string; at: string; direction: 'in' | 'out';
-  source: 'sales' | 'income' | 'expense' | 'salary' | 'supplier';
+  source: 'sales' | 'income' | 'expense' | 'salary' | 'supplier' | 'subscription' | 'refund';
   category: string; description: string; amount_paisa: number; payment_method: string | null; reference: string | null;
 }
 
@@ -55,3 +55,36 @@ export interface SalaryPayment {
 }
 
 export interface Payee { id: string; name: string; role: string | null; status: string }
+
+/* ------------------------------------------------ the platform's own books */
+
+export interface PlatformProfitAndLoss {
+  income: {
+    subscriptionsPaisa: number; payments: number; byPlan: { plan: string; amount: number; payments: number }[];
+    refundsPaisa: number; refunds: number; netSubscriptionsPaisa: number;
+    otherIncome: CategoryAmount[]; otherIncomePaisa: number; totalPaisa: number;
+  };
+  costs: { feesPaisa: number; expenses: CategoryAmount[]; expensesPaisa: number; totalPaisa: number };
+  netProfitPaisa: number;
+  netMargin: number;
+}
+
+export interface PlatformAccountsSummary {
+  range: { from: string; to: string };
+  profitAndLoss: PlatformProfitAndLoss;
+  position: { payingPharmacies: number; awaitingPaisa: number; awaitingPayments: number; refundsOwedPaisa: number; refundsOwed: number };
+  trend: AccountsSummary['trend'];
+}
+
+export type PlatformEntryKind = 'income' | 'expense';
+
+export interface PlatformEntry {
+  id: string; kind: PlatformEntryKind; category: string; description: string; amount_paisa: number; entry_date: string;
+  payment_method: string; reference: string | null; party: string | null; created_by_name: string | null; created_at: string;
+}
+
+export interface PaymentProviderSetup {
+  key: string; label: string; configured: boolean; missing: string[]; mode: string; verified: boolean; note: string;
+  methods: string[]; capabilities: { redirect: boolean; lookup: boolean; refund: boolean; webhook: boolean };
+  webhookUrl: string | null; returnUrl: string | null;
+}

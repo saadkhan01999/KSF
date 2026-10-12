@@ -140,35 +140,43 @@ body { background: var(--surface); }
   border-top: 1px solid var(--line-faint);
 }
 
-/* The account card at the foot of the sidebar, as in the reference. */
+/* The account card at the foot of the sidebar: who is signed in, and where.
+   It opens the account menu, which is at least as wide as the card. */
 .account-card {
   display: flex;
   align-items: center;
   gap: var(--s-3);
   width: 100%;
-  min-height: 56px;
-  padding: 8px var(--s-3);
-  border: 1px solid transparent;
-  border-radius: var(--r-md);
-  background: transparent;
+  min-height: 60px;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  box-shadow: var(--sh-xs);
   text-align: left;
-  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
-.account-card:hover { background: var(--surface-2); border-color: var(--line); }
-.account-card .meta { min-width: 0; flex: 1; }
-.account-card .meta strong {
-  display: block;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
+.account-card:hover { border-color: var(--line-strong); box-shadow: var(--sh-sm); }
+.account-card[aria-expanded="true"] { border-color: var(--brand-600); box-shadow: var(--ring); }
+.account-card-avatar { position: relative; flex: 0 0 auto; display: inline-flex; }
+.account-card .presence {
+  position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--ok-500); border: 2px solid var(--sidebar);
 }
+.account-card .meta { min-width: 0; flex: 1; display: grid; gap: 1px; }
+.account-card .meta strong,
+.account-card .meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-card .meta strong { font-size: var(--fs-sm); font-weight: 650; color: var(--text); }
 .account-card .meta span { font-size: var(--fs-xs); color: var(--text-dim); }
-.account-card > svg:last-child { flex: 0 0 16px; color: var(--text-dim); }
+.account-card-caret {
+  flex: 0 0 28px; display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: var(--r-sm); color: var(--text-dim); transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.account-card:hover .account-card-caret { background: var(--surface-3); color: var(--text); }
 .sidebar.is-collapsed .account-card { justify-content: center; padding-inline: 0; }
+.sidebar.is-collapsed .account-card { border-color: transparent; background: transparent; box-shadow: none; }
 .sidebar.is-collapsed .account-card .meta,
-.sidebar.is-collapsed .account-card > svg:last-child { display: none; }
+.sidebar.is-collapsed .account-card-caret { display: none; }
 
 .collapse-btn {
   width: 100%;

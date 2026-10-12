@@ -181,7 +181,12 @@ export const PAYMENT_LABELS: Record<string, string> = {
   credit: 'On account (udhaar)'
 };
 
-export const payment = (method: string): string => PAYMENT_LABELS[method] ?? method;
+/* Names a subscription payment carries that are not choices at a till. */
+const PROVIDER_LABELS: Record<string, string> = {
+  transfer: 'Bank transfer', manual: 'Recorded by KSF', stripe: 'Card (Stripe)', gateway: 'Payment gateway'
+};
+
+export const payment = (method: string): string => PAYMENT_LABELS[method] ?? PROVIDER_LABELS[method] ?? method;
 
 export const STOCK_LABELS: Record<string, string> = {
   'in-stock': 'In stock',

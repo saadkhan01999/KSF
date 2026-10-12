@@ -42,7 +42,8 @@ backend/src/
   modules/           one file per area; each registers its routes on import
     auth, account, people, catalogue, inventory, purchasing, selling,
     cashbook, accounting, reporting, messaging, billing, invoices,
-    directory, live, setup, migrate, support, platform, team, admin,
+    directory, live, setup, migrate, support, platform,
+    platform-accounts, team, admin,
     shared (helpers used by several modules)
   services/          logic used by more than one module
     subscriptions, payments/ (provider, adapters, stripe, index),
@@ -112,6 +113,7 @@ notifications) have `pharmacy_id: null`.
 | Subscriptions | `subscription_plans`, `subscriptions`, `subscription_payments`, `payment_attempts`, `payment_refunds`, `webhook_events`, `trials` |
 | Referrals | `referral_codes`, `referrals` |
 | Reference | `medicine_directory` (platform-wide, kept by the platform team) |
+| Platform books | `platform_entries` (KSF's own income and expenses besides subscriptions; no `pharmacy_id`) |
 | Data import | `migration_jobs`, `migration_items` |
 
 Embedding is used where the child never lives without the parent and is
@@ -233,5 +235,6 @@ move to a bottom bar.
 
 `tests/unit.test.mjs` (no database), and the API suites against a throwaway
 MongoDB database: `api` (the whole platform over HTTP), `accounting`, `live`,
-`stripe`, `directory` and `access` (every route as every kind of caller).
+`stripe`, `directory`, `access` (every route as every kind of caller) and
+`platform-accounts`.
 See `tests/README.md`.

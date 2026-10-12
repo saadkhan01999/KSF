@@ -990,9 +990,12 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding: var(--s-3) 10px var(--s-4);
+  margin: -1px -1px 2px;
+  padding: var(--s-4) var(--s-3);
+  border-radius: calc(var(--r-md) - 2px);
+  background: linear-gradient(135deg, var(--accent-soft), transparent 75%);
 }
-.menu-account .avatar { flex: 0 0 38px; width: 38px; height: 38px; }
+.menu-account .avatar { flex: 0 0 42px; width: 42px; height: 42px; }
 .menu-account-meta { min-width: 0; display: block; }
 .menu-account-meta strong {
   display: block;
@@ -1004,8 +1007,30 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
   display: block;
   font-size: var(--fs-xs);
   color: var(--text-dim);
-  max-width: 190px;
+  max-width: 220px;
 }
+
+/* Light, dark or the device's choice, side by side in the account menu. */
+.theme-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  margin: 2px 6px 6px;
+  padding: 3px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.theme-switch button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 34px; padding: 0 8px; border-radius: var(--r-sm);
+  font-size: var(--fs-sm); font-weight: 600; color: var(--text-soft);
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+.theme-switch button:hover { color: var(--text); }
+.theme-switch button.is-on { background: var(--surface); color: var(--text); box-shadow: var(--sh-sm); }
+.theme-switch button.is-on svg { color: var(--brand-600); }
+.theme-switch button:focus-visible { outline: none; box-shadow: var(--ring); }
 .menu-account-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1293,4 +1318,10 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
 
 /* A plain dropdown floats above the page (see Menu in ui.tsx): above the
    sticky top bar and any open window, and never clipped by a scroll box. */
-.menu.is-floating { position: fixed; z-index: 140; }
+.menu.is-floating {
+  position: fixed; z-index: 140;
+  max-width: min(340px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

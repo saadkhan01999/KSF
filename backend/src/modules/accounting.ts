@@ -50,10 +50,10 @@ const SALARIES_CATEGORY = 'Salaries';
 
 const isDay = (value: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 const isMonth = (value: string): boolean => /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
-const endOf = (day: string): string => `${day}T23:59:59.999Z`;
+export const endOf = (day: string): string => `${day}T23:59:59.999Z`;
 
 /** The period a request asks about: ?from&to, defaulting to this month so far. */
-export function period(ctx: PharmacyCtx): { from: string; to: string } {
+export function period(ctx: { query: URLSearchParams }): { from: string; to: string } {
   const from = toStr(ctx.query.get('from'), 10);
   const to = toStr(ctx.query.get('to'), 10);
   const range = { from: isDay(from) ? from : startOfMonth(0), to: isDay(to) ? to : today() };
@@ -62,21 +62,21 @@ export function period(ctx: PharmacyCtx): { from: string; to: string } {
 }
 
 /** A date on a money record: given, valid, and not in the future. */
-function moneyDate(value: unknown, field: string, fallback?: string): string {
+export function moneyDate(value: unknown, field: string, fallback?: string): string {
   const day = toStr(value, 10) || fallback || today();
   if (!isDay(day)) bad('Give the date as YYYY-MM-DD.', field);
   if (day > today()) bad('A payment cannot be dated in the future.', field);
   return day;
 }
 
-function moneyMethod(value: unknown, fallback = 'cash'): string {
+export function moneyMethod(value: unknown, fallback = 'cash'): string {
   const method = toStr(value, 20) || fallback;
   if (!MONEY_METHODS.includes(method)) bad('Choose how the money was paid.', 'paymentMethod');
   return method;
 }
 
 /** A non-negative whole number of paisa. */
-function paisa(value: unknown, field: string, fallback = 0): number {
+export function paisa(value: unknown, field: string, fallback = 0): number {
   if (value === undefined || value === null || value === '') return fallback;
   const amount = toInt(value, -1);
   if (amount < 0) bad('Amounts cannot be negative.', field);
@@ -635,7 +635,7 @@ route('DELETE', '/api/v1/accounting/salaries/:id', 'accounting.manage', async (c
    Rows as JSON, like every other export: the browser turns them into a CSV
    with one shared routine (filename, encoding, formula neutralising). */
 
-const rs = (amount: number): number => Math.round(amount) / 100;
+export const rs = (amount: number): number => Math.round(amount) / 100;
 
 async function profitAndLossRows(pharmacyId: string, from: string, to: string) {
   const pnl = await profitAndLoss(pharmacyId, from, to);

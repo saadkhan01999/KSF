@@ -15,6 +15,7 @@ npm run test:api    # every API suite over HTTP — needs MongoDB
 | `stripe.test.mjs` | Stripe against a stand-in for its API: Checkout at the plan's price, a returning browser believed only after asking Stripe, a payment applied once, forged / stale / unsigned events refused, renewals, a failed renewal's grace period, invoices, refunds, the card page, cancellation |
 | `directory.test.mjs` | The medicine directory: the starter set, search, who may keep it, secure references only, verification and its reset, drafts and archived entries kept from pharmacies, imports |
 | `access.test.mjs` | Every route in the route table: anonymous callers turned away, each pharmacy role refused what it does not hold, every built-in role's screens, the platform console per team role, support mode, and no pharmacy reading or changing another's records |
+| `platform-accounts.test.mjs` | KSF's own books: one slip number per pharmacy, subscriptions less refunds plus other income against expenses to the rupee, the ledger and its filters, the downloads, finance roles only (a read-only role can read, not write), deletions in the activity log, and the payment-methods check naming missing settings, never their values |
 | `setup.mjs` | The configuration every test run uses. Tests never read `.env` |
 | `support/server.mjs` | Starts the API inside the test process on a free port and drops its database afterwards |
 

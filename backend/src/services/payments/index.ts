@@ -47,6 +47,15 @@ export const listProviders = () => ADAPTERS.map((adapter) => {
 });
 export const availableProviders = () => listProviders().filter((provider) => provider.configured);
 
+/** For the platform's Payment methods panel: every provider, what it still
+    needs, and the two addresses to register with it. Setting names only —
+    never their values. */
+export const providerSetup = () => listProviders().map((provider) => ({
+  ...provider,
+  webhookUrl: provider.capabilities.webhook ? `${APP_URL}/api/v1/payments/webhook/${provider.key}` : null,
+  returnUrl: provider.capabilities.redirect ? `${APP_URL}/api/v1/payments/return/${provider.key}` : null
+}));
+
 /** The configured default, or the first provider that is usable. */
 export function defaultProviderKey(): string {
   const preferred = env.PAYMENT_PROVIDER.toLowerCase();

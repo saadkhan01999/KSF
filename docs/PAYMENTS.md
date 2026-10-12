@@ -1,6 +1,6 @@
 # Taking subscription payments
 
-**KSF 2.1**
+**KSF 2.2**
 
 This is about the money KSF collects for itself — the subscription a pharmacy
 pays to use it. Money a pharmacy takes over its own counter is a different
@@ -46,7 +46,10 @@ Read these before changing anything in `backend/src/services/payments/`.
 | **Easypaisa** | Same: implemented, never run against a sandbox. The hash field order is configurable because it differs between merchant packs | Store ID, hash key, and the sandbox cases in §6 |
 | **A card form inside KSF** | Deliberately not built: cards are typed on Stripe's own page | — |
 
-`GET /api/v1/billing/providers` is the truth at runtime: it reports
+The Super Admin sees the same in the console, under **Accounts › Payment
+methods** (`GET /api/v1/platform/payments/providers`): each provider, switched
+on or not, test or live, the setting names it still needs, and the webhook and
+return addresses to register — copied with one click. `GET /api/v1/billing/providers` is the truth at runtime: it reports
 `configured` and `verified` per provider, and `missing` lists the settings that
 are absent. `verified` is a flag you set yourself — `JAZZCASH_VERIFIED=true` —
 **after** you have run the sandbox cases. It exists so that nobody can mistake

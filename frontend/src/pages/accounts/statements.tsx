@@ -1,12 +1,12 @@
 /* The two statements — profit and loss, and cash in and out — drawn the same
    way on the screen and on paper, so the printed copy is the screen. */
 
-import type { CashFlow, ProfitAndLoss } from '../../types/accounting';
+import type { CashFlow, PlatformProfitAndLoss, ProfitAndLoss } from '../../types/accounting';
 import { payment, percent, rupees } from '../../utils/format';
 
 type Tone = 'sub' | 'total' | 'result' | 'note';
 
-function Row({ label, value, tone, negative }: { label: string; value: number; tone?: Tone; negative?: boolean }) {
+export function Row({ label, value, tone, negative }: { label: string; value: number; tone?: Tone; negative?: boolean }) {
   /* A cost is shown in brackets, the way an accountant writes it, so a
      column of figures reads correctly without a minus sign on every line. */
   const shown = negative ? `(${rupees(Math.abs(value))})` : rupees(value);
@@ -18,7 +18,7 @@ function Row({ label, value, tone, negative }: { label: string; value: number; t
   );
 }
 
-function Heading({ children }: { children: string }) {
+export function Heading({ children }: { children: string }) {
   return <div className="statement-head">{children}</div>;
 }
 
@@ -69,6 +69,30 @@ export function CashStatement({ cash }: { cash: CashFlow }) {
       <Row label="Total money out" value={cash.out.totalPaisa} tone="total" negative />
 
       <Row label={cash.netPaisa < 0 ? 'More went out than came in' : 'More came in than went out'} value={cash.netPaisa} tone="result" />
+    </div>
+  );
+}
+
+/** KSF's own profit and loss: subscriptions less refunds, other income, and
+    the platform's costs. */
+export function PlatformProfitAndLossStatement({ pnl }: { pnl: PlatformProfitAndLoss }) {
+  const { income, costs } = pnl;
+  return (
+    <div className="statement">
+      <Heading>Income</Heading>
+      {income.byPlan.map((row) => <Row key={row.plan} label={`${row.plan} plan · ${row.payments} payment${row.payments === 1 ? '' : 's'}`} value={row.amount} tone="sub" />)}
+      {!income.byPlan.length && <Row label="Subscriptions" value={0} tone="sub" />}
+      {income.refundsPaisa > 0 && <Row label={`Refunds · ${income.refunds}`} value={income.refundsPaisa} tone="sub" negative />}
+      {income.otherIncome.map((row) => <Row key={row.category} label={row.category} value={row.amount} tone="sub" />)}
+      <Row label="Total income" value={income.totalPaisa} tone="total" />
+
+      <Heading>Costs</Heading>
+      {costs.feesPaisa > 0 && <Row label="Payment provider fees" value={costs.feesPaisa} tone="sub" negative />}
+      {costs.expenses.map((row) => <Row key={row.category} label={row.category} value={row.amount} tone="sub" negative />)}
+      {!costs.expenses.length && !costs.feesPaisa && <Row label="Nothing spent in this period" value={0} tone="sub" />}
+      <Row label="Total costs" value={costs.totalPaisa} tone="total" negative />
+
+      <Row label={`Net ${pnl.netProfitPaisa < 0 ? 'loss' : 'profit'} · ${percent(pnl.netMargin)} of income`} value={pnl.netProfitPaisa} tone="result" />
     </div>
   );
 }

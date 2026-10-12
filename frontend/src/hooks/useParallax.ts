@@ -215,23 +215,20 @@ export function useParallax<T extends HTMLElement>(options: ParallaxOptions = {}
 
 /** Current scroll offset, sampled by the shared ticker. Used for the sticky
     nav's shrink state. */
-export function useScrollY(): number {
-  const [offset, setOffset] = useState(0);
+/** Calls `listener` with the scroll offset whenever it changes, from the
+    shared ticker (no scroll listener). Returns the unsubscribe. */
+export function onScrollOffset(listener: (offset: number) => void): () => void {
+  scrollSubscribers.add(listener);
+  startTicker();
+  return () => { scrollSubscribers.delete(listener); stopTickerIfIdle(); };
+}
 
-  useEffect(() => {
-    // Only re-render when the value crosses a meaningful boundary, so the nav
-    // does not re-render on every frame of a scroll.
-    let last = -1;
-    const subscriber = (value: number) => {
-      const stepped = value < 12 ? 0 : 12;
-      if (stepped !== last) { last = stepped; setOffset(stepped); }
-    };
-    scrollSubscribers.add(subscriber);
-    startTicker();
-    return () => { scrollSubscribers.delete(subscriber); stopTickerIfIdle(); };
-  }, []);
-
-  return offset;
+/** Whether the page has scrolled further than `threshold` pixels. Re-renders
+    only when the answer changes, not on every frame of a scroll. */
+export function useScrolledPast(threshold: number): boolean {
+  const [past, setPast] = useState(false);
+  useEffect(() => onScrollOffset((offset) => setPast(offset > threshold)), [threshold]);
+  return past;
 }
 
 /** Sets `data-view` on <html>, which decides whether the page scrolls

@@ -8,13 +8,13 @@
    always "Sign in", in that order, in the same position, on every page.
    ========================================================================== */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { ArrowUpRight, Menu as MenuIcon, X, Mail, Phone, MapPin } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, Menu as MenuIcon, X, Mail, Phone, MapPin } from 'lucide-react';
 import { BrandLogo } from './Brand';
 import { BRAND } from '../brand';
 import { useBusiness, placeOf } from '../services/business';
-import { useScrollY } from '../hooks/useParallax';
+import { onScrollOffset, useScrolledPast } from '../hooks/useParallax';
 
 const LINKS = [
   { to: '/product', label: 'Product' },
@@ -24,7 +24,9 @@ const LINKS = [
 ];
 
 export function SiteHeader() {
-  const scrollY = useScrollY();
+  /* Off the top of the page, the bar gets a solid, blurred background so
+     what scrolls beneath it never shows through the links. */
+  const stuck = useScrolledPast(8);
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
@@ -41,7 +43,7 @@ export function SiteHeader() {
   }, [open]);
 
   return (
-    <header className={`site-nav ${scrollY > 12 ? 'is-stuck' : ''} ${open ? 'is-open' : ''}`}>
+    <header className={`site-nav ${stuck ? 'is-stuck' : ''} ${open ? 'is-open' : ''}`}>
       <Link to="/" aria-label="KSF, home" className="site-brand">
         <BrandLogo size={34} />
       </Link>
@@ -197,7 +199,40 @@ export function SiteFooter() {
             : 'Built for pharmacies across Pakistan.'}
         </span>
       </div>
+      <BackToTop />
     </footer>
+  );
+}
+
+/**
+ * Back to the top, once the page is long enough to need it. The ring around
+ * the arrow fills as the page is read; the scroll back is smooth unless the
+ * visitor has asked for less motion.
+ */
+export function BackToTop() {
+  const shown = useScrolledPast(480);
+  const ring = useRef<HTMLButtonElement>(null);
+
+  /* Progress is written straight to a CSS variable on every change, so the
+     ring moves with the page without re-rendering anything. */
+  useEffect(() => onScrollOffset((offset) => {
+    const room = document.documentElement.scrollHeight - window.innerHeight;
+    ring.current?.style.setProperty('--progress', String(room > 0 ? Math.min(1, offset / room) : 0));
+  }), []);
+
+  const toTop = () => {
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' });
+    document.getElementById('main')?.focus({ preventScroll: true });
+  };
+
+  return (
+    <button
+      ref={ring} type="button" className={`back-to-top ${shown ? 'is-shown' : ''}`} onClick={toTop}
+      aria-label="Back to the top" tabIndex={shown ? 0 : -1} aria-hidden={!shown}
+    >
+      <span><ArrowUp size={20} strokeWidth={2.4} /></span>
+    </button>
   );
 }
 
@@ -206,7 +241,7 @@ export function SitePage({ children, className = '' }: { children: React.ReactNo
   return (
     <div className={`site ${className}`}>
       <SiteHeader />
-      <main id="main">{children}</main>
+      <main id="main" tabIndex={-1}>{children}</main>
       <SiteFooter />
     </div>
   );

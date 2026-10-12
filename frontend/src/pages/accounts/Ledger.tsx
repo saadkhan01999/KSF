@@ -1,6 +1,7 @@
 /* Every movement the accounts are built from, newest first: the till's
    takings day by day, other income, expenses, salaries and supplier payments.
-   Each row links back to the screen it was recorded on. */
+   Each row links back to the screen it was recorded on. The platform's own
+   books use the same list, with their own endpoint and links. */
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -14,15 +15,19 @@ import { date, payment, rupees } from '../../utils/format';
 
 interface LedgerReply extends Paged<LedgerRow> { totals: { inPaisa: number; outPaisa: number; netPaisa: number } }
 
-const SOURCE_LINK: Record<LedgerRow['source'], (row: LedgerRow) => string | null> = {
+const PHARMACY_LINK: Partial<Record<LedgerRow['source'], (row: LedgerRow) => string>> = {
   sales: (row) => `/sales?from=${row.date}&to=${row.date}`,
   expense: () => '/expenses',
   supplier: () => '/purchases',
   income: () => '/accounts?tab=income',
   salary: () => '/accounts?tab=salaries'
 };
+const pharmacyLink = (row: LedgerRow): string | null => PHARMACY_LINK[row.source]?.(row) ?? null;
 
-export function AccountsLedger({ range }: { range: string }) {
+export function AccountsLedger({
+  range, path = '/accounting/transactions', linkFor = pharmacyLink,
+  emptyMessage = 'Sales, expenses, salaries, supplier payments and other income will appear here as they are recorded.'
+}: { range: string; path?: string; linkFor?: (row: LedgerRow) => string | null; emptyMessage?: string }) {
   const [term, setTerm] = useState('');
   const search = useDebounced(term);
   const [direction, setDirection] = useState<'all' | 'in' | 'out'>('all');
@@ -30,8 +35,8 @@ export function AccountsLedger({ range }: { range: string }) {
   useEffect(() => { setPage(1); }, [search, direction, range]);
 
   const { data, loading } = useApiData<LedgerReply>(
-    `/accounting/transactions?${range}&${query({ q: search, direction, page, size: 25 }).slice(1)}`,
-    [range, search, direction, page]
+    `${path}?${range}&${query({ q: search, direction, page, size: 25 }).slice(1)}`,
+    [path, range, search, direction, page]
   );
 
   return (
@@ -56,7 +61,7 @@ export function AccountsLedger({ range }: { range: string }) {
         {loading && !data
           ? <TableSkeleton columns={4} />
           : !data?.data.length
-            ? <EmptyState icon={<ArrowLeftRight size={30} />} title="Nothing moved in this period" message="Sales, expenses, salaries, supplier payments and other income will appear here as they are recorded." />
+            ? <EmptyState icon={<ArrowLeftRight size={30} />} title="Nothing moved in this period" message={emptyMessage} />
             : (
               <>
                 <div className="table-scroll">
@@ -71,7 +76,7 @@ export function AccountsLedger({ range }: { range: string }) {
                     </thead>
                     <tbody>
                       {data.data.map((row) => {
-                        const link = SOURCE_LINK[row.source](row);
+                        const link = linkFor(row);
                         return (
                           <tr key={`${row.source}-${row.id}`}>
                             <td className="cell-title">

@@ -461,7 +461,7 @@ function PaymentModal({ open, detail, onClose, onSaved }: { open: boolean; detai
         <TextInput label="Amount" prefix="Rs" type="number" min={1} required value={amount} onChange={(event) => setAmount(event.target.value)} />
         <SelectInput label="Paid by" value={method} onChange={(event) => setMethod(event.target.value)}
           options={[{ value: 'cash', label: 'Cash' }, { value: 'cheque', label: 'Cheque' }, { value: 'transfer', label: 'Bank transfer' }, { value: 'wallet', label: 'Easypaisa / JazzCash' }]} />
-        <TextInput label="Receipt, cheque or slip number" required wrapClass="span-2" value={reference} onChange={(event) => setReference(event.target.value)} hint="Each reference can be recorded once, so the same payment is never counted twice." />
+        <TextInput label="Receipt, cheque or slip number" required wrapClass="span-2" value={reference} onChange={(event) => setReference(event.target.value)} hint="A reference is recorded once for each pharmacy, so the same payment is never counted twice." />
       </div>
     </Modal>
   );

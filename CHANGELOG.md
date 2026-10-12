@@ -3,6 +3,43 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.2.0] — 2026-10-12
+
+### Accounts for the Super Admin
+- **Accounts** in the platform console (`platform.finance.view`, writing with
+  `platform.finance.manage`): KSF's own books. Income is subscription
+  payments by plan, less the refunds completed in the period, plus other
+  income such as setup and training fees; costs are payment-provider fees
+  and the platform's expenses — team salaries, servers and hosting, software,
+  marketing, rent and the rest. Net profit, paying pharmacies, payments still
+  waiting and refunds still owed, twelve months' trend, every movement in
+  one ledger, an A4 statement and CSV downloads.
+- **Payment methods** (Accounts › Payment methods): every way to pay — Stripe,
+  bank transfer, JazzCash, Easypaisa, a gateway — switched on or not, test or
+  live, the setting names each still needs (never their values), and the
+  webhook and return addresses to register, copied with one click.
+
+### Fixed
+- Recording an offline payment for a pharmacy was refused when **another**
+  pharmacy had used the same slip number. A slip, receipt or cheque number is
+  now unique within its own pharmacy; recording it twice for the same pharmacy
+  is still refused, and the message says when and for how much it was first
+  recorded. (A provider's charge id stays unique across the platform.) The old
+  database index is replaced on the first start.
+- The account menu opened from the sidebar stretched across the whole screen.
+  It now opens beside its card, at least as wide as it, inside the window.
+- The website's header stayed transparent after scrolling, so the page showed
+  through the links. It now turns solid, with a soft shadow, as soon as the
+  page moves.
+
+### Look and feel
+- The sidebar's account card shows who is signed in and where ("Admin · Khan
+  Pharmacy"), with a presence dot, and opens an account menu with a compact
+  Light / Dark / Auto switch.
+- The website has a **back to top** button once a page is long enough: a ring
+  around it fills as the page is read, and it scrolls back smoothly (at once
+  for visitors who ask for less motion).
+
 ## [2.1.0] — 2026-10-12
 
 The ten points of the October update: accounts, card payments that renew

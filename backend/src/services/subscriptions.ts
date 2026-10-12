@@ -279,8 +279,9 @@ export async function cancelSubscription(input: { pharmacyId: string; reason?: s
 /* ---------------------------------------------------------------- payments */
 
 /**
- * Record a payment and, if it succeeded, extend the period. The provider
- * reference is unique per provider, so the same charge is applied once.
+ * Record a payment and, if it succeeded, extend the period. A provider's
+ * reference is unique per provider, so the same charge is applied once; a
+ * slip number recorded by hand is unique within its pharmacy.
  */
 export async function recordPayment(input: {
   pharmacyId: string; subscriptionId: string; amountPaisa: number; currency?: string; status?: string;
@@ -291,7 +292,9 @@ export async function recordPayment(input: {
   const provider = input.provider ?? 'manual';
   const status = input.status ?? 'succeeded';
   const reference = input.providerReference ?? `local-${randomUUID()}`;
-  const existing = await col.subscriptionPayments().findOne({ provider, provider_reference: reference });
+  const existing = await col.subscriptionPayments().findOne(
+    provider === 'manual' ? { provider, provider_reference: reference, pharmacy_id: input.pharmacyId } : { provider, provider_reference: reference }
+  );
   if (existing) return { ok: true, duplicate: true, payment: existing };
 
   const subscription = await col.subscriptions().findOne({ _id: input.subscriptionId, pharmacy_id: input.pharmacyId });

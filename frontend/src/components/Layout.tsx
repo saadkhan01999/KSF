@@ -86,6 +86,12 @@ const NAV: NavGroup[] = [
   }
 ];
 
+const THEME_CHOICES: { value: 'light' | 'dark' | 'system'; label: string; icon: React.ReactNode }[] = [
+  { value: 'light', label: 'Light', icon: <Sun size={16} /> },
+  { value: 'dark', label: 'Dark', icon: <Moon size={16} /> },
+  { value: 'system', label: 'Auto', icon: <Monitor size={16} /> }
+];
+
 /* The platform console: the Super Admin's menu, and their team's — each
    member sees only what their team role includes. */
 const PLATFORM_NAV: NavGroup[] = [
@@ -102,6 +108,7 @@ const PLATFORM_NAV: NavGroup[] = [
   {
     label: 'Money',
     items: [
+      { to: '/platform/accounts', label: 'Accounts', icon: <Landmark />, permission: 'platform.finance.view' },
       { to: '/platform/income', label: 'Income', icon: <BadgeDollarSign />, permission: 'platform.finance.view' },
       { to: '/platform/plans', label: 'Plans', icon: <Layers />, permission: 'platform.plans.manage' }
     ]
@@ -233,6 +240,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
     navigate('/login', { replace: true });
   };
 
+  /* Who and where, under the name: "Admin · Khan Pharmacy", "Super Admin · KSF platform". */
+  const whereLine = user?.supportMode
+    ? `Support · ${user.pharmacyName ?? workspace?.pharmacy?.name ?? ''}`
+    : [user?.roleName, isPlatform ? 'KSF platform' : workspace?.pharmacy?.name].filter(Boolean).join(' · ');
+
   const accountMenu = (close: () => void) => (
     <>
       <div className="menu-account">
@@ -262,9 +274,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <MenuItem icon={<KeyRound />} onClick={() => { close(); setPasswordOpen(true); }}>Change password</MenuItem>
       <div className="menu-sep" />
       <div className="menu-label">Appearance</div>
-      <MenuItem icon={<Sun />} selected={theme === 'light'} onClick={() => setTheme('light')}>Light</MenuItem>
-      <MenuItem icon={<Moon />} selected={theme === 'dark'} onClick={() => setTheme('dark')}>Dark</MenuItem>
-      <MenuItem icon={<Monitor />} selected={theme === 'system'} onClick={() => setTheme('system')}>Match device</MenuItem>
+      <div className="theme-switch" role="radiogroup" aria-label="Light or dark">
+        {THEME_CHOICES.map((choice) => (
+          <button
+            key={choice.value} type="button" role="radio" aria-checked={theme === choice.value}
+            className={theme === choice.value ? 'is-on' : ''} onClick={() => setTheme(choice.value)}
+          >
+            {choice.icon}<span>{choice.label}</span>
+          </button>
+        ))}
+      </div>
       <MenuItem icon={<Palette />} onClick={() => { close(); navigate('/account'); }}>Colour theme</MenuItem>
       <div className="menu-sep" />
       {user?.supportMode && <MenuItem icon={<ArrowLeftCircle />} onClick={() => { close(); void backToPlatform(); }}>Back to the platform</MenuItem>}
@@ -334,12 +353,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
             align="left"
             trigger={({ toggle, props }) => (
               <button className="account-card" onClick={toggle} aria-label="Account menu" {...props}>
-                <PersonAvatar name={user?.fullName} url={user?.avatarUrl} tone={admin ? 'gold' : undefined} />
+                <span className="account-card-avatar">
+                  <PersonAvatar name={user?.fullName} url={user?.avatarUrl} tone={admin ? 'gold' : undefined} />
+                  <i className="presence" aria-hidden="true" />
+                </span>
                 <span className="meta">
                   <strong>{user?.fullName}</strong>
-                  <span>{user?.supportMode ? `Support · ${user.pharmacyName ?? ''}` : user?.roleName}</span>
+                  <span>{whereLine}</span>
                 </span>
-                <ChevronsUpDown size={16} />
+                <span className="account-card-caret" aria-hidden="true"><ChevronsUpDown size={15} /></span>
               </button>
             )}
           >
