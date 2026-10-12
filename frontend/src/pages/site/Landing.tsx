@@ -103,7 +103,7 @@ export default function Landing() {
           <div className="hero-inner">
             <span className="hero-badge">
               <b><Sparkles size={12} /> New</b>
-              Version {BRAND.version} — accounts, card payments and a medicine directory
+              Version {BRAND.version} — accounts for every pharmacy, card payments and a medicine directory
             </span>
 
             <h1>

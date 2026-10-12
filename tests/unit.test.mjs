@@ -20,6 +20,7 @@ const { createHmac } = await import('node:crypto');
 const { readFileSync } = await import('node:fs');
 const { PLATFORM_PERMISSION_KEYS, TEAM_MANAGE } = await import('../backend/src/domain/platform.ts');
 const calc = await import('../frontend/src/utils/calculator.ts');
+const { compareVersions } = await import('../frontend/src/utils/version.ts');
 
 describe('reading imported files', () => {
   it('detects semicolons and keeps quoted commas and newlines', () => {
@@ -389,5 +390,14 @@ describe('the counter calculator', () => {
     assert.equal(calc.keyAction('Enter'), '=');
     assert.equal(calc.keyAction('x'), '×');
     assert.equal(calc.keyAction('a'), null);
+  });
+});
+
+describe('the version check', () => {
+  it('orders releases by number, not by text', () => {
+    assert.ok(compareVersions('2.10.0', '2.9.1') > 0);
+    assert.ok(compareVersions('2.1.0', '2.2.1') < 0);
+    assert.equal(compareVersions('2.2.1', '2.2.1'), 0);
+    assert.equal(compareVersions('2.2', '2.2.0'), 0);
   });
 });

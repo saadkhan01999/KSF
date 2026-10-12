@@ -3,6 +3,14 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.2.1] — 2026-10-12
+
+- **Is the new version live?** The platform Overview, and a pharmacy's
+  Settings › System, ask the server which version it runs and compare it with
+  the website's: "Website 2.2.1 · Server 2.2.1 — up to date", or which of the
+  two (Railway or Vercel) still has to redeploy from `main`.
+- The website's hero names this release's highlights.
+
 ## [2.2.0] — 2026-10-12
 
 ### Accounts for the Super Admin

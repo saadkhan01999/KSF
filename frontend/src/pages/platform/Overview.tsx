@@ -9,6 +9,7 @@ import { useApiData, useLiveRefresh } from '../../hooks/useApi';
 import { Button, Card, StatCard, BarChart, DonutChart, StatusBadge, EmptyState, CardSkeleton, Badge } from '../../components/ui';
 import { rupees, rupeesShort, number, monthLabel, ago, date } from '../../utils/format';
 import type { PlatformOverview } from '../../types/platform';
+import { VersionCheck } from '../../components/VersionCheck';
 
 const change = (now: number, before: number): number | null => (before > 0 ? Math.round(((now - before) / before) * 1000) / 10 : null);
 
@@ -33,6 +34,7 @@ export default function Overview() {
           <Button variant="primary" icon={<Building2 size={18} />} onClick={() => navigate('/platform/pharmacies')}>All pharmacies</Button>
         </div>
       </div>
+      <VersionCheck />
 
       <div className="grid grid-4 mb-5">
         <StatCard
