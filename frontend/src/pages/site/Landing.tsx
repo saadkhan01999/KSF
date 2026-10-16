@@ -120,7 +120,7 @@ export default function Landing() {
                 Start free trial
                 <span className="arrow"><ArrowRight /></span>
               </Link>
-              <Link to="/login" className="btn btn-secondary btn-lg btn-pill">Sign in</Link>
+              <Link to="/login" className="btn btn-secondary btn-lg btn-pill text-center">Sign in</Link>
             </div>
 
             <div className="hero-proof">
