@@ -263,8 +263,70 @@ route('DELETE', '/api/v1/medicines/:id', 'medicines.delete', async (ctx) => {
  * zero, and a code pasted out of a spreadsheet has usually lost its leading
  * zeros. Each candidate is an exact match or not a match at all.
  */
+/* -------------------------------------------------------------- GS1 codes
+   The 2D DataMatrix on a medicine pack holds GS1 "Application Identifiers":
+   01 the product number (GTIN-14), 17 the expiry (YYMMDD), 10 the batch and
+   21 the serial. Scanners send it with or without brackets, with a GS
+   character (0x1D) after each variable-length field, and sometimes with a
+   "]d2" prefix naming the symbology. Without the GS characters a batch and a
+   serial cannot be told apart, so then only the fixed-length fields are read. */
+export interface Gs1Code { gtin: string; expiry: string | null; batch: string | null; serial: string | null }
+
+const GS = '\u001d';
+const FIXED_AI: Record<string, number> = { '01': 14, '11': 6, '15': 6, '17': 6 };
+const VARIABLE_AI = new Set(['10', '21']);
+
+/** YYMMDD as an ISO date; a day of 00 means the end of that month. */
+function gs1Date(value: string | undefined): string | null {
+  if (!value || !/^\d{6}$/.test(value)) return null;
+  const year = 2000 + Number(value.slice(0, 2));
+  const month = Number(value.slice(2, 4));
+  if (month < 1 || month > 12) return null;
+  const day = Number(value.slice(4, 6)) || new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+export function gs1Of(code: string): Gs1Code | null {
+  const text = code.trim().replace(/^\][A-Za-z]\d/, '');
+  if (text.startsWith('(')) {
+    const fields = new Map([...text.matchAll(/\((\d{2,4})\)([^(]*)/g)].map((match) => [match[1], match[2].replace(GS, '').trim()]));
+    const gtin = fields.get('01') ?? '';
+    return /^\d{14}$/.test(gtin) ? { gtin, expiry: gs1Date(fields.get('17')), batch: fields.get('10') || null, serial: fields.get('21') || null } : null;
+  }
+  if (text.length < 16 || !/^01\d{14}/.test(text)) return null;
+
+  const found: Gs1Code = { gtin: '', expiry: null, batch: null, serial: null };
+  const separated = text.includes(GS);
+  let at = 0;
+  while (at < text.length) {
+    if (text[at] === GS) { at += 1; continue; }
+    const ai = text.slice(at, at + 2);
+    if (ai in FIXED_AI) {
+      const value = text.slice(at + 2, at + 2 + FIXED_AI[ai]);
+      if (ai === '01') found.gtin = value;
+      if (ai === '17') found.expiry = gs1Date(value);
+      at += 2 + FIXED_AI[ai];
+    } else if (VARIABLE_AI.has(ai) && separated) {
+      const end = text.indexOf(GS, at + 2);
+      const value = text.slice(at + 2, end < 0 ? undefined : end);
+      if (ai === '10') found.batch = value || null; else found.serial = value || null;
+      at = end < 0 ? text.length : end + 1;
+    } else {
+      break;
+    }
+  }
+  return /^\d{14}$/.test(found.gtin) ? found : null;
+}
+
+/** What to store on a medicine for a scanned code: a GS1 code's product number, as the EAN-13 on the box. */
+export function canonicalBarcode(code: string): string {
+  const gs1 = gs1Of(code);
+  if (gs1) return gs1.gtin.startsWith('0') ? gs1.gtin.slice(1) : gs1.gtin;
+  return code.replace(/\s/g, '');
+}
+
 export function barcodeVariants(code: string): string[] {
-  const digits = code.replace(/\s/g, '');
+  const digits = gs1Of(code)?.gtin ?? code.replace(/\s/g, '');
   const variants = new Set([digits]);
   if (/^\d+$/.test(digits)) {
     variants.add(digits.replace(/^0+/, ''));
@@ -302,7 +364,8 @@ route('GET', '/api/v1/medicines-lookup', 'medicines.read', async (ctx) => {
  * is a catalogue problem the cashier should see.
  */
 route('GET', '/api/v1/medicines-scan', 'medicines.read', async (ctx) => {
-  const code = toStr(ctx.query.get('code'), 40).trim();
+  /* A GS1 DataMatrix can run to 70-odd characters. */
+  const code = toStr(ctx.query.get('code'), 120).trim();
   if (!code) bad('Scan or type a barcode.', 'code');
   const variants = barcodeVariants(code);
   const rows = await col.medicines().aggregate([
@@ -315,5 +378,5 @@ route('GET', '/api/v1/medicines-scan', 'medicines.read', async (ctx) => {
     { $sort: { name: 1 } },
     { $limit: 5 }
   ]).toArray();
-  return { data: rows, code, tried: variants };
+  return { data: rows, code, tried: variants, barcode: canonicalBarcode(code), gs1: gs1Of(code) };
 });

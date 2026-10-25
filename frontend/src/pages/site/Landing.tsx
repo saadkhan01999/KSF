@@ -103,7 +103,7 @@ export default function Landing() {
           <div className="hero-inner">
             <span className="hero-badge">
               <b><Sparkles size={12} /> New</b>
-              Version {BRAND.version} — accounts for every pharmacy, card payments and a medicine directory
+              Version {BRAND.version} — scan at the till with any barcode scanner, or the phone&apos;s camera
             </span>
 
             <h1>
@@ -185,7 +185,7 @@ export default function Landing() {
               medicine leaving the counter without a pharmacist&apos;s verification.
             </p>
             <ul className="tick-list">
-              <li><Check size={15} /> Barcode and item-code search, or type the first three letters</li>
+              <li><Check size={15} /> Scan with a USB or Bluetooth barcode scanner, or the camera, or type the first three letters</li>
               <li><Check size={15} /> Cost and retail held separately, so margin is always visible</li>
               <li><Check size={15} /> Reorder levels per medicine, with the alert on the dashboard</li>
               <li><Check size={15} /> Categories you name yourself</li>

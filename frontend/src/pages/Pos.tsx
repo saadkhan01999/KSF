@@ -4,7 +4,8 @@
    is standing there, the queue is behind them, and the person serving may be
    using a phone, a tablet or a keyboard.
 
-     - The search box holds focus, so a barcode scanner just works.
+     - A USB or Bluetooth barcode scanner works wherever the cursor is, and
+       the camera scans where there is no scanner (pages/pos/).
      - Tapping a card adds one; tapping again adds another.
      - Prescription-only medicine cannot be added without a verified
        prescription attached, and the card says so plainly.
@@ -14,19 +15,30 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Search, ScanLine, Plus, Minus, Trash2, ShoppingCart, User, Pill, 
+  Search, Plus, Minus, Trash2, ShoppingCart, User, Pill, Camera,
   Printer, CheckCircle2, Percent, ChevronRight, Stethoscope, PackageX, Lock, CircleAlert
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useApiData, useDebounced, useAction } from '../hooks/useApi';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { api, query } from '../services/api';
 import {
-  Button, Modal, SelectInput, TextInput, EmptyState, Badge, 
-  Allow, Alert, Spinner, Segmented
+  Button, Modal, SelectInput, TextInput, EmptyState, Badge,
+  Allow, Alert, Spinner, Segmented, Menu
 } from '../components/ui';
 import { rupees, amount, toPaisa, date, inDays, payment, PAYMENT_LABELS, shortName } from '../utils/format';
+import { beep } from '../utils/beep';
+import { looksLikeBarcode } from '../utils/scanner';
 import { BRAND } from '../brand';
 import type { Medicine, Customer, Prescription, Sale, CartLine } from '../types';
+import { CameraScanner } from './pos/CameraScanner';
+import { ScannerPanel, type LastScan } from './pos/ScannerPanel';
+import { UnknownBarcode, type UnknownCode } from './pos/UnknownBarcode';
+
+/** Where a code came from: typed and Enter, a hardware scanner, or the camera. */
+type ScanSource = 'typed' | 'scanner' | 'camera';
+
+interface ScanReply { data: Medicine[]; barcode?: string }
 
 export default function Pos() {
   const { can, ok, fail, workspace, user, refreshWorkspace } = useApp();
@@ -76,29 +88,28 @@ export default function Pos() {
   useEffect(() => { focusSearch(); }, [focusSearch]);
 
   /* ------------------------------- cart ------------------------------- */
-  const add = useCallback((medicine: Medicine) => {
-    if (medicine.on_hand <= 0) { fail(new Error(`${medicine.name} is out of stock.`)); return; }
+  /** Adds one; says whether it went in (a scan beeps accordingly). */
+  const add = useCallback((medicine: Medicine): boolean => {
+    if (medicine.on_hand <= 0) { fail(new Error(`${medicine.name} is out of stock.`)); return false; }
     if (medicine.requires_prescription && !prescriptionId) {
       fail(new Error(`${medicine.name} is prescription-only. Attach a verified prescription first.`));
       setRxPickerOpen(true);
-      return;
+      return false;
     }
-    setCart((current) => {
-      const line = current.find((l) => l.medicine.id === medicine.id);
-      if (line) {
-        if (line.quantity >= medicine.on_hand) {
-          fail(new Error(`Only ${medicine.on_hand} of ${medicine.name} left on the shelf.`));
-          return current;
-        }
-        return current.map((l) => (l.medicine.id === medicine.id ? { ...l, quantity: l.quantity + 1 } : l));
-      }
-      return [...current, { medicine, quantity: 1, unitPricePaisa: medicine.price_paisa }];
-    });
+    const line = cart.find((l) => l.medicine.id === medicine.id);
+    if (line && line.quantity >= medicine.on_hand) {
+      fail(new Error(`Only ${medicine.on_hand} of ${medicine.name} left on the shelf.`));
+      return false;
+    }
+    setCart((current) => (current.some((l) => l.medicine.id === medicine.id)
+      ? current.map((l) => (l.medicine.id === medicine.id ? { ...l, quantity: l.quantity + 1 } : l))
+      : [...current, { medicine, quantity: 1, unitPricePaisa: medicine.price_paisa }]));
     setJustAdded(medicine.id);
     window.setTimeout(() => setJustAdded(null), 700);
     setTerm('');
     focusSearch();
-  }, [fail, prescriptionId, focusSearch]);
+    return true;
+  }, [cart, fail, prescriptionId, focusSearch]);
 
   /* ----------------------------- scanning -----------------------------
      A scanner is a very fast keyboard: it types the whole code and presses
@@ -108,36 +119,77 @@ export default function Pos() {
      box. The code is resolved on the server instead, exactly.
      ------------------------------------------------------------------- */
   const [scanning, setScanning] = useState(false);
+  const [lastScan, setLastScan] = useState<LastScan | null>(null);
+  /* The scanner button says "Added" or "Not added" for a moment after a scan. */
+  const [flash, setFlash] = useState<'ok' | 'error' | null>(null);
+  const flashTimer = useRef(0);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [unknown, setUnknown] = useState<UnknownCode | null>(null);
 
-  const scan = useCallback(async (code: string) => {
+  const scan = useCallback(async (code: string, source: ScanSource = 'typed') => {
     const trimmed = code.trim();
     if (!trimmed) return;
+    /* A scan answers with a sound and the button; typing does not need to. */
+    const record = (outcome: LastScan['outcome'], name?: string) => {
+      setLastScan({ code: trimmed, at: new Date().toISOString(), outcome, name });
+      if (source === 'typed') return;
+      const good = outcome === 'added';
+      beep(good ? 'ok' : 'error');
+      setFlash(good ? 'ok' : 'error');
+      window.clearTimeout(flashTimer.current);
+      flashTimer.current = window.setTimeout(() => setFlash(null), 1600);
+    };
     setScanning(true);
     try {
-      const found = await api.get<{ data: Medicine[] }>(`/medicines-scan${query({ code: trimmed })}`);
+      const found = await api.get<ScanReply>(`/medicines-scan${query({ code: trimmed })}`);
       const matches = found.data ?? [];
-      if (matches.length === 1) { add(matches[0]); return; }
+      if (matches.length === 1) { record(add(matches[0]) ? 'added' : 'refused', matches[0].name); return; }
       if (matches.length > 1) {
         /* Two products sharing a code. Show them and let the person choose —
            picking one by sort order is how the wrong medicine gets sold. */
+        record('several');
         fail(new Error(`More than one medicine carries the code ${trimmed}. Pick the right one from the list and fix the duplicate in Medicines.`));
-        setTerm(trimmed);
+        setTerm(found.barcode ?? trimmed);
         return;
       }
-      /* Not a code we know. If the typed search has landed on exactly one
+      /* Not a code we know. If a typed search has landed on exactly one
          medicine, that is what the person meant. */
-      if (medicines.length === 1) { add(medicines[0]); return; }
+      if (source === 'typed' && medicines.length === 1) { add(medicines[0]); return; }
+      if (source !== 'typed' || looksLikeBarcode(trimmed)) {
+        record('unknown');
+        setCameraOpen(false);
+        setUnknown({ code: trimmed, barcode: found.barcode ?? trimmed });
+        return;
+      }
       fail(new Error(
         medicines.length === 0
-          ? `Nothing matches "${trimmed}". If the pack has a barcode, add it to the medicine so the scanner finds it next time.`
+          ? `Nothing matches "${trimmed}". Check the spelling, or try the generic name.`
           : `"${trimmed}" is not a barcode in the catalogue. Tap the right medicine from the ${medicines.length} matches.`
       ));
     } catch (problem) {
+      if (source !== 'typed') beep('error');
       fail(problem);
     } finally {
       setScanning(false);
     }
   }, [add, fail, medicines]);
+
+  /* A hardware scanner, wherever the cursor is. A scan after a finished sale
+     starts the next one; while the payment window is open it is held back,
+     so nothing is added to a sale that is being paid for. */
+  const onHardwareScan = useCallback((code: string) => {
+    if (payOpen) {
+      beep('error');
+      setLastScan({ code, at: new Date().toISOString(), outcome: 'busy' });
+      fail(new Error('Finish or close the payment first, then scan the next item.'));
+      return;
+    }
+    setReceipt(null);
+    setUnknown(null);
+    setRxPickerOpen(false);
+    void scan(code, 'scanner');
+  }, [payOpen, fail, scan]);
+  useBarcodeScanner(onHardwareScan);
 
   const setQuantity = (id: string, quantity: number) => {
     setCart((current) => current.flatMap((line) => {
@@ -267,13 +319,24 @@ export default function Pos() {
               placeholder="Scan a barcode, or search by medicine or generic name…"
               aria-label="Scan a barcode or search medicines"
             />
-            <Button
-              className="scan" variant="quiet" size="sm"
-              icon={scanning ? <Spinner /> : <ScanLine size={16} />}
-              onClick={focusSearch}
-            >
-              {scanning ? 'Looking up…' : 'Scanner ready'}
-            </Button>
+            <div className="pos-search-tools">
+              <button type="button" className="icon-btn pos-camera" onClick={() => setCameraOpen(true)} aria-label="Scan with the camera" title="Scan with the camera">
+                <Camera size={19} />
+              </button>
+              <Menu
+                panel label="Barcode scanner"
+                trigger={({ toggle, props }) => (
+                  <button type="button" className={`btn btn-quiet btn-sm scan ${flash ? `is-${flash}` : ''}`} onClick={toggle} {...props}>
+                    {scanning ? <Spinner /> : <span className="scan-dot" aria-hidden="true" />}
+                    <span className="scan-label">
+                      {scanning ? 'Looking up…' : flash === 'ok' ? 'Added' : flash === 'error' ? 'Not added' : 'Scanner ready'}
+                    </span>
+                  </button>
+                )}
+              >
+                {(close) => <ScannerPanel last={lastScan} onCamera={() => { close(); setCameraOpen(true); }} />}
+              </Menu>
+            </div>
           </div>
 
           {prescription && (
@@ -727,6 +790,23 @@ export default function Pos() {
       >
         {receipt && <Receipt sale={receipt} />}
       </Modal>
+
+      {/* ----------------------------- scanning ----------------------------- */}
+      <CameraScanner
+        open={cameraOpen}
+        onClose={() => { setCameraOpen(false); focusSearch(); }}
+        onCode={(code) => { void scan(code, 'camera'); }}
+      />
+      <UnknownBarcode
+        unknown={unknown}
+        onClose={() => { setUnknown(null); focusSearch(); }}
+        onLinked={(medicine) => {
+          setUnknown(null);
+          const added = add(medicine);
+          setLastScan({ code: medicine.barcode ?? '', at: new Date().toISOString(), outcome: added ? 'added' : 'refused', name: medicine.name });
+          if (added) beep('ok');
+        }}
+      />
     </>
   );
 }

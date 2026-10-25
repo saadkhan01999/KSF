@@ -190,7 +190,7 @@ export function createApp(): express.Express {
     crossOriginEmbedderPolicy: false
   }));
   app.use((_req, res, next) => {
-    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');
+    res.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');
     next();
   });
 
