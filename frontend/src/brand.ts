@@ -23,8 +23,8 @@ export const BRAND = {
   strapline: 'PHARMACY SYSTEM',
   /** One line, for the tab title and the marketing meta description. */
   tagline: 'Pharmacy management, built for Pakistan',
-  version: '2.2.1'
+  version: '2.3.0'
 } as const;
 
-/** "KSF 2.2.1" — the string the footer, About and Settings all show. */
+/** "KSF 2.3.0" — the string the footer, About and Settings all show. */
 export const versionLabel = `${BRAND.name} ${BRAND.version}`;

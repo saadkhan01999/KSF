@@ -10,7 +10,7 @@ const { jazzcashSignature } = await import('../backend/src/services/payments/ada
 const { hashPassword, verifyPassword, passwordProblem } = await import('../backend/src/security/password.ts');
 const { generateSecret, totpNow, verifyTotp } = await import('../backend/src/security/totp.ts');
 const { stockState, expiryState, plural } = await import('../backend/src/modules/shared.ts');
-const { barcodeVariants } = await import('../backend/src/modules/catalogue.ts');
+const { barcodeVariants, canonicalBarcode, gs1Of } = await import('../backend/src/modules/catalogue.ts');
 const { SYSTEM_ROLES, PERMISSION_KEYS, THEMES, PHARMACY_ADMIN_ROLE } = await import('../backend/src/domain/permissions.ts');
 const { trustProxySetting, ALLOWED_ORIGINS, originMatcher, originAllowed } = await import('../backend/src/config/env.ts');
 const { databaseHint } = await import('../backend/src/db/mongo.ts');
@@ -21,6 +21,7 @@ const { readFileSync } = await import('node:fs');
 const { PLATFORM_PERMISSION_KEYS, TEAM_MANAGE } = await import('../backend/src/domain/platform.ts');
 const calc = await import('../frontend/src/utils/calculator.ts');
 const { compareVersions } = await import('../frontend/src/utils/version.ts');
+const { ScanDetector, looksLikeBarcode } = await import('../frontend/src/utils/scanner.ts');
 
 describe('reading imported files', () => {
   it('detects semicolons and keeps quoted commas and newlines', () => {
@@ -131,6 +132,21 @@ describe('stock rules', () => {
   it('tries the barcode forms a scanner and a spreadsheet produce', () => {
     assert.ok(barcodeVariants('08964000111222').includes('8964000111222'));
     assert.ok(barcodeVariants('896400011122').includes('0896400011122'));
+  });
+
+  it('reads the GS1 DataMatrix on a medicine pack, in each form a scanner sends it', () => {
+    const GS = '\u001d';
+    const full = { gtin: '08964000111222', expiry: '2027-12-31', batch: 'AB12', serial: 'X9' };
+    assert.deepEqual(gs1Of(`010896400011122217271231` + `10AB12${GS}21X9`), full);
+    assert.deepEqual(gs1Of('(01)08964000111222(17)271231(10)AB12(21)X9'), full);
+    assert.deepEqual(gs1Of(`]d2010896400011122217271231` + `10AB12${GS}21X9`), full);
+    /* Without separators a batch cannot be told from a serial: only the fixed fields. */
+    assert.deepEqual(gs1Of('0108964000111222172712001010AB1221X9'), { gtin: '08964000111222', expiry: '2027-12-31', batch: null, serial: null });
+    assert.equal(gs1Of('8964000111222'), null);
+    assert.equal(gs1Of('01234567890128'), null);
+    assert.ok(barcodeVariants('(01)08964000111222(17)271231').includes('8964000111222'));
+    assert.equal(canonicalBarcode(`]d20108964000111222${GS}10AB12`), '8964000111222');
+    assert.equal(canonicalBarcode(' 8964 000 111222 '), '8964000111222');
   });
 
   it('names role groups in plain English', () => {
@@ -399,5 +415,56 @@ describe('the version check', () => {
     assert.ok(compareVersions('2.1.0', '2.2.1') < 0);
     assert.equal(compareVersions('2.2.1', '2.2.1'), 0);
     assert.equal(compareVersions('2.2', '2.2.0'), 0);
+  });
+});
+
+describe('telling a barcode scanner from a person', () => {
+  /** Types `text` with `gap` ms between keys, from `start`; returns the steps. */
+  const type = (detector, text, gap, start = 1000) => [...text].map((key, index) => detector.key(key, start + index * gap));
+
+  it('takes a fast burst ending in Enter as a scan, and swallows it once it is sure', () => {
+    const detector = new ScanDetector();
+    const steps = type(detector, '8964000111222', 8);
+    assert.equal(steps[0].kind, 'start');
+    assert.deepEqual(steps.slice(1, 3).map((step) => step.confirmed), [false, false]);
+    assert.ok(steps.slice(3).every((step) => step.kind === 'collect' && step.confirmed));
+    assert.deepEqual(detector.key('Enter', 1000 + 13 * 8), { kind: 'done', code: '8964000111222' });
+  });
+
+  it('accepts Tab at the end, or no suffix at all once the scanner goes quiet', () => {
+    const tabbed = new ScanDetector();
+    type(tabbed, 'ABC-12345', 10);
+    assert.deepEqual(tabbed.key('Tab', 1090), { kind: 'done', code: 'ABC-12345' });
+    const quiet = new ScanDetector();
+    type(quiet, '5012345678900', 9);
+    assert.equal(quiet.settle(1000 + 12 * 9 + 50), null, 'still too soon');
+    assert.equal(quiet.settle(1000 + 12 * 9 + 120), '5012345678900');
+  });
+
+  it('never mistakes a person typing, a held key or a shortcut for a scanner', () => {
+    const person = new ScanDetector();
+    type(person, 'panadol', 140);
+    assert.deepEqual(person.key('Enter', 1000 + 7 * 140), { kind: 'ignore' });
+    const held = new ScanDetector();
+    assert.ok(type(held, '1111', 30).every((step, index) => index === 0 || step.kind === 'collect'));
+    assert.deepEqual(held.key('1', 1150, true), { kind: 'ignore' }, 'a repeating key resets');
+    assert.equal(held.settle(5000), null);
+    const short = new ScanDetector();
+    type(short, '12', 5);
+    assert.deepEqual(short.key('Enter', 1012), { kind: 'ignore' });
+  });
+
+  it('keeps a burst going through Shift, and starts again after a pause', () => {
+    const detector = new ScanDetector();
+    type(detector, 'AB', 8);
+    assert.deepEqual(detector.key('Shift', 1012), { kind: 'passive' });
+    type(detector, 'CD12', 8, 1016);
+    assert.deepEqual(detector.key('Enter', 1050), { kind: 'done', code: 'ABCD12' });
+    assert.deepEqual(detector.key('7', 3000), { kind: 'start' });
+  });
+
+  it('knows a barcode from a search word', () => {
+    for (const code of ['8964000111222', '12345670', '(01)08964000111222(17)271231', ']d20108964000111222', 'KSF-A1B2C3']) assert.ok(looksLikeBarcode(code), code);
+    for (const word of ['panadol', 'Brufen 400', '123']) assert.equal(looksLikeBarcode(word), false, word);
   });
 });

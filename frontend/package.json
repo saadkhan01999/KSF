@@ -1,7 +1,7 @@
 {
   "name": "@ksf/frontend",
   "private": true,
-  "version": "2.2.1",
+  "version": "2.3.0",
   "type": "module",
   "description": "KSF Pharmacy — the browser application: React 18, TypeScript (strict) and Vite. Talks to the API in ../backend through /api.",
   "scripts": {
@@ -11,6 +11,8 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@zxing/browser": "0.2.1",
+    "@zxing/library": "0.23.0",
     "lucide-react": "0.468.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",

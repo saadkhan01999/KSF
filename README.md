@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.2.1** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.3.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -18,12 +18,13 @@ support requests they raise.
 4. [How it is built](#how-it-is-built)
 5. [Security model](#security-model)
 6. [Roles, plans, support mode and themes](#roles-plans-support-mode-and-themes)
-7. [REST API](#rest-api)
-8. [Project layout](#project-layout)
-9. [Testing](#testing)
-10. [University edition](#university-edition)
-11. [Deployment](#deployment)
-12. [Further reading](#further-reading)
+7. [Barcode scanners](#barcode-scanners)
+8. [REST API](#rest-api)
+9. [Project layout](#project-layout)
+10. [Testing](#testing)
+11. [University edition](#university-edition)
+12. [Deployment](#deployment)
+13. [Further reading](#further-reading)
 
 ---
 
@@ -33,7 +34,7 @@ support requests they raise.
 
 | Area | What is in it |
 |---|---|
-| Till | Barcode or search, FEFO batch allocation, prescription checks, cash / card / Easypaisa / JazzCash / bank / credit (udhaar), reasoned discounts with a per-pharmacy limit, printable 76 mm receipt, a calculator that stays open beside the sale |
+| Till | **Barcode scanning** — any USB or Bluetooth scanner, wherever the cursor is, plain barcodes and the GS1 DataMatrix on the pack, or the camera of a phone or laptop; an unknown barcode is linked to its medicine in one step — or search; FEFO batch allocation, prescription checks, cash / card / Easypaisa / JazzCash / bank / credit (udhaar), reasoned discounts with a per-pharmacy limit, printable 76 mm receipt, a calculator that stays open beside the sale |
 | Stock | Medicines, categories, batches with expiry, adjustments after a count, quarantine and write-off, low-stock and expiry alerts, a full movement ledger |
 | Buying | Suppliers, purchase orders, receiving into stock (atomically), dated supplier payments by cash, bank, cheque or wallet, what is owed to whom |
 | People | Customers with allergies and credit limits, repayments and reversals, prescriptions verified by a pharmacist |
@@ -187,7 +188,7 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
 | Permissions | Checked on the server for every request; a role can never be given more than its maker holds; a pharmacy's people never see another pharmacy's records (`tests/access.test.mjs` proves it for every route and every built-in role) |
 | Plan features | A feature the pharmacy's plan does not include is refused with `402 feature_locked`, on the server — the screen showing a lock is a courtesy |
 | Brute force | Per-account lock-out, per-IP limits on sign-in and sign-up, write throttling |
-| Headers | Helmet: strict CSP (`script-src 'self'`, `form-action` limited to the payment pages), HSTS in production, frame denial |
+| Headers | Helmet: strict CSP (`script-src 'self'`, `form-action` limited to the payment pages), HSTS in production, frame denial; the camera is allowed for KSF's own pages only (`Permissions-Policy: camera=(self)`), for scanning at the till |
 | Card payments | Cards are typed only on Stripe's hosted Checkout; no card number reaches KSF |
 | Webhooks | Stripe: the `Stripe-Signature` HMAC-SHA256 over the raw body, within five minutes, each event applied once. Others: HMAC-SHA256 over the raw body. Amounts are checked against what the server asked for |
 
@@ -218,6 +219,27 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
   Amber, Graphite), each with light and dark mode. The pharmacy Admin sets the
   pharmacy's theme in **Settings › Appearance** and chooses which roles may
   pick their own.
+
+---
+
+## Barcode scanners
+
+The till (**Sell › New sale**) takes a scan wherever the cursor is — the
+search box, a quantity box or nowhere at all — and the item goes straight into
+the sale with a beep. Nothing has to be clicked first.
+
+| | |
+|---|---|
+| Which scanners | Any USB or Bluetooth scanner in **keyboard (HID) mode**, which is how almost all of them come out of the box. No driver and no app. 1D (EAN-13, EAN-8, UPC, Code 128, Code 39) and 2D (QR, DataMatrix) |
+| Setting it up | Plug it in (or pair it over Bluetooth) and scan. An **Enter** at the end of each scan is the factory setting and the fastest; Tab, or nothing at all, works too |
+| How the till tells it from a person | A scanner types a whole code in a few milliseconds; a person cannot. Keys that arrive that fast are taken as a scan and kept out of whichever box has the cursor; normal typing is left alone |
+| The pack's 2D code | The GS1 DataMatrix printed on medicine packs (product, expiry, batch, serial) finds the medicine by its product number; a lost leading zero on a barcode does not matter |
+| Camera | The camera button beside the search box scans with a phone's or laptop's camera — the back camera, with the light, on phones. The browser asks for permission once. It needs **https** (Vercel and Railway give it; `localhost` counts too) |
+| A barcode KSF does not know | The till asks which medicine it is and saves the barcode on it (with `medicines.write`), so the next scan finds it — or opens **Add medicine** with the barcode filled in |
+| The scanner button | **Scanner ready** on the till: the last code read and what happened to it, the camera, the beep on or off, and these steps for whoever is at the counter |
+
+While the payment window is open, scans are held back (with a low beep), so a
+pack scanned by mistake never changes a sale that is being paid.
 
 ---
 
@@ -376,7 +398,7 @@ added without a line here.
 | `PATCH /api/v1/medicines/:id` | `medicines.write` | Edit a medicine |
 | `DELETE /api/v1/medicines/:id` | `medicines.delete` | Retire a medicine (history stays) |
 | `GET /api/v1/medicines-lookup` | `medicines.read` | Fast search for the till, in-stock first |
-| `GET /api/v1/medicines-scan` | `medicines.read` | Resolve one barcode exactly (tolerates a lost leading zero) |
+| `GET /api/v1/medicines-scan` | `medicines.read` | Resolve one scanned code exactly: a barcode (tolerates a lost leading zero) or a GS1 DataMatrix; replies with the matches, the barcode to save for an unknown one, and the product, expiry, batch and serial it carried |
 
 #### Stock
 
@@ -690,7 +712,7 @@ npm test
 
 | Suite | What it proves |
 |---|---|
-| `tests/unit.test.mjs` | Import parsing, money and dates, payment rules and signatures (Stripe's included), passwords, authenticator codes, stock rules, roles and themes, the live feed's audiences, the calculator, that every screen is guarded, and that this README lists every route. Needs no database |
+| `tests/unit.test.mjs` | Import parsing, money and dates, payment rules and signatures (Stripe's included), passwords, authenticator codes, stock rules, roles and themes, the live feed's audiences, the calculator, telling a barcode scanner from a person typing, that every screen is guarded, and that this README lists every route. Needs no database |
 | `tests/api.test.mjs` | The whole platform over HTTP: sign-up, stock, the till, refunds, day close, reports, staff, messaging, themes, support tickets, the platform console, support mode, data import, tenant isolation, suspension, and the Super Admin changing their own e-mail and password |
 | `tests/accounting.test.mjs` | The accounts to the paisa: profit and loss, cash flow, other income, salaries, supplier payments, the ledger and the downloads |
 | `tests/live.test.mjs` | A price change reaching a visitor's open page, a subscription change reaching its own pharmacy and no other, replay after a reconnect, and a feature locking and unlocking on the server the moment the plan changes |
@@ -698,6 +720,7 @@ npm test
 | `tests/directory.test.mjs` | The starter set, searching by name, other name, brand or category, verification and its reset when the words change, drafts and archived entries kept from pharmacies, imports, and that only the team members whose role includes it can change it |
 | `tests/access.test.mjs` | Every role: refused without the permission, every built-in role's screens, the platform kept apart, and no pharmacy reading another's records |
 | `tests/platform-accounts.test.mjs` | KSF's own books to the paisa (subscriptions, refunds, other income, expenses), the ledger and downloads, finance roles only, one slip number per pharmacy, and the payment-methods check |
+| `tests/scanning.test.mjs` | Scanning at the till: a barcode with or without its leading zero, the GS1 DataMatrix on a pack, an unknown barcode saved on its medicine (and nothing else changed), a cashier who can scan but not change the catalogue, and no two medicines sharing a barcode |
 
 The API suites run against a real MongoDB in a throwaway database
 (`ksf_test_<random>`) that is dropped afterwards. Point them at a server with
@@ -740,7 +763,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.2.1 · Server 2.2.1 — up to date", or
+System) compares the two: "Website 2.3.0 · Server 2.3.0 — up to date", or
 which one still has to redeploy from `main` (Railway › the service ›
 Deployments, or Vercel › Deployments).
 

@@ -3,6 +3,54 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.3.0] — 2026-10-25
+
+### Barcode scanning at the till
+- **Any USB or Bluetooth barcode scanner** works on **Sell › New sale** with
+  nothing to click first: the cursor can be in the search box, in a quantity
+  box or nowhere at all. The till tells a scanner from a person by speed — a
+  scanner types a whole code in a few milliseconds — so the code goes into the
+  sale and never into the box that had the cursor, and normal typing is left
+  alone. Scanners that end each scan with Enter (the factory setting), with
+  Tab, or with nothing all work.
+- **The GS1 DataMatrix** printed on medicine packs is read too: the product
+  number finds the medicine; expiry, batch and serial come back with it.
+- **Scan with the camera**: the camera button beside the search box uses a
+  phone's or laptop's camera (the back camera on phones, with the light and a
+  camera switch). It uses the browser's own barcode reader where there is one,
+  and otherwise loads a reader only when the camera is opened, so the till
+  itself is no bigger. It needs https, which Vercel and Railway provide.
+- **The scanner button** ("Scanner ready") shows the last code read and what
+  happened — added, not in the catalogue, more than one match — and opens a
+  panel with the camera, the beep switch and the steps for the counter. Each
+  scan beeps (a low double beep when it was not added), and the button flashes
+  green or red.
+- **A barcode KSF does not know** opens a short window: pick the medicine it
+  belongs to and the barcode is saved on it (staff with `medicines.write`), so
+  the next scan finds it — or add it as a new medicine with the barcode
+  already filled in. Staff without that permission are told to ask a manager.
+- Scans are held back while the payment window is open, so a pack scanned by
+  mistake never changes a sale that is being paid.
+
+### API
+- `GET /api/v1/medicines-scan` also answers with `barcode` (the barcode to
+  save for a code that is not in the catalogue) and `gs1` (the product,
+  expiry, batch and serial a GS1 code carried, or `null`).
+
+### Security
+- `Permissions-Policy` allows the camera for KSF's own pages
+  (`camera=(self)`, on the server and on Vercel); other sites embedded in a
+  page still cannot use it.
+
+### Tests
+- `tests/scanning.test.mjs`: scanning over HTTP against MongoDB. The unit
+  suite tells a scanner from a person typing and reads GS1 codes. In a real
+  browser, the till was scanned with the cursor on the page, in a quantity
+  box and in the search box; with Enter, Tab and no suffix; a GS1 code; an
+  unknown barcode linked to its medicine; during payment; and through a
+  camera fed a video of an EAN-13 barcode — on a desktop, a phone and a
+  320-pixel screen.
+
 ## [2.2.1] — 2026-10-12
 
 - **Is the new version live?** The platform Overview, and a pharmacy's

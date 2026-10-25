@@ -50,10 +50,13 @@ export default function Medicines() {
 
   /* Opened from the medicine directory with "Add to my medicines": the form
      starts filled in from the entry, and only the prices and stock levels are
-     left to type. The draft is read once, then cleared from the history. */
+     left to type. Opened from the till with an unknown barcode
+     (?barcode=…, in a new tab so the sale is kept): the form starts with it.
+     The draft is read once, then cleared from the history. */
   const location = useLocation();
   const navigate = useNavigate();
-  const [prefill] = useState(() => (location.state as { prefill?: Partial<typeof emptyForm> } | null)?.prefill ?? null);
+  const [prefill] = useState(() => (location.state as { prefill?: Partial<typeof emptyForm> } | null)?.prefill
+    ?? (params.get('barcode') ? { barcode: params.get('barcode') ?? '' } : null));
   useEffect(() => {
     if (!prefill) return;
     setEditing(null);
