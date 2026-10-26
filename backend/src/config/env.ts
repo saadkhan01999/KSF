@@ -124,6 +124,13 @@ const schema = z.object({
   PAYMENT_PROVIDER: z.string().default('manual'),
   PAYMENT_WEBHOOK_SECRET: z.string().default(''),
 
+  /* ------------------------------------------------------ barcode lookup */
+  /* An unknown barcode is also looked up in the open product databases (Open
+     Food Facts, Open Beauty Facts, Open Products Facts, UPCitemdb) to fill in
+     a new medicine. Only product numbers are sent, never other QR text. */
+  BARCODE_LOOKUP_ONLINE: bool(true),
+  BARCODE_LOOKUP_TIMEOUT_MS: int(3500, 500),
+
   /* ---------------------------------------------------------- data import */
   MIGRATION_MAX_ROWS: int(20000, 1),
   MIGRATION_BACKUP_DIR: z.string().default('.data/backups'),

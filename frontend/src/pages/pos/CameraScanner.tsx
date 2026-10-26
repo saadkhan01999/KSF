@@ -1,64 +1,52 @@
 /* Scanning with the camera: the phone, tablet or laptop at the counter reads
-   the barcode on the pack when there is no hardware scanner.
+   the barcode on the pack when there is no hardware scanner — any linear or
+   2D code (utils/decode.ts). Each pack is reported once: the same code is
+   ignored for a couple of seconds while it is still in front of the lens.
 
-   The browser's own BarcodeDetector is used where it exists (Chrome on
-   Android and macOS); everywhere else the ZXing decoder is loaded, only when
-   the camera is first opened, so the till itself stays light. Each pack is
-   reported once: the same code is ignored for a couple of seconds while it
-   is still in front of the lens. */
+   Where the live camera cannot open (an http:// address, permission refused,
+   no camera), "Scan a photo" still works: a phone opens its camera app, and
+   the code is read from the picture. */
 
-import { useEffect, useRef, useState } from 'react';
-import { Camera, CameraOff, RefreshCw, ScanLine, Zap, ZapOff } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Camera, CameraOff, ImageUp, RefreshCw, ScanLine, Zap, ZapOff } from 'lucide-react';
 import { Button, Modal } from '../../components/ui';
+import { decodePhoto, decodeVideo } from '../../utils/decode';
 
 type State = 'starting' | 'scanning' | 'denied' | 'missing' | 'insecure' | 'failed';
 
-/* Formats on medicine packs and shop labels, in each decoder's own names. */
-const NATIVE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'qr_code', 'data_matrix'];
 const SAME_CODE_PAUSE = 2500;
 
-interface NativeDetector { detect(source: HTMLVideoElement): Promise<Array<{ rawValue: string }>> }
-interface NativeDetectorClass {
-  new (options: { formats: string[] }): NativeDetector;
-  getSupportedFormats?: () => Promise<string[]>;
-}
-
-/** Starts reading codes off the video; returns how to stop. */
-async function startDecoding(video: HTMLVideoElement, report: (code: string) => void): Promise<() => void> {
-  const Native = (window as unknown as { BarcodeDetector?: NativeDetectorClass }).BarcodeDetector;
-  const supported = Native ? await Native.getSupportedFormats?.().catch(() => []) ?? [] : [];
-  const formats = NATIVE_FORMATS.filter((format) => supported.includes(format));
-  if (Native && formats.includes('ean_13')) {
-    const detector = new Native({ formats });
-    let running = true;
-    const look = async () => {
-      if (!running) return;
-      try {
-        if (video.readyState >= 2) {
-          const [found] = await detector.detect(video);
-          if (found?.rawValue) report(found.rawValue);
-        }
-      } catch { /* a frame that could not be read */ }
-      if (running) window.setTimeout(() => { void look(); }, 120);
-    };
-    void look();
-    return () => { running = false; };
-  }
-
-  const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([import('@zxing/browser'), import('@zxing/library')]);
-  const hints = new Map<unknown, unknown>([
-    [DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128,
-      BarcodeFormat.CODE_39, BarcodeFormat.ITF, BarcodeFormat.QR_CODE, BarcodeFormat.DATA_MATRIX
-    ]],
-    [DecodeHintType.TRY_HARDER, true]
-  ]);
-  const reader = new BrowserMultiFormatReader(hints as Map<never, unknown>, { delayBetweenScanAttempts: 120, delayBetweenScanSuccess: 400 });
-  const controls = await reader.decodeFromVideoElement(video, (result) => { if (result) report(result.getText()); });
-  return () => controls.stop();
+/** A hidden file input that takes a photo (the camera app on a phone) and reads the code in it. */
+export function PhotoScan({ onCode, onNothing, children }: {
+  onCode: (code: string) => void; onNothing: () => void;
+  children: (open: () => void, reading: boolean) => ReactNode;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState(false);
+  const read = async (file: File | undefined) => {
+    if (!file) return;
+    setReading(true);
+    try {
+      const code = await decodePhoto(file).catch(() => null);
+      if (code) onCode(code); else onNothing();
+    } finally {
+      setReading(false);
+      if (input.current) input.current.value = '';
+    }
+  };
+  return (
+    <>
+      <input
+        ref={input} type="file" accept="image/*" capture="environment" hidden
+        onChange={(event) => { void read(event.target.files?.[0]); }}
+      />
+      {children(() => input.current?.click(), reading)}
+    </>
+  );
 }
 
 export function CameraScanner({ open, onClose, onCode }: { open: boolean; onClose: () => void; onCode: (code: string) => void }) {
+  const [photoNote, setPhotoNote] = useState('');
   const video = useRef<HTMLVideoElement>(null);
   const latest = useRef(onCode);
   latest.current = onCode;
@@ -97,7 +85,7 @@ export function CameraScanner({ open, onClose, onCode }: { open: boolean; onClos
         const [track] = stream.getVideoTracks();
         const capabilities = (track?.getCapabilities?.() ?? {}) as { torch?: boolean };
         setTorch(capabilities.torch ? { track, on: false } : null);
-        stopDecoding = await startDecoding(video.current, report);
+        stopDecoding = await decodeVideo(video.current, report);
         if (!stopped) setState('scanning');
       } catch (problem) {
         if (stopped) return;
@@ -130,9 +118,9 @@ export function CameraScanner({ open, onClose, onCode }: { open: boolean; onClos
   };
 
   const problem: Record<Exclude<State, 'starting' | 'scanning'>, { title: string; text: string }> = {
-    denied: { title: 'The camera was not allowed', text: 'Allow the camera for this site — the camera icon in the address bar — then open the scanner again.' },
+    denied: { title: 'The camera was not allowed', text: 'Allow the camera for this site — the camera icon in the address bar — then open the scanner again, or use "Scan a photo".' },
     missing: { title: 'No camera found', text: 'Connect a camera, or use a USB or Bluetooth barcode scanner instead.' },
-    insecure: { title: 'The camera needs a secure address', text: 'Browsers open the camera only on https:// addresses (or on this computer). Open KSF on its https address.' },
+    insecure: { title: 'The live camera needs a secure address', text: 'Browsers open the camera only on https:// addresses (or on this computer). Use "Scan a photo" below, or open KSF on its https address.' },
     failed: { title: 'The camera could not start', text: 'Another app may be using it. Close it, then try again.' }
   };
   const trouble = state !== 'starting' && state !== 'scanning' ? problem[state] : null;
@@ -141,9 +129,15 @@ export function CameraScanner({ open, onClose, onCode }: { open: boolean; onClos
     <Modal
       open={open} onClose={onClose} size="md" icon={<Camera />}
       title="Scan with the camera"
-      subtitle="Hold the barcode inside the frame. Each pack is added once."
+      subtitle="Any barcode or QR code: hold it inside the frame. Each pack is added once."
       footer={(
         <>
+          <PhotoScan
+            onCode={(code) => { setPhotoNote(''); setLast(code); latest.current(code); }}
+            onNothing={() => setPhotoNote('No barcode could be read in that photo. Fill the frame with the barcode, in good light, and try again.')}
+          >
+            {(pick, reading) => <Button variant="outline" icon={<ImageUp size={16} />} loading={reading} onClick={pick}>Scan a photo</Button>}
+          </PhotoScan>
           {cameras.length > 1 && <Button variant="outline" icon={<RefreshCw size={16} />} onClick={switchCamera}>Switch camera</Button>}
           {torch && (
             <Button variant="outline" icon={torch.on ? <ZapOff size={16} /> : <Zap size={16} />} onClick={() => { void toggleTorch(); }}>
@@ -166,6 +160,7 @@ export function CameraScanner({ open, onClose, onCode }: { open: boolean; onClos
           </div>
         )}
       </div>
+      {photoNote && <p className="cam-photo-note" role="alert">{photoNote}</p>}
       <p className="cam-status" aria-live="polite">
         {last ? <>Last read <code>{last.replace(/\u001d/g, ' ')}</code></> : state === 'scanning' ? 'Looking for a barcode…' : ' '}
       </p>

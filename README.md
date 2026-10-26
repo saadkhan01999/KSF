@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.3.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.4.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -34,8 +34,8 @@ support requests they raise.
 
 | Area | What is in it |
 |---|---|
-| Till | **Barcode scanning** — any USB or Bluetooth scanner, wherever the cursor is, plain barcodes and the GS1 DataMatrix on the pack, or the camera of a phone or laptop; an unknown barcode is linked to its medicine in one step — or search; FEFO batch allocation, prescription checks, cash / card / Easypaisa / JazzCash / bank / credit (udhaar), reasoned discounts with a per-pharmacy limit, printable 76 mm receipt, a calculator that stays open beside the sale |
-| Stock | Medicines, categories, batches with expiry, adjustments after a count, quarantine and write-off, low-stock and expiry alerts, a full movement ledger |
+| Till | **Barcode scanning** — any USB or Bluetooth scanner, wherever the cursor is, every linear and 2D code (EAN, UPC, Code 128, the GS1 DataMatrix on the pack, QR …), the camera of a phone or laptop, or a photo; a "Medicine selected" card and chime for each scan; an unknown barcode linked to its medicine, or added with its details filled in — or search; FEFO batch allocation, prescription checks, cash / card / Easypaisa / JazzCash / bank / credit (udhaar), reasoned discounts with a per-pharmacy limit, printable 76 mm receipt, a calculator that stays open beside the sale |
+| Stock | Medicines (scan the pack and the form fills in from KSF's shared barcode list, the open product databases and the medicine directory), categories, batches with expiry, adjustments after a count, quarantine and write-off, low-stock and expiry alerts, a full movement ledger |
 | Buying | Suppliers, purchase orders, receiving into stock (atomically), dated supplier payments by cash, bank, cheque or wallet, what is owed to whom |
 | People | Customers with allergies and credit limits, repayments and reversals, prescriptions verified by a pharmacist |
 | Accounts | **Income and expenses in one place**: sales, other income, purchases, salaries and every other cost; net profit, cash in and out, receivables and payables; a profit-and-loss statement, a ledger, twelve months' trend; A4 statements to print or save as PDF and CSV downloads |
@@ -226,20 +226,53 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
 
 The till (**Sell › New sale**) takes a scan wherever the cursor is — the
 search box, a quantity box or nowhere at all — and the item goes straight into
-the sale with a beep. Nothing has to be clicked first.
+the sale with a two-note chime and a small card at the top of the screen:
+**Medicine selected**, its name, strength, price and how many are now in the
+sale. The card goes by itself after about two and a half seconds; a pack that
+cannot go in (out of stock, prescription only, no more on the shelf) gets a
+red **Not added** card with the reason and a low double tone instead.
 
 | | |
 |---|---|
-| Which scanners | Any USB or Bluetooth scanner in **keyboard (HID) mode**, which is how almost all of them come out of the box. No driver and no app. 1D (EAN-13, EAN-8, UPC, Code 128, Code 39) and 2D (QR, DataMatrix) |
+| Which scanners | Any USB or Bluetooth scanner in **keyboard (HID) mode**, which is how almost all of them come out of the box. No driver and no app |
+| Which codes | Every kind on a pack or a shelf label. Linear: EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39, Code 93, Codabar, ITF (ITF-14) and GS1 DataBar. 2D: DataMatrix, QR, PDF417 and Aztec (a 2D scanner, or the camera) |
 | Setting it up | Plug it in (or pair it over Bluetooth) and scan. An **Enter** at the end of each scan is the factory setting and the fastest; Tab, or nothing at all, works too |
-| How the till tells it from a person | A scanner types a whole code in a few milliseconds; a person cannot. Keys that arrive that fast are taken as a scan and kept out of whichever box has the cursor; normal typing is left alone |
-| The pack's 2D code | The GS1 DataMatrix printed on medicine packs (product, expiry, batch, serial) finds the medicine by its product number; a lost leading zero on a barcode does not matter |
-| Camera | The camera button beside the search box scans with a phone's or laptop's camera — the back camera, with the light, on phones. The browser asks for permission once. It needs **https** (Vercel and Railway give it; `localhost` counts too) |
-| A barcode KSF does not know | The till asks which medicine it is and saves the barcode on it (with `medicines.write`), so the next scan finds it — or opens **Add medicine** with the barcode filled in |
-| The scanner button | **Scanner ready** on the till: the last code read and what happened to it, the camera, the beep on or off, and these steps for whoever is at the counter |
+| How the till tells it from a person | A scanner types a whole code at a few milliseconds a key; a person cannot keep up 40 ms a key. A burst that fast is taken as a scan and kept out of whichever box has the cursor; normal typing is left alone. Slower Bluetooth scanners, which stutter, still count |
+| The pack's 2D code | The GS1 DataMatrix on medicine packs (product, expiry, batch, serial) finds the medicine by its product number — with the GS separators most scanners send as Ctrl+] — and so does a GS1 Digital Link in a QR code (`https://…/01/<product number>/…`). A lost leading zero does not matter |
+| Camera | The camera button beside the search box scans with a phone's or laptop's camera — the back camera, with the light, on phones. The browser asks for permission once. The live camera needs **https** (Vercel and Railway give it; `localhost` counts too) |
+| Scan a photo | In the camera window, **Scan a photo** reads the code from a picture — on a phone it opens the camera app. It works on any address, even where the live camera is not allowed |
+| A barcode the pharmacy does not stock | The till shows what KSF knows about the pack and offers **Add with these details**; or say which medicine it is, and the barcode is saved on it (with `medicines.write`) so the next scan finds it |
+| The scanner button | **Scanner ready** on the till: the last code read and what happened to it, the camera, the sound on or off, and these steps for whoever is at the counter |
 
-While the payment window is open, scans are held back (with a low beep), so a
+While the payment window is open, scans are held back (with a low tone), so a
 pack scanned by mistake never changes a sale that is being paid.
+
+### A new medicine, filled in from its barcode
+
+On **Medicines › Add medicine**, scan the pack (scanner or camera), or type the
+barcode and press Enter. The form fills in what KSF knows; the fields it
+filled are tinted green until someone changes them, and nothing anybody typed
+is ever overwritten. Only the prices and stock levels are left to type. The
+answer comes from the first of these that knows the barcode:
+
+1. **KSF's shared barcode list.** When any pharmacy saves a medicine with a
+   barcode, what is printed on that pack — name, generic name, manufacturer,
+   form, strength, pack size, DRAP number, category name and prescription
+   status — is kept against the barcode for every pharmacy. Never a price, a
+   cost, stock, a shelf or which pharmacy it was. The first pharmacy to save a
+   barcode sets its details and alone can correct them; later ones only fill
+   in what is missing.
+2. **The open product databases** — Open Products, Beauty and Food Facts, and
+   UPCitemdb — for a product number only (never other text a QR code holds),
+   with a short timeout. Each answer, "not found" too, is remembered, so a
+   barcode is asked about once, and one pharmacy can ask about at most 120 new
+   barcodes an hour. `BARCODE_LOOKUP_ONLINE=false` turns this off.
+3. **The KSF medicine directory**, for what the name implies: "Panadol" is a
+   brand of Paracetamol, made by Haleon, sold over the counter. The strength,
+   form and pack size are also read from the product's name ("500mg Tablets 20s").
+
+A GS1 code also shows the pack's batch and expiry. If the pharmacy already
+has a medicine with that barcode, the form says so and opens it instead.
 
 ---
 
@@ -399,6 +432,7 @@ added without a line here.
 | `DELETE /api/v1/medicines/:id` | `medicines.delete` | Retire a medicine (history stays) |
 | `GET /api/v1/medicines-lookup` | `medicines.read` | Fast search for the till, in-stock first |
 | `GET /api/v1/medicines-scan` | `medicines.read` | Resolve one scanned code exactly: a barcode (tolerates a lost leading zero) or a GS1 DataMatrix; replies with the matches, the barcode to save for an unknown one, and the product, expiry, batch and serial it carried |
+| `GET /api/v1/medicines-barcode-info` | `medicines.write` | What KSF knows about a scanned pack, to fill in a new medicine: from KSF's shared barcode list, the open product databases and the medicine directory; also says if the pharmacy already has it |
 
 #### Stock
 
@@ -720,7 +754,7 @@ npm test
 | `tests/directory.test.mjs` | The starter set, searching by name, other name, brand or category, verification and its reset when the words change, drafts and archived entries kept from pharmacies, imports, and that only the team members whose role includes it can change it |
 | `tests/access.test.mjs` | Every role: refused without the permission, every built-in role's screens, the platform kept apart, and no pharmacy reading another's records |
 | `tests/platform-accounts.test.mjs` | KSF's own books to the paisa (subscriptions, refunds, other income, expenses), the ledger and downloads, finance roles only, one slip number per pharmacy, and the payment-methods check |
-| `tests/scanning.test.mjs` | Scanning at the till: a barcode with or without its leading zero, the GS1 DataMatrix on a pack, an unknown barcode saved on its medicine (and nothing else changed), a cashier who can scan but not change the catalogue, and no two medicines sharing a barcode |
+| `tests/scanning.test.mjs` | Scanning: a barcode with or without its leading zero, the GS1 DataMatrix on a pack, a GS1 Digital Link QR, an unknown barcode saved on its medicine (and nothing else changed), a cashier who can scan but not change the catalogue, no two medicines sharing a barcode; and a new medicine filled in from its barcode — from another pharmacy (never its price, stock or shelf; the first pharmacy's details stand), from the open product databases (a stand-in, asked once per barcode) and from the medicine directory |
 
 The API suites run against a real MongoDB in a throwaway database
 (`ksf_test_<random>`) that is dropped afterwards. Point them at a server with
@@ -763,7 +797,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.3.0 · Server 2.3.0 — up to date", or
+System) compares the two: "Website 2.4.0 · Server 2.4.0 — up to date", or
 which one still has to redeploy from `main` (Railway › the service ›
 Deployments, or Vercel › Deployments).
 

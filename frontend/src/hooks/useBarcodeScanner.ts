@@ -9,7 +9,8 @@
    handed to `onScan`. A person typing is never affected. */
 
 import { useEffect, useRef } from 'react';
-import { SCAN_TIMING, ScanDetector } from '../utils/scanner';
+import { GS, SCAN_TIMING, ScanDetector } from '../utils/scanner';
+import { wakeSound } from '../utils/beep';
 
 type Field = HTMLInputElement | HTMLTextAreaElement;
 const TEXT_INPUTS = new Set(['text', 'search', 'number', 'tel', 'email', 'url', 'password', '']);
@@ -48,21 +49,33 @@ export function useBarcodeScanner(onScan: (code: string) => void, enabled = true
 
     const onKey = (event: KeyboardEvent) => {
       if (event.isComposing) return;
-      const step = detector.key(event.key, performance.now(), event.ctrlKey || event.altKey || event.metaKey || event.repeat);
+      /* The GS separator of a GS1 DataMatrix: Ctrl+] from most scanners. */
+      const separator = event.key === GS || (event.ctrlKey && (event.key === ']' || event.code === 'BracketRight'));
+      const key = separator ? GS : event.key;
+      const wasScan = detector.confirmed;
+      const step = detector.key(key, performance.now(), (!separator && (event.ctrlKey || event.altKey || event.metaKey)) || event.repeat);
       if (step.kind === 'passive') return;
       window.clearTimeout(quiet);
 
       if (step.kind === 'start') {
         const field = fieldOf(event.target);
         landed = field ? { field, value: field.value } : null;
+        /* A key press may start sound; the beep comes after the lookup. */
+        wakeSound();
       }
+      if (separator && step.kind !== 'ignore') event.preventDefault();
       if (step.kind === 'done' || (step.kind === 'collect' && step.confirmed)) {
         /* Ahead of every other listener, React's included. */
         event.preventDefault();
         event.stopImmediatePropagation();
       }
       if (step.kind === 'done') { finish(step.code); return; }
-      if (step.kind === 'ignore') { landed = null; return; }
+      if (step.kind === 'ignore') {
+        /* A scan cut short: take its first characters back out of the field too. */
+        if (wasScan && landed) restore(landed.field, landed.value);
+        landed = null;
+        return;
+      }
 
       /* A scanner that sends no Enter or Tab: the scan ends when it goes quiet. */
       quiet = window.setTimeout(() => {

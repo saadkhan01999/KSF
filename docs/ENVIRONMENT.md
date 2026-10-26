@@ -139,6 +139,21 @@ the new parameters.
 The full list per provider, and how a payment moves from *pending* to
 *succeeded*, is in `docs/PAYMENTS.md`.
 
+## Barcode lookup
+
+When a pack is scanned that the pharmacy does not stock yet, the Add medicine
+form is filled in from KSF's shared barcode list first; if KSF does not know
+the barcode, the server asks the open product databases (Open Products, Beauty
+and Food Facts, and UPCitemdb's free lookup). Only product numbers (EAN-8,
+UPC-A, EAN-13, GTIN-14) are sent — never other text a QR code holds — and
+every answer, "not found" included, is remembered, so each barcode is asked
+about once; one pharmacy can ask about at most 120 new barcodes an hour.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `BARCODE_LOOKUP_ONLINE` | `true` | Ask the open product databases about barcodes KSF does not know. `false` keeps every lookup inside KSF |
+| `BARCODE_LOOKUP_TIMEOUT_MS` | `3500` | How long to wait for them, in milliseconds, before filling in only what KSF knows |
+
 ## Data import and backups
 
 | Setting | Default | Meaning |

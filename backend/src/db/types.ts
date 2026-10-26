@@ -198,6 +198,21 @@ export interface DirectoryMedicine extends Base {
   created_by: Id | null; created_at: When; updated_by: Id | null; updated_at: When;
 }
 
+/** What KSF knows about the product behind one barcode, for every pharmacy.
+    Only what is printed on the pack — never a price, stock or who sells it.
+    `found: false` remembers a barcode nobody knew, so it is not asked again
+    straight away. The id is the barcode. `learned_from` is the pharmacy that
+    set it, so that pharmacy alone can correct it; it is never sent out. */
+export interface BarcodeProduct extends Base {
+  barcode: string; found: boolean;
+  name: string | null; generic_name: string | null; manufacturer: string | null; form: string | null;
+  strength: string | null; pack_size: string | null; drap_reg_no: string | null; category: string | null;
+  requires_prescription: Flag | null; is_controlled: Flag | null;
+  source: 'pharmacy' | 'open-food-facts' | 'open-beauty-facts' | 'open-products-facts' | 'upcitemdb' | 'none';
+  learned_from?: Id | null;
+  checked_at: When; created_at: When; updated_at: When;
+}
+
 /* ------------------------------------------------------------ accounting */
 /** Money that came in other than from a sale: a supplier's bonus, shelf rent. */
 export interface IncomeEntry extends Base {

@@ -151,6 +151,7 @@ export const col = {
   salaryPayments: c<T.SalaryPayment>('salary_payments'),
   supplierPayments: c<T.SupplierPayment>('supplier_payments'),
   directory: c<T.DirectoryMedicine>('medicine_directory'),
+  barcodeProducts: c<T.BarcodeProduct>('barcode_products'),
   platformEntries: c<T.PlatformEntry>('platform_entries'),
 
   notifications: c<T.Notification>('notifications'),

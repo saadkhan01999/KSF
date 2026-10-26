@@ -103,7 +103,7 @@ export default function Landing() {
           <div className="hero-inner">
             <span className="hero-badge">
               <b><Sparkles size={12} /> New</b>
-              Version {BRAND.version} — scan at the till with any barcode scanner, or the phone&apos;s camera
+              Version {BRAND.version} — scan any barcode, and new medicines fill themselves in
             </span>
 
             <h1>

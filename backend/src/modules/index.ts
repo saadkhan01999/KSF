@@ -5,6 +5,7 @@ import './admin.js';
 import './people.js';
 import './account.js';
 import './catalogue.js';
+import './barcodes.js';
 import './inventory.js';
 import './purchasing.js';
 import './selling.js';
