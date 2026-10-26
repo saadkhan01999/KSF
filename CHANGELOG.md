@@ -3,6 +3,84 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.4.0] — 2026-10-26
+
+### Every kind of barcode
+- **Linear and 2D codes alike**: EAN-13, EAN-8, UPC-A, UPC-E, Code 128,
+  Code 39, Code 93, Codabar, ITF-14 and GS1 DataBar; DataMatrix, QR, PDF417
+  and Aztec — from a hardware scanner, the live camera, or a photo.
+- **Scan a photo**, in the camera window: on a phone it opens the camera app,
+  and it works on any address, also where the browser will not open the live
+  camera (an http:// address, a refused permission).
+- **QR codes with a GS1 Digital Link** (`https://…/01/<product number>/…`)
+  find the medicine by its product number, with the batch and expiry.
+- A GS1 DataMatrix whose separators a scanner sends as **Ctrl+]** is read
+  whole. Before, the Ctrl key broke the scan in two.
+- **Slower Bluetooth scanners** that stutter between keys are recognised: a
+  scan is now told from typing by its average speed. A fast typist is still
+  never taken for a scanner.
+- A barcode can be up to 120 characters (QR text). A GS1 code typed into a
+  medicine's barcode field is kept as the barcode printed on the box.
+
+### Each scan, seen and heard
+- **"Medicine selected"**: a small card at the top of the till, with an
+  animated tick, the medicine's name, strength, price and how many are now in
+  the sale. It leaves by itself after about two and a half seconds, and the
+  next scan replaces it. A pack that cannot go in gets a red **"Not added"**
+  card with the reason (out of stock, prescription only, no more on the
+  shelf) instead of a separate error message.
+- A brighter two-note chime for a scan that went in, a low double tone for one
+  that did not. The sound is now woken by the first touch or key press, so
+  the very first scan of the day beeps too.
+
+### New medicines fill themselves in
+- **Medicines › Add medicine** starts with "Scan the pack to fill this in".
+  Scan the barcode (scanner or camera), or type it and press Enter, and the
+  form fills in the name, generic name, manufacturer, category, form,
+  strength, pack size, DRAP number and prescription status. The fields it
+  filled are tinted until changed; nothing typed is ever overwritten. A GS1
+  code also shows the pack's batch and expiry; a barcode the pharmacy already
+  has opens that medicine instead.
+- Where the details come from:
+  - **KSF's shared barcode list.** What is printed on a pack, learned
+    whenever any pharmacy saves a medicine with a barcode. It never holds a
+    price, cost, stock, shelf or which pharmacy it was. The first pharmacy's
+    details stand, and only it can correct them; later ones only fill in what
+    was missing.
+  - **The open product databases** (Open Products, Beauty and Food Facts,
+    UPCitemdb). They are asked about product numbers only, once per barcode,
+    with a short timeout, and at most 120 new barcodes an hour per pharmacy.
+    `BARCODE_LOOKUP_ONLINE=false` turns this off.
+  - **The KSF medicine directory**, which supplies the generic name, maker,
+    category and prescription status a brand implies. Strength, form and pack
+    size are read from the product's name.
+- **At the till**, an unknown barcode that KSF knows shows the pack's details
+  with **Add with these details**, which opens the form already filled in.
+
+### API
+- `GET /api/v1/medicines-barcode-info?code=` (`medicines.write`): what KSF
+  knows about a scanned pack, for filling in a new medicine.
+
+### Settings
+- `BARCODE_LOOKUP_ONLINE` (default `true`) and `BARCODE_LOOKUP_TIMEOUT_MS`
+  (default `3500`).
+
+### Tests
+- `tests/scanning.test.mjs` adds the Digital Link, typed GS1 codes, and the
+  barcode lookup. The lookup is tested from another pharmacy (prices, stock
+  and shelf never shared; the first pharmacy's details stand), from the open
+  databases (a stand-in, asked once, never for other QR text), from the
+  medicine directory, and for who may use it.
+- The unit suite adds slow scanners, fast typists, Ctrl+] separators, Digital
+  Links and reading a product's name.
+- In a real browser, with no failures:
+  - photos of QR, DataMatrix, ITF-14, Code 128, Code 39, UPC-A, EAN-8 and
+    Aztec codes;
+  - the live camera reading QR, DataMatrix and Code 128;
+  - the scan card on a desktop, a phone and a 320-pixel screen;
+  - the Add medicine form filled in from a scan, from the form and from the
+    till.
+
 ## [2.3.0] — 2026-10-25
 
 ### Barcode scanning at the till

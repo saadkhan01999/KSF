@@ -1,17 +1,19 @@
 /* A barcode the catalogue does not know yet. Usually the medicine is there —
    it was added by name, without its barcode — so the quickest fix is to say
    which one it is: the code is saved on that medicine (the next scan finds it
-   straight away) and the pack goes into the sale. A medicine KSF has never
-   had opens in a new tab, so the sale on the till is not lost. */
+   straight away) and the pack goes into the sale. A medicine the pharmacy
+   has never had opens in a new tab — filled in from what KSF knows about the
+   barcode — so the sale on the till is not lost. */
 
 import { useEffect, useState } from 'react';
-import { Barcode, ExternalLink, Link2 } from 'lucide-react';
+import { Barcode, ExternalLink, Link2, PackagePlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useAction, useApiData, useDebounced } from '../../hooks/useApi';
 import { api, query } from '../../services/api';
 import { Alert, Button, Modal, SearchField, Spinner } from '../../components/ui';
 import { rupees } from '../../utils/format';
 import type { Medicine } from '../../types';
+import { productLine, type BarcodeInfo } from '../../utils/barcodeInfo';
 
 export interface UnknownCode { code: string; barcode: string }
 
@@ -26,6 +28,11 @@ export function UnknownBarcode({ unknown, onClose, onLinked }: { unknown: Unknow
   const { data, loading } = useApiData<{ data: Medicine[] }>(
     unknown && canLink ? `/medicines-lookup${query({ q: search })}` : null, [unknown, search]
   );
+  /* What KSF knows about the pack, for adding it as a new medicine. */
+  const { data: info } = useApiData<BarcodeInfo>(
+    unknown && canLink ? `/medicines-barcode-info${query({ code: unknown.code })}` : null, [unknown]
+  );
+  const known = info?.fields && info.code === unknown?.code.trim() ? info : null;
 
   const link = (medicine: Medicine) => run(
     () => api.patch(`/medicines/${medicine.id}`, { barcode: unknown!.barcode }),
@@ -44,7 +51,7 @@ export function UnknownBarcode({ unknown, onClose, onLinked }: { unknown: Unknow
       subtitle={unknown ? <>Scanned <code className="mono">{unknown.barcode}</code></> : undefined}
       footer={(
         <>
-          {canLink && <Button variant="outline" icon={<ExternalLink size={16} />} onClick={addNew}>Add as a new medicine</Button>}
+          {canLink && !known && <Button variant="outline" icon={<ExternalLink size={16} />} onClick={addNew}>Add as a new medicine</Button>}
           <Button variant="primary" onClick={onClose}>Close</Button>
         </>
       )}
@@ -56,7 +63,20 @@ export function UnknownBarcode({ unknown, onClose, onLinked }: { unknown: Unknow
         </Alert>
       ) : (
         <>
-          <p className="t-sm t-soft mb-3">Which medicine is it? Choose it once — the barcode is saved on it, and the pack goes into the sale.</p>
+          {known?.fields && (
+            <div className="pack-found">
+              <span className="pack-found-icon" aria-hidden="true"><PackagePlus size={20} /></span>
+              <div className="grow">
+                <small>KSF knows this pack</small>
+                <strong>{known.fields.name}</strong>
+                {productLine(known.fields) && <span>{productLine(known.fields)}</span>}
+              </div>
+              <Button variant="primary" size="sm" icon={<ExternalLink size={15} />} onClick={addNew}>Add with these details</Button>
+            </div>
+          )}
+          <p className="t-sm t-soft mb-3">
+            {known ? 'Or, if you stock it already under another name, choose it' : 'Which medicine is it? Choose it once'} — the barcode is saved on it, and the pack goes into the sale.
+          </p>
           <SearchField value={term} onChange={setTerm} placeholder="Find the medicine by name or generic name…" autoFocus />
           <ul className="link-list" aria-busy={loading || undefined}>
             {loading && !data ? <li className="link-empty"><Spinner /></li> : null}

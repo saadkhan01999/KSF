@@ -10,7 +10,7 @@ const { jazzcashSignature } = await import('../backend/src/services/payments/ada
 const { hashPassword, verifyPassword, passwordProblem } = await import('../backend/src/security/password.ts');
 const { generateSecret, totpNow, verifyTotp } = await import('../backend/src/security/totp.ts');
 const { stockState, expiryState, plural } = await import('../backend/src/modules/shared.ts');
-const { barcodeVariants, canonicalBarcode, gs1Of } = await import('../backend/src/modules/catalogue.ts');
+const { barcodeVariants, canonicalBarcode, gs1Of, nameFacts, isProductNumber } = await import('../backend/src/domain/barcodes.ts');
 const { SYSTEM_ROLES, PERMISSION_KEYS, THEMES, PHARMACY_ADMIN_ROLE } = await import('../backend/src/domain/permissions.ts');
 const { trustProxySetting, ALLOWED_ORIGINS, originMatcher, originAllowed } = await import('../backend/src/config/env.ts');
 const { databaseHint } = await import('../backend/src/db/mongo.ts');
@@ -21,7 +21,7 @@ const { readFileSync } = await import('node:fs');
 const { PLATFORM_PERMISSION_KEYS, TEAM_MANAGE } = await import('../backend/src/domain/platform.ts');
 const calc = await import('../frontend/src/utils/calculator.ts');
 const { compareVersions } = await import('../frontend/src/utils/version.ts');
-const { ScanDetector, looksLikeBarcode } = await import('../frontend/src/utils/scanner.ts');
+const { ScanDetector, looksLikeBarcode, readable, GS } = await import('../frontend/src/utils/scanner.ts');
 
 describe('reading imported files', () => {
   it('detects semicolons and keeps quoted commas and newlines', () => {
@@ -147,6 +147,27 @@ describe('stock rules', () => {
     assert.ok(barcodeVariants('(01)08964000111222(17)271231').includes('8964000111222'));
     assert.equal(canonicalBarcode(`]d20108964000111222${GS}10AB12`), '8964000111222');
     assert.equal(canonicalBarcode(' 8964 000 111222 '), '8964000111222');
+    /* Some scanners send the leading FNC1 as a GS. */
+    assert.deepEqual(gs1Of(`${GS}010896400011122217271231`), { ...full, batch: null, serial: null });
+  });
+
+  it('reads a GS1 Digital Link in a QR code, and keeps small packs as EAN-8', () => {
+    assert.deepEqual(gs1Of('https://id.gs1.org/01/08964000111222/10/AB12/21/X9?17=271231'), { gtin: '08964000111222', expiry: '2027-12-31', batch: 'AB12', serial: 'X9' });
+    assert.deepEqual(gs1Of('https://brand.example.pk/01/8964000111222'), { gtin: '08964000111222', expiry: null, batch: null, serial: null });
+    assert.equal(gs1Of('https://example.com/products/8964000111222'), null);
+    assert.equal(canonicalBarcode('https://id.gs1.org/01/08964000111222/10/AB12'), '8964000111222');
+    assert.equal(canonicalBarcode('(01)00000096385074'), '96385074');
+    assert.ok(barcodeVariants('https://id.gs1.org/01/08964000111222').includes('8964000111222'));
+    /* Any other QR text is a barcode as it stands. */
+    assert.equal(canonicalBarcode('KSF:SHELF-C3'), 'KSF:SHELF-C3');
+    assert.ok(isProductNumber('8964000111222') && isProductNumber('96385074') && !isProductNumber('KSF-A1B2C3'));
+  });
+
+  it('reads strength, form and pack size from a product name', () => {
+    assert.deepEqual(nameFacts('Panadol Extra 500mg Tablets 20s'), { strength: '500mg', form: 'Tablet', packSize: '20 tablets' });
+    assert.deepEqual(nameFacts('Calpol Syrup 120mg/5ml', '60 ml'), { strength: '120mg/5ml', form: 'Syrup', packSize: '60 ml' });
+    assert.deepEqual(nameFacts('Augmentin 625 mg Tablets', 'Pack of 6'), { strength: '625mg', form: 'Tablet', packSize: '6 tablets' });
+    assert.deepEqual(nameFacts('Hand sanitiser'), { strength: null, form: null, packSize: null });
   });
 
   it('names role groups in plain English', () => {
@@ -463,8 +484,30 @@ describe('telling a barcode scanner from a person', () => {
     assert.deepEqual(detector.key('7', 3000), { kind: 'start' });
   });
 
+  it('takes a slower Bluetooth scanner, which stutters, but never a fast typist', () => {
+    const bluetooth = new ScanDetector();
+    [0, 22, 40, 110, 128, 150, 168, 186, 204, 222, 240, 258, 276].forEach((gap, index) => bluetooth.key('8964000111222'[index], 1000 + gap));
+    assert.ok(bluetooth.confirmed, 'an average of 23 ms a key, with one 70 ms stutter');
+    assert.deepEqual(bluetooth.key('Enter', 1300), { kind: 'done', code: '8964000111222' });
+    const typist = new ScanDetector();
+    assert.ok(type(typist, 'paracetamol', 65).every((step) => step.kind === 'start' || !step.confirmed));
+    assert.deepEqual(typist.key('Enter', 1000 + 11 * 65), { kind: 'ignore' });
+  });
+
+  it('keeps the GS separator of a GS1 DataMatrix inside the scan', () => {
+    const detector = new ScanDetector();
+    type(detector, `010896400011122210AB12${GS}21X9`, 6);
+    assert.deepEqual(detector.key('Enter', 1200), { kind: 'done', code: `010896400011122210AB12${GS}21X9` });
+    assert.equal(readable(`10AB12${GS}21X9`), '10AB12 21X9');
+    /* Ctrl on its own, as a scanner presses it before "]", leaves the burst alone. */
+    const ctrl = new ScanDetector();
+    type(ctrl, '0108964000111222', 6);
+    assert.deepEqual(ctrl.key('Control', 1100), { kind: 'passive' });
+    assert.ok(ctrl.confirmed);
+  });
+
   it('knows a barcode from a search word', () => {
-    for (const code of ['8964000111222', '12345670', '(01)08964000111222(17)271231', ']d20108964000111222', 'KSF-A1B2C3']) assert.ok(looksLikeBarcode(code), code);
+    for (const code of ['8964000111222', '12345670', '(01)08964000111222(17)271231', ']d20108964000111222', 'KSF-A1B2C3', 'https://id.gs1.org/01/08964000111222/10/AB12']) assert.ok(looksLikeBarcode(code), code);
     for (const word of ['panadol', 'Brufen 400', '123']) assert.equal(looksLikeBarcode(word), false, word);
   });
 });

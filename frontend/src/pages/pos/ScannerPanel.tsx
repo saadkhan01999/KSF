@@ -67,7 +67,8 @@ export function ScannerPanel({ last, onCamera }: { last: LastScan | null; onCame
           <ul>
             <li>Set it to <b>keyboard (HID) mode</b> and to send <b>Enter</b> after each code — most scanners do both out of the box.</li>
             <li>Bluetooth: pair it with this computer or tablet first, like a keyboard.</li>
-            <li>Ordinary barcodes (EAN, UPC, Code 128) and the square <b>DataMatrix</b> codes on medicine packs both work. The square ones need a 2D scanner.</li>
+            <li>Every kind of code works: the striped ones (EAN, UPC, Code 128, Code 39, Code 93, Codabar, ITF, DataBar) and the square ones (<b>DataMatrix</b> on medicine packs, QR, PDF417, Aztec). The square ones need a 2D scanner, or the camera.</li>
+            <li>No camera access on this address? In the camera window, <b>Scan a photo</b> reads the code from a picture.</li>
             <li>Scanned and nothing happened? The last code read appears above — if it is there, the scanner works and the code is simply not on a medicine yet.</li>
           </ul>
         </details>

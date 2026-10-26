@@ -112,7 +112,7 @@ notifications) have `pharmacy_id: null`.
 | Records | `activity_logs`, `audit_logs` + `audit_heads` (hash chain), `security_events` |
 | Subscriptions | `subscription_plans`, `subscriptions`, `subscription_payments`, `payment_attempts`, `payment_refunds`, `webhook_events`, `trials` |
 | Referrals | `referral_codes`, `referrals` |
-| Reference | `medicine_directory` (platform-wide, kept by the platform team) |
+| Reference | `medicine_directory` (platform-wide, kept by the platform team), `barcode_products` (platform-wide: what a barcode's pack says — learned from pharmacies' medicines without prices, stock or who saved it, or from the open product databases; no `pharmacy_id`) |
 | Platform books | `platform_entries` (KSF's own income and expenses besides subscriptions; no `pharmacy_id`) |
 | Data import | `migration_jobs`, `migration_items` |
 

@@ -39,5 +39,7 @@ Object.assign(process.env, {
   MAIL_OUTBOX: '.data/test-outbox',
   PASSWORD_SCRYPT_N: '16384',
   PUBLIC_APP_URL: 'http://localhost:5180',
-  PUBLIC_ALLOWED_ORIGINS: 'http://localhost:5180'
+  PUBLIC_ALLOWED_ORIGINS: 'http://localhost:5180',
+  /* Tests never reach the internet; scanning.test.mjs answers for the product databases itself. */
+  BARCODE_LOOKUP_ONLINE: 'false'
 });

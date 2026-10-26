@@ -34,11 +34,14 @@ import type { Medicine, Customer, Prescription, Sale, CartLine } from '../types'
 import { CameraScanner } from './pos/CameraScanner';
 import { ScannerPanel, type LastScan } from './pos/ScannerPanel';
 import { UnknownBarcode, type UnknownCode } from './pos/UnknownBarcode';
+import { ScanToast, type ScanNote } from './pos/ScanToast';
 
 /** Where a code came from: typed and Enter, a hardware scanner, or the camera. */
 type ScanSource = 'typed' | 'scanner' | 'camera';
 
 interface ScanReply { data: Medicine[]; barcode?: string }
+/** Why a medicine did not go in: in full for a message, briefly for the scan card. */
+interface Refusal { message: string; short: string }
 
 export default function Pos() {
   const { can, ok, fail, workspace, user, refreshWorkspace } = useApp();
@@ -88,18 +91,20 @@ export default function Pos() {
   useEffect(() => { focusSearch(); }, [focusSearch]);
 
   /* ------------------------------- cart ------------------------------- */
-  /** Adds one; says whether it went in (a scan beeps accordingly). */
-  const add = useCallback((medicine: Medicine): boolean => {
-    if (medicine.on_hand <= 0) { fail(new Error(`${medicine.name} is out of stock.`)); return false; }
+  /** Adds one, or says why not. `quiet` leaves the saying to the caller (a scan shows its own card). */
+  const add = useCallback((medicine: Medicine, quiet = false): Refusal | null => {
+    const refuse = (message: string, short: string): Refusal => {
+      if (!quiet) fail(new Error(message));
+      return { message, short };
+    };
+    if (medicine.on_hand <= 0) return refuse(`${medicine.name} is out of stock.`, 'Out of stock');
     if (medicine.requires_prescription && !prescriptionId) {
-      fail(new Error(`${medicine.name} is prescription-only. Attach a verified prescription first.`));
       setRxPickerOpen(true);
-      return false;
+      return refuse(`${medicine.name} is prescription-only. Attach a verified prescription first.`, 'Prescription only: attach a verified prescription first');
     }
     const line = cart.find((l) => l.medicine.id === medicine.id);
     if (line && line.quantity >= medicine.on_hand) {
-      fail(new Error(`Only ${medicine.on_hand} of ${medicine.name} left on the shelf.`));
-      return false;
+      return refuse(`Only ${medicine.on_hand} of ${medicine.name} left on the shelf.`, `Only ${medicine.on_hand} on the shelf, all in this sale`);
     }
     setCart((current) => (current.some((l) => l.medicine.id === medicine.id)
       ? current.map((l) => (l.medicine.id === medicine.id ? { ...l, quantity: l.quantity + 1 } : l))
@@ -108,8 +113,22 @@ export default function Pos() {
     window.setTimeout(() => setJustAdded(null), 700);
     setTerm('');
     focusSearch();
-    return true;
+    return null;
   }, [cart, fail, prescriptionId, focusSearch]);
+
+  /* The card at the top of the till after a scan: which medicine went in, or why not. */
+  const [scanNote, setScanNote] = useState<ScanNote | null>(null);
+  const noteId = useRef(0);
+  const clearNote = useCallback(() => setScanNote(null), []);
+  const announce = useCallback((tone: ScanNote['tone'], title: string, detail: string) => {
+    noteId.current += 1;
+    setScanNote({ id: noteId.current, tone, title, detail });
+  }, []);
+  const announceAdded = useCallback((medicine: Medicine, refusal: Refusal | null) => {
+    if (refusal) { announce('error', medicine.name, refusal.short); return; }
+    const inSale = (cart.find((l) => l.medicine.id === medicine.id)?.quantity ?? 0) + 1;
+    announce('ok', medicine.name, [medicine.strength, rupees(medicine.price_paisa), `${inSale} in the sale`].filter(Boolean).join(' · '));
+  }, [announce, cart]);
 
   /* ----------------------------- scanning -----------------------------
      A scanner is a very fast keyboard: it types the whole code and presses
@@ -143,12 +162,19 @@ export default function Pos() {
     try {
       const found = await api.get<ScanReply>(`/medicines-scan${query({ code: trimmed })}`);
       const matches = found.data ?? [];
-      if (matches.length === 1) { record(add(matches[0]) ? 'added' : 'refused', matches[0].name); return; }
+      if (matches.length === 1) {
+        const [medicine] = matches;
+        const refusal = add(medicine, source !== 'typed');
+        record(refusal ? 'refused' : 'added', medicine.name);
+        if (source !== 'typed') announceAdded(medicine, refusal);
+        return;
+      }
       if (matches.length > 1) {
         /* Two products sharing a code. Show them and let the person choose —
            picking one by sort order is how the wrong medicine gets sold. */
         record('several');
-        fail(new Error(`More than one medicine carries the code ${trimmed}. Pick the right one from the list and fix the duplicate in Medicines.`));
+        if (source === 'typed') fail(new Error(`More than one medicine carries the code ${trimmed}. Pick the right one from the list and fix the duplicate in Medicines.`));
+        else announce('error', `${matches.length} medicines share this barcode`, 'Pick the right one from the list, then fix the duplicate in Medicines');
         setTerm(found.barcode ?? trimmed);
         return;
       }
@@ -172,7 +198,7 @@ export default function Pos() {
     } finally {
       setScanning(false);
     }
-  }, [add, fail, medicines]);
+  }, [add, announce, announceAdded, fail, medicines]);
 
   /* A hardware scanner, wherever the cursor is. A scan after a finished sale
      starts the next one; while the payment window is open it is held back,
@@ -181,14 +207,14 @@ export default function Pos() {
     if (payOpen) {
       beep('error');
       setLastScan({ code, at: new Date().toISOString(), outcome: 'busy' });
-      fail(new Error('Finish or close the payment first, then scan the next item.'));
+      announce('error', 'Payment in progress', 'Finish or close the payment first, then scan the next item');
       return;
     }
     setReceipt(null);
     setUnknown(null);
     setRxPickerOpen(false);
     void scan(code, 'scanner');
-  }, [payOpen, fail, scan]);
+  }, [payOpen, announce, scan]);
   useBarcodeScanner(onHardwareScan);
 
   const setQuantity = (id: string, quantity: number) => {
@@ -792,6 +818,7 @@ export default function Pos() {
       </Modal>
 
       {/* ----------------------------- scanning ----------------------------- */}
+      <ScanToast note={scanNote} onDone={clearNote} />
       <CameraScanner
         open={cameraOpen}
         onClose={() => { setCameraOpen(false); focusSearch(); }}
@@ -802,9 +829,10 @@ export default function Pos() {
         onClose={() => { setUnknown(null); focusSearch(); }}
         onLinked={(medicine) => {
           setUnknown(null);
-          const added = add(medicine);
-          setLastScan({ code: medicine.barcode ?? '', at: new Date().toISOString(), outcome: added ? 'added' : 'refused', name: medicine.name });
-          if (added) beep('ok');
+          const refusal = add(medicine, true);
+          setLastScan({ code: medicine.barcode ?? '', at: new Date().toISOString(), outcome: refusal ? 'refused' : 'added', name: medicine.name });
+          beep(refusal ? 'error' : 'ok');
+          announceAdded(medicine, refusal);
         }}
       />
     </>
