@@ -14,7 +14,8 @@ import { ArrowUp, ArrowUpRight, Menu as MenuIcon, X, Mail, Phone, MapPin } from 
 import { BrandLogo } from './Brand';
 import { BRAND } from '../brand';
 import { useBusiness, placeOf } from '../services/business';
-import { onScrollOffset, useScrolledPast } from '../hooks/useParallax';
+import { onScrollOffset, useReveal, useScrolledPast } from '../hooks/useParallax';
+import { glideTo } from '../utils/glide';
 
 const LINKS = [
   { to: '/product', label: 'Product' },
@@ -200,14 +201,122 @@ export function SiteFooter() {
         </span>
       </div>
       <BackToTop />
+      <SiteScrollbar />
+      <SiteMotion />
     </footer>
+  );
+}
+
+/** Every public page: its sections fade up as they scroll into view, and the
+    cards inside them follow one after another (base.css). Sections that
+    render later — plans fetched from the server — are picked up as they come. */
+function SiteMotion() {
+  const { pathname } = useLocation();
+  useReveal([pathname]);
+  return null;
+}
+
+/**
+ * The website's scrollbar: a green pill on the right edge that the hand can
+ * hold — the pointer turns to a grabbing hand over it, the page follows the
+ * drag, and a click on the rail above or below it glides a screen at a time.
+ * A browser's own scrollbar cannot change the pointer, so on a mouse or
+ * trackpad this replaces it (the page still scrolls with the wheel, the keys
+ * and the touchpad exactly as before). On a touch screen the browser's own
+ * overlay is better, and stays.
+ */
+export function SiteScrollbar() {
+  const rail = useRef<HTMLDivElement>(null);
+  const thumb = useRef<HTMLDivElement>(null);
+  const [fine] = useState(() => typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches);
+
+  useEffect(() => {
+    if (!fine) return undefined;
+    const root = document.documentElement;
+    root.classList.add('has-site-scroll');
+    let frame = 0;
+    let idle = 0;
+    const place = () => {
+      frame = 0;
+      const bar = rail.current;
+      const pill = thumb.current;
+      if (!bar || !pill) return;
+      const view = window.innerHeight;
+      const room = root.scrollHeight - view;
+      bar.classList.toggle('is-needless', room <= 1);
+      if (room <= 1) return;
+      const height = Math.max(56, (view * view) / root.scrollHeight);
+      pill.style.height = `${height}px`;
+      pill.style.transform = `translateY(${(window.scrollY / room) * (view - height)}px)`;
+    };
+    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(place); };
+    const onScroll = () => {
+      schedule();
+      rail.current?.classList.add('is-moving');
+      window.clearTimeout(idle);
+      idle = window.setTimeout(() => rail.current?.classList.remove('is-moving'), 900);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', schedule);
+    const grows = new ResizeObserver(schedule);
+    grows.observe(document.body);
+    schedule();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', schedule);
+      grows.disconnect();
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(idle);
+      root.classList.remove('has-site-scroll', 'is-dragging-scroll');
+    };
+  }, [fine]);
+
+  if (!fine) return null;
+
+  /* Hold and drag: the page follows the pill, one to one. */
+  const grab = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const pill = event.currentTarget;
+    const root = document.documentElement;
+    const startY = event.clientY;
+    const startTop = window.scrollY;
+    const room = root.scrollHeight - window.innerHeight;
+    const travel = Math.max(1, window.innerHeight - pill.offsetHeight);
+    pill.setPointerCapture(event.pointerId);
+    root.classList.add('is-dragging-scroll');
+    const move = (next: PointerEvent) => window.scrollTo(0, startTop + ((next.clientY - startY) * room) / travel);
+    const release = () => {
+      root.classList.remove('is-dragging-scroll');
+      pill.removeEventListener('pointermove', move);
+      pill.removeEventListener('pointerup', release);
+      pill.removeEventListener('pointercancel', release);
+    };
+    pill.addEventListener('pointermove', move);
+    pill.addEventListener('pointerup', release);
+    pill.addEventListener('pointercancel', release);
+  };
+
+  /* A click on the rail: a screen up or down, gliding. */
+  const page = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || !thumb.current) return;
+    const pill = thumb.current.getBoundingClientRect();
+    const down = event.clientY > pill.bottom;
+    glideTo(window.scrollY + (down ? 1 : -1) * window.innerHeight * 0.9);
+  };
+
+  return (
+    <div ref={rail} className="site-scroll" aria-hidden="true" onClick={page}>
+      <div ref={thumb} className="site-scroll-thumb" onPointerDown={grab} />
+    </div>
   );
 }
 
 /**
  * Back to the top, once the page is long enough to need it. The ring around
- * the arrow fills as the page is read; the scroll back is smooth unless the
- * visitor has asked for less motion.
+ * the arrow fills as the page is read; the way back is a slow, eased glide
+ * unless the visitor has asked for less motion.
  */
 export function BackToTop() {
   const shown = useScrolledPast(480);
@@ -220,9 +329,9 @@ export function BackToTop() {
     ring.current?.style.setProperty('--progress', String(room > 0 ? Math.min(1, offset / room) : 0));
   }), []);
 
+  /* A calm glide to the top, over about a second (utils/glide.ts). */
   const toTop = () => {
-    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    window.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' });
+    glideTo(0);
     document.getElementById('main')?.focus({ preventScroll: true });
   };
 

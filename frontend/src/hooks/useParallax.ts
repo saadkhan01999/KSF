@@ -45,6 +45,8 @@ const scrollSubscribers = new Set<(offset: number) => void>();
 
 let ticking = false;
 let lastOffset = -1;
+/* When the ticker last ran: the reveal's safety net reads it. */
+let lastFrameAt = 0;
 
 /** Finds the element that actually scrolls: `.main` inside the app shell,
     otherwise the document. */
@@ -107,6 +109,7 @@ function revealPass(viewport: number): void {
 function frame(): void {
   if (!ticking) return;
   window.requestAnimationFrame(frame);
+  lastFrameAt = performance.now();
 
   if (document.hidden) return;
 
@@ -138,14 +141,15 @@ function stopTickerIfIdle(): void {
 
 /* ------------------------------------------------------------------ reveal */
 
-/** Fades sections up as they arrive. Pass anything that changes when new
-    `[data-reveal]` elements appear, so late-rendered sections are collected. */
+/** Fades sections up as they arrive. Sections that render later — a list
+    fetched from the server — are collected as they appear. Pass anything
+    that changes with the page (the path) so a new page starts afresh. */
 export function useReveal(deps: unknown[] = []): void {
   useEffect(() => {
-    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]:not(.is-visible)'));
+    const pending = () => Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]:not(.is-visible)'));
 
     if (reducedMotion()) {
-      nodes.forEach((node) => node.classList.add('is-visible'));
+      pending().forEach((node) => node.classList.add('is-visible'));
       return undefined;
     }
 
@@ -153,12 +157,25 @@ export function useReveal(deps: unknown[] = []): void {
        line never runs, the content is simply visible — which is the correct
        failure. */
     document.documentElement.classList.add('reveal-armed');
-    nodes.forEach((node) => reveals.add(node));
-    startTicker();
+    const collect = () => {
+      for (const node of pending()) reveals.add(node);
+      startTicker();
+    };
+    collect();
 
-    /* Belt and braces: whatever happens, nothing stays hidden for longer than
-       this. A missed reveal is a cosmetic loss; hidden content is not. */
-    const safety = window.setTimeout(() => {
+    /* New sections, as the page renders them. */
+    let queued = 0;
+    const watcher = new MutationObserver(() => {
+      if (!queued) queued = window.requestAnimationFrame(() => { queued = 0; collect(); });
+    });
+    watcher.observe(document.body, { childList: true, subtree: true });
+
+    /* Belt and braces: if the ticker ever stops running (a frozen or broken
+       page), everything waiting is shown. A missed reveal is a cosmetic loss;
+       hidden content is not. While the ticker runs, sections wait for the
+       reader to scroll to them — that is the point of the motion. */
+    const safety = window.setInterval(() => {
+      if (performance.now() - lastFrameAt < 1500) return;
       for (const node of [...reveals]) {
         node.classList.add('is-visible');
         reveals.delete(node);
@@ -166,8 +183,10 @@ export function useReveal(deps: unknown[] = []): void {
     }, 1600);
 
     return () => {
-      window.clearTimeout(safety);
-      nodes.forEach((node) => reveals.delete(node));
+      watcher.disconnect();
+      window.cancelAnimationFrame(queued);
+      window.clearInterval(safety);
+      for (const node of pending()) reveals.delete(node);
       stopTickerIfIdle();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

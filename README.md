@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.5.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.5.1** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -34,7 +34,7 @@ support requests they raise.
 
 | Area | What is in it |
 |---|---|
-| Till | **Barcode scanning** — any USB or Bluetooth scanner, wherever the cursor is, every linear and 2D code (EAN, UPC, Code 128, the GS1 DataMatrix on the pack, QR …), the camera of a phone or laptop, or a photo; a "Medicine selected" card and a checkout-scanner beep for each scan; an unknown barcode linked to its medicine, or added with its details filled in — or search; FEFO batch allocation, prescription checks, cash / card / Easypaisa / JazzCash / bank / credit (udhaar), reasoned discounts with a per-pharmacy limit, printable 76 mm receipt, a calculator that stays open beside the sale |
+| Till | **Barcode scanning** — any USB or Bluetooth scanner, wherever the cursor is, every linear and 2D code (EAN, UPC, Code 128, the GS1 DataMatrix on the pack, QR …), the camera of a phone or laptop, or a photo; a "Medicine selected" card and a checkout-scanner beep for each scan; an unknown barcode linked to its medicine, or added with its details filled in — or search; FEFO batch allocation, prescription checks, cash / card / Easypaisa / JazzCash / bank / credit (udhaar), reasoned discounts with a per-pharmacy limit, a 76 mm receipt that prints in full on one slip of exactly its own length (from the till or Sales history), a calculator that stays open beside the sale |
 | Stock | Medicines (scan the pack and the form fills in from KSF's shared barcode list, the open product databases and the medicine directory), categories, batches with expiry, adjustments after a count, quarantine and write-off, low-stock and expiry alerts, a full movement ledger |
 | Buying | Suppliers, purchase orders, receiving into stock (atomically), dated supplier payments by cash, bank, cheque or wallet, what is owed to whom |
 | People | Customers with allergies and credit limits, repayments and reversals, prescriptions verified by a pharmacist |
@@ -803,7 +803,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.5.0 · Server 2.5.0 — up to date", or
+System) compares the two: "Website 2.5.1 · Server 2.5.1 — up to date", or
 which one still has to redeploy from `main` (Railway › the service ›
 Deployments, or Vercel › Deployments).
 

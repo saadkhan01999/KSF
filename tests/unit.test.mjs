@@ -22,6 +22,7 @@ const { PLATFORM_PERMISSION_KEYS, TEAM_MANAGE } = await import('../backend/src/d
 const calc = await import('../frontend/src/utils/calculator.ts');
 const { compareVersions } = await import('../frontend/src/utils/version.ts');
 const { ScanDetector, looksLikeBarcode, readable, GS, ReadConfirmer, gtinValid } = await import('../frontend/src/utils/scanner.ts');
+const { easeInOutCubic, glideDuration } = await import('../frontend/src/utils/glide.ts');
 
 describe('reading imported files', () => {
   it('detects semicolons and keeps quoted commas and newlines', () => {
@@ -519,6 +520,18 @@ describe('telling a barcode scanner from a person', () => {
     assert.equal(camera.accept('BRU400', 'code_39', 2300), true, 'the same twice in a row');
     assert.equal(camera.accept('A1234B', 'codabar', 5000), false);
     assert.equal(camera.accept('A1234B', 'codabar', 7000), false, 'too far apart to be one look at one label');
+  });
+
+  it('glides back to the top calmly: eased at both ends, longer for longer pages, never rushed or endless', () => {
+    assert.equal(easeInOutCubic(0), 0);
+    assert.equal(easeInOutCubic(1), 1);
+    assert.equal(easeInOutCubic(0.5), 0.5);
+    assert.ok(easeInOutCubic(0.1) < 0.01 && easeInOutCubic(0.9) > 0.99, 'slow away, slow to rest');
+    const steps = Array.from({ length: 21 }, (_, i) => easeInOutCubic(i / 20));
+    assert.ok(steps.every((value, i) => i === 0 || value >= steps[i - 1]), 'never goes back');
+    assert.equal(glideDuration(300), 700, 'a short way still takes a moment');
+    assert.ok(glideDuration(4000) > glideDuration(1500), 'longer for longer');
+    assert.equal(glideDuration(60000), 1500, 'and never more than a second and a half');
   });
 
   it('knows a barcode from a search word', () => {

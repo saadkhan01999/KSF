@@ -180,15 +180,47 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--s-5) 0; }
    that makes content readable. */
 html.reveal-armed [data-reveal] {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity var(--t-parallax) var(--ease-out), transform var(--t-parallax) var(--ease-out);
+  transform: translate3d(0, 34px, 0) scale(.985);
+  transition: opacity .8s cubic-bezier(.22, 1, .36, 1), transform .95s cubic-bezier(.22, 1, .36, 1);
   will-change: opacity, transform;
 }
-html.reveal-armed [data-reveal].is-visible { opacity: 1; transform: none; }
+html.reveal-armed [data-reveal].is-visible { opacity: 1; transform: none; will-change: auto; }
+
+/* Inside a section, its cards and list items follow one after another, a
+   breath apart, rising a little less than the section itself. */
+html.reveal-armed [data-reveal] :is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid,
+  .terms-grid, .status-grid, .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > * {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition: opacity .7s cubic-bezier(.22, 1, .36, 1), transform .8s cubic-bezier(.22, 1, .36, 1);
+  transition-delay: calc(var(--reveal-step, 0) * 65ms + 120ms);
+}
+html.reveal-armed [data-reveal].is-visible :is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid,
+  .terms-grid, .status-grid, .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > * {
+  opacity: 1;
+  transform: none;
+}
+:is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid, .terms-grid, .status-grid,
+  .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > :nth-child(2) { --reveal-step: 1; }
+:is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid, .terms-grid, .status-grid,
+  .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > :nth-child(3) { --reveal-step: 2; }
+:is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid, .terms-grid, .status-grid,
+  .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > :nth-child(4) { --reveal-step: 3; }
+:is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid, .terms-grid, .status-grid,
+  .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > :nth-child(5) { --reveal-step: 4; }
+:is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid, .terms-grid, .status-grid,
+  .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > :nth-child(6) { --reveal-step: 5; }
+:is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid, .terms-grid, .status-grid,
+  .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > :nth-child(n+7) { --reveal-step: 6; }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-reveal] { opacity: 1; transform: none; transition: none; }
+  [data-reveal], [data-reveal] * { opacity: 1 !important; transform: none !important; transition: none !important; }
 }
+
+/* A glide (utils/glide.ts) or a drag of the website's scrollbar moves the
+   page itself, frame by frame: the stylesheet's smooth scrolling is off
+   meanwhile, or it would smooth every step a second time. */
+html.is-gliding, html.is-dragging-scroll { scroll-behavior: auto !important; }
 
 /* ------------------------- Boot recovery notice -------------------------
    Styling for the message /boot.js writes when the app never mounts. It is

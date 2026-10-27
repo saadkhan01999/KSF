@@ -16,7 +16,7 @@ import {
   Button, SearchField, StatCard, StatusBadge, Modal, ConfirmDialog, EmptyState,
   TableSkeleton, Pager, Allow, Alert, Badge
 } from '../components/ui';
-import { Receipt as ReceiptView } from './Pos';
+import { Receipt as ReceiptView, ReceiptPrint, printReceipt } from '../components/receipt';
 import {
   rupees, rupeesShort, number, dateTime, date, payment, PAYMENT_LABELS,
   isoDaysAgo, todayIso, downloadCsv
@@ -229,7 +229,7 @@ export default function Sales() {
         footer={
           <>
             <Button variant="outline" onClick={() => setViewing(null)} className="no-print">Close</Button>
-            <Button variant="secondary" icon={<Printer size={17} />} onClick={() => window.print()} className="no-print">
+            <Button variant="secondary" icon={<Printer size={17} />} onClick={printReceipt} className="no-print" disabled={!detail?.data}>
               Print receipt
             </Button>
           </>
@@ -292,6 +292,8 @@ export default function Sales() {
             </>
           )}
       </Modal>
+
+      <ReceiptPrint sale={viewing ? detail?.data : null} />
 
       <ConfirmDialog
         open={!!refunding}
