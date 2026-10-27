@@ -3,6 +3,62 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.5.1] — 2026-10-27
+
+### Fixed
+- **A printed receipt stopped after the header.** The slip was printed from
+  inside the till's "Sale completed" window. That window is fixed to the
+  screen and scrolls inside itself, so the paper got only what fitted: the
+  pharmacy, the invoice number, the date and the customer, with no
+  medicines, total or payment.
+  - **The fix:** the receipt is now printed from a copy of its own, drawn
+    outside the app, so it flows onto the paper in full: every medicine
+    with its batch and expiry, the subtotal, discount, GST, total, payment,
+    change and footer.
+  - **Paper length:** set to the slip's exact length (76 mm wide), so a
+    thermal roll neither cuts it short nor feeds blank paper after it.
+  - **Ctrl+P too:** while a receipt is on screen, pressing Ctrl+P prints
+    the slip alone.
+  - **Sales history** prints the same full receipt from an invoice. It did
+    not print the receipt at all before when "Show the printable receipt"
+    was closed.
+- A receipt for a pharmacy with no street address no longer starts its
+  address line with a comma.
+
+### The website
+- **A scrollbar you can hold.** The page has a green pill on its right
+  edge. Over it the pointer becomes an open hand, holding it becomes a
+  grabbing hand, and the page follows the drag. It widens when the pointer
+  comes near. A click on the rail above or below it glides a screen at a
+  time. A browser's own scrollbar cannot change the pointer, so on a mouse
+  or trackpad this replaces it. The wheel, keys and touchpad scroll exactly
+  as before, and a phone keeps its own overlay.
+- **Back to the top, calmly.** It now glides there in about 0.7–1.5 seconds,
+  easing away and easing to rest, instead of the browser's near-instant
+  jump. Touching the wheel or the screen stops it at once. With "reduce
+  motion" on it simply jumps.
+- **Sections rise gently as they scroll into view, on every public page.**
+  Before, a safety timer showed every section after 1.6 seconds, so by the
+  time a visitor scrolled down nothing was left to animate. Now the timer
+  acts only if the animation itself stops working. The motion:
+  - each section fades up;
+  - the cards, plans, questions and list items in it follow one after
+    another, about 65 ms apart;
+  - each page's heading arrives gently when it opens.
+  - Sections that load later (the price comparison) are picked up as they
+    appear, so nothing can stay hidden. "Reduce motion" switches it all off.
+
+### Tests
+- **Unit:** the glide's easing and timing.
+- **In a real browser:**
+  - an eight-medicine sale printed to PDF from the till and from Sales
+    history: every line on one slip, nothing of the till behind it;
+  - the scrollbar: the hand pointers, a drag scrolling one to one, the
+    thumb following the page, and a phone keeping its own;
+  - the glide back to the top: its time and smoothness;
+  - every section and card on eight public pages shown once scrolled
+    through, with no sideways scroll, desktop and phone.
+
 ## [2.5.0] — 2026-10-27
 
 ### The pharmacy's own logo, everywhere

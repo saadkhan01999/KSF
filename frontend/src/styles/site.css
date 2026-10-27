@@ -278,3 +278,74 @@
 @media (max-width: 640px) {
   .preview-rail { display: none !important; }
 }
+
+/* ======================= the website's scrollbar =======================
+   A green pill the hand can hold (SiteScrollbar in SiteChrome.tsx). The
+   browser's own bar is hidden while it is there; on a touch screen it is
+   not there, and the browser's own overlay stays. */
+html.has-site-scroll { scrollbar-width: none; }
+html.has-site-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+.site-scroll {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 75;
+  width: 16px;
+  cursor: pointer;
+}
+/* The rail: invisible until the pointer comes near or the page moves. */
+.site-scroll::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  right: 5px;
+  width: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--scroll-thumb) 14%, transparent);
+  opacity: 0;
+  transition: opacity .3s ease, width .25s ease, right .25s ease;
+}
+.site-scroll:hover::before, .site-scroll.is-moving::before { opacity: 1; }
+.site-scroll:hover::before { width: 10px; right: 3px; }
+.site-scroll.is-needless { display: none; }
+
+.site-scroll-thumb {
+  position: absolute;
+  top: 0;
+  right: 5px;
+  width: 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #34C389 0%, var(--scroll-thumb) 45%, #14442E 100%);
+  box-shadow: 0 3px 10px -2px rgba(20, 68, 46, .45), inset 0 0 0 1px rgba(255, 255, 255, .22);
+  opacity: .72;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity .25s ease, width .25s cubic-bezier(.22, 1, .36, 1), right .25s cubic-bezier(.22, 1, .36, 1), box-shadow .25s ease;
+}
+.site-scroll.is-moving .site-scroll-thumb { opacity: .95; }
+.site-scroll:hover .site-scroll-thumb { width: 10px; right: 3px; opacity: 1; }
+.site-scroll-thumb:hover { box-shadow: 0 4px 14px -2px rgba(20, 68, 46, .6), inset 0 0 0 1px rgba(255, 255, 255, .3); }
+html.is-dragging-scroll, html.is-dragging-scroll * { cursor: grabbing !important; user-select: none; }
+html.is-dragging-scroll .site-scroll::before { opacity: 1; width: 10px; right: 3px; }
+html.is-dragging-scroll .site-scroll-thumb {
+  width: 10px;
+  right: 3px;
+  opacity: 1;
+  background: linear-gradient(180deg, #3CD394 0%, #22A06B 45%, #14442E 100%);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--scroll-thumb) 22%, transparent), 0 6px 16px -2px rgba(20, 68, 46, .55);
+}
+:root[data-theme='dark'] .site-scroll-thumb { background: linear-gradient(180deg, #7BE3B4 0%, var(--scroll-thumb) 55%, #1C6B48 100%); }
+
+/* Each page's heading arrives gently when the page opens. */
+.page-hero-inner > * { animation: ksf-fade-up .8s cubic-bezier(.22, 1, .36, 1) both; }
+.page-hero-inner > :nth-child(2) { animation-delay: .08s; }
+.page-hero-inner > :nth-child(3) { animation-delay: .16s; }
+.page-hero-inner > :nth-child(n+4) { animation-delay: .24s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .site-scroll::before, .site-scroll-thumb { transition: none; }
+  .page-hero-inner > * { animation: none; }
+}

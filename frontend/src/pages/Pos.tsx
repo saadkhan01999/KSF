@@ -26,15 +26,15 @@ import {
   Button, Modal, SelectInput, TextInput, EmptyState, Badge,
   Allow, Alert, Spinner, Segmented, Menu
 } from '../components/ui';
-import { rupees, amount, toPaisa, date, inDays, payment, PAYMENT_LABELS, shortName } from '../utils/format';
+import { rupees, toPaisa, date, inDays, payment, PAYMENT_LABELS, shortName } from '../utils/format';
 import { beep } from '../utils/beep';
 import { looksLikeBarcode } from '../utils/scanner';
-import { BRAND } from '../brand';
 import type { Medicine, Customer, Prescription, Sale, CartLine } from '../types';
 import { CameraScanner } from './pos/CameraScanner';
 import { ScannerPanel, type LastScan } from './pos/ScannerPanel';
 import { UnknownBarcode, type UnknownCode } from './pos/UnknownBarcode';
 import { ScanToast, type ScanNote } from './pos/ScanToast';
+import { Receipt, ReceiptPrint, printReceipt } from '../components/receipt';
 
 /** Where a code came from: typed and Enter, a hardware scanner, or the camera. */
 type ScanSource = 'typed' | 'scanner' | 'camera';
@@ -812,7 +812,7 @@ export default function Pos() {
             <Button variant="outline" onClick={() => { setReceipt(null); focusSearch(); }} className="no-print">
               Next customer
             </Button>
-            <Button variant="primary" icon={<Printer size={17} />} onClick={() => window.print()} className="no-print">
+            <Button variant="primary" icon={<Printer size={17} />} onClick={printReceipt} className="no-print">
               Print receipt
             </Button>
           </>
@@ -820,6 +820,7 @@ export default function Pos() {
       >
         {receipt && <Receipt sale={receipt} />}
       </Modal>
+      <ReceiptPrint sale={receipt} />
 
       {/* ----------------------------- scanning ----------------------------- */}
       <ScanToast note={scanNote} onDone={clearNote} />
@@ -840,74 +841,6 @@ export default function Pos() {
         }}
       />
     </>
-  );
-}
-
-/* -------------------------------------------------------------------------
-   The printed receipt. Sized for a 76mm thermal roll, which is what almost
-   every counter printer in Pakistan uses.
-   ------------------------------------------------------------------------- */
-export function Receipt({ sale }: { sale: Sale }) {
-  return (
-    <div className="receipt">
-      <h3>{sale.pharmacy?.name ?? 'KSF PHARMACY'}</h3>
-      <div className="rc-sub">
-        {sale.pharmacy?.address}{sale.pharmacy?.city ? `, ${sale.pharmacy.city}` : ''}<br />
-        {sale.pharmacy?.phone}<br />
-        {sale.pharmacy?.ntn && <>NTN {sale.pharmacy.ntn} · </>}
-        {sale.pharmacy?.drap_licence && <>Lic {sale.pharmacy.drap_licence}</>}
-      </div>
-      <hr />
-      <div className="rc-line"><span>Invoice</span><span>{sale.invoice_no}</span></div>
-      <div className="rc-line"><span>Date</span><span>{date(sale.sold_at)}</span></div>
-      <div className="rc-line"><span>Served by</span><span>{sale.served_by_name}</span></div>
-      <div className="rc-line"><span>Customer</span><span>{sale.customer_name || 'Walk-in'}</span></div>
-      {sale.prescription_reference && (
-        <div className="rc-line"><span>Prescription</span><span>{sale.prescription_reference}</span></div>
-      )}
-      <hr />
-      {(sale.items ?? []).map((item) => (
-        <div className="rc-item" key={item.id}>
-          <div className="rc-name">{item.medicine_name}</div>
-          <div className="rc-line">
-            <span>{item.quantity} × {amount(item.unit_price_paisa)}</span>
-            <span>{amount(item.line_total_paisa)}</span>
-          </div>
-          {/* Batch and expiry on the slip, so a return or a recall can be
-              traced to the pack that was actually handed over. */}
-          {(item.batch_no || item.expiry_date) && (
-            <div className="rc-trace">
-              {item.batch_no && <>B: {item.batch_no}</>}
-              {item.batch_no && item.expiry_date && ' · '}
-              {item.expiry_date && <>Exp {item.expiry_date.slice(5, 7)}/{item.expiry_date.slice(2, 4)}</>}
-            </div>
-          )}
-        </div>
-      ))}
-      <hr />
-      <div className="rc-line"><span>Subtotal</span><span>{amount(sale.subtotal_paisa)}</span></div>
-      {sale.discount_paisa > 0 && <div className="rc-line"><span>Discount</span><span>-{amount(sale.discount_paisa)}</span></div>}
-      {sale.gst_paisa > 0 && <div className="rc-line"><span>GST</span><span>{amount(sale.gst_paisa)}</span></div>}
-      <div className="rc-line rc-total"><span>TOTAL</span><span>Rs {amount(sale.total_paisa)}</span></div>
-      {sale.payment_method === 'credit' ? (
-        <>
-          <div className="rc-line"><span>On account (udhaar)</span><span>{amount(sale.total_paisa)}</span></div>
-          {typeof sale.loyalty_points === 'number' && (
-            <div className="rc-line"><span>Points</span><span>{sale.loyalty_points}</span></div>
-          )}
-        </>
-      ) : (
-        <>
-          <div className="rc-line"><span>Paid ({payment(sale.payment_method)})</span><span>{amount(sale.paid_paisa)}</span></div>
-          {sale.change_paisa > 0 && <div className="rc-line"><span>Change</span><span>{amount(sale.change_paisa)}</span></div>}
-        </>
-      )}
-      <hr />
-      <div className="rc-foot">
-        {sale.footer}<br /><br />
-        {BRAND.name} {BRAND.version}
-      </div>
-    </div>
   );
 }
 
