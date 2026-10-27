@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.4.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.5.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -34,7 +34,7 @@ support requests they raise.
 
 | Area | What is in it |
 |---|---|
-| Till | **Barcode scanning** — any USB or Bluetooth scanner, wherever the cursor is, every linear and 2D code (EAN, UPC, Code 128, the GS1 DataMatrix on the pack, QR …), the camera of a phone or laptop, or a photo; a "Medicine selected" card and chime for each scan; an unknown barcode linked to its medicine, or added with its details filled in — or search; FEFO batch allocation, prescription checks, cash / card / Easypaisa / JazzCash / bank / credit (udhaar), reasoned discounts with a per-pharmacy limit, printable 76 mm receipt, a calculator that stays open beside the sale |
+| Till | **Barcode scanning** — any USB or Bluetooth scanner, wherever the cursor is, every linear and 2D code (EAN, UPC, Code 128, the GS1 DataMatrix on the pack, QR …), the camera of a phone or laptop, or a photo; a "Medicine selected" card and a checkout-scanner beep for each scan; an unknown barcode linked to its medicine, or added with its details filled in — or search; FEFO batch allocation, prescription checks, cash / card / Easypaisa / JazzCash / bank / credit (udhaar), reasoned discounts with a per-pharmacy limit, printable 76 mm receipt, a calculator that stays open beside the sale |
 | Stock | Medicines (scan the pack and the form fills in from KSF's shared barcode list, the open product databases and the medicine directory), categories, batches with expiry, adjustments after a count, quarantine and write-off, low-stock and expiry alerts, a full movement ledger |
 | Buying | Suppliers, purchase orders, receiving into stock (atomically), dated supplier payments by cash, bank, cheque or wallet, what is owed to whom |
 | People | Customers with allergies and credit limits, repayments and reversals, prescriptions verified by a pharmacist |
@@ -226,31 +226,37 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
 
 The till (**Sell › New sale**) takes a scan wherever the cursor is — the
 search box, a quantity box or nowhere at all — and the item goes straight into
-the sale with a two-note chime and a small card at the top of the screen:
+the sale with the short *beep* of a checkout scanner (and a buzz, on a phone)
+and a small card at the top of the screen:
 **Medicine selected**, its name, strength, price and how many are now in the
 sale. The card goes by itself after about two and a half seconds; a pack that
 cannot go in (out of stock, prescription only, no more on the shelf) gets a
-red **Not added** card with the reason and a low double tone instead.
+red **Not added** card with the reason and a low double buzz instead. A barcode
+that arrives in the search box — typed, or from a scanner too slow to be told
+from typing — gets the same beep and card.
 
 | | |
 |---|---|
 | Which scanners | Any USB or Bluetooth scanner in **keyboard (HID) mode**, which is how almost all of them come out of the box. No driver and no app |
 | Which codes | Every kind on a pack or a shelf label. Linear: EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39, Code 93, Codabar, ITF (ITF-14) and GS1 DataBar. 2D: DataMatrix, QR, PDF417 and Aztec (a 2D scanner, or the camera) |
 | Setting it up | Plug it in (or pair it over Bluetooth) and scan. An **Enter** at the end of each scan is the factory setting and the fastest; Tab, or nothing at all, works too |
-| How the till tells it from a person | A scanner types a whole code at a few milliseconds a key; a person cannot keep up 40 ms a key. A burst that fast is taken as a scan and kept out of whichever box has the cursor; normal typing is left alone. Slower Bluetooth scanners, which stutter, still count |
+| How the till tells it from a person | A scanner types a whole code at a few milliseconds a key; a person cannot keep up 40 ms a key. A burst that fast is taken as a scan and kept out of whichever box has the cursor; normal typing is left alone. Slower Bluetooth scanners, which stutter, still count, and so does a scanner typing on the number pad with Num Lock off |
 | The pack's 2D code | The GS1 DataMatrix on medicine packs (product, expiry, batch, serial) finds the medicine by its product number — with the GS separators most scanners send as Ctrl+] — and so does a GS1 Digital Link in a QR code (`https://…/01/<product number>/…`). A lost leading zero does not matter |
-| Camera | The camera button beside the search box scans with a phone's or laptop's camera — the back camera, with the light, on phones. The browser asks for permission once. The live camera needs **https** (Vercel and Railway give it; `localhost` counts too) |
-| Scan a photo | In the camera window, **Scan a photo** reads the code from a picture — on a phone it opens the camera app. It works on any address, even where the live camera is not allowed |
+| Camera | The camera button beside the search box scans with a phone's or laptop's camera: the back camera in full HD, with continuous focus, **tap to focus**, **zoom** and the light where the phone has them. It beeps the moment it reads a code. The browser asks for permission once. The live camera needs **https** (Vercel and Railway give it; `localhost` counts too) |
+| How the camera reads hard packs | Two readers at once: the browser's own (on Android and macOS) and ZXing in a background worker, which looks at each frame a different way in turn — the whole frame; the scan area at full resolution; the middle enlarged twice over (a tiny barcode on a strip or a dropper bottle); turned a quarter turn (a barcode printed upright on a narrow box); sharpened (faded or slightly blurred print); a second binariser; and inverted (light bars on dark foil). Codes with a check digit or error correction are taken at the first read; Code 39, Code 93, Codabar and short ITF must read the same twice, so a smudge never adds the wrong medicine |
+| Scan a photo | In the camera window, **Scan a photo** reads the code from a picture, every one of those ways — on a phone it opens the camera app. It works on any address, even where the live camera is not allowed |
 | A barcode the pharmacy does not stock | The till shows what KSF knows about the pack and offers **Add with these details**; or say which medicine it is, and the barcode is saved on it (with `medicines.write`) so the next scan finds it |
 | The scanner button | **Scanner ready** on the till: the last code read and what happened to it, the camera, the sound on or off, and these steps for whoever is at the counter |
 
-While the payment window is open, scans are held back (with a low tone), so a
+While the payment window is open, scans are held back (with a low buzz), so a
 pack scanned by mistake never changes a sale that is being paid.
 
 ### A new medicine, filled in from its barcode
 
 On **Medicines › Add medicine**, scan the pack (scanner or camera), or type the
-barcode and press Enter. The form fills in what KSF knows; the fields it
+barcode and press Enter. It beeps, a card says what was found ("Details filled
+in", "New barcode", "Already in your catalogue"), and the form fills in what
+KSF knows; the fields it
 filled are tinted green until someone changes them, and nothing anybody typed
 is ever overwritten. Only the prices and stock levels are left to type. The
 answer comes from the first of these that knows the barcode:
@@ -746,7 +752,7 @@ npm test
 
 | Suite | What it proves |
 |---|---|
-| `tests/unit.test.mjs` | Import parsing, money and dates, payment rules and signatures (Stripe's included), passwords, authenticator codes, stock rules, roles and themes, the live feed's audiences, the calculator, telling a barcode scanner from a person typing, that every screen is guarded, and that this README lists every route. Needs no database |
+| `tests/unit.test.mjs` | Import parsing, money and dates, payment rules and signatures (Stripe's included), passwords, authenticator codes, stock rules, roles and themes, the live feed's audiences, the calculator, telling a barcode scanner from a person typing, believing a camera read (check digits, a second read for codes without one), that every screen is guarded, and that this README lists every route. Needs no database |
 | `tests/api.test.mjs` | The whole platform over HTTP: sign-up, stock, the till, refunds, day close, reports, staff, messaging, themes, support tickets, the platform console, support mode, data import, tenant isolation, suspension, and the Super Admin changing their own e-mail and password |
 | `tests/accounting.test.mjs` | The accounts to the paisa: profit and loss, cash flow, other income, salaries, supplier payments, the ledger and the downloads |
 | `tests/live.test.mjs` | A price change reaching a visitor's open page, a subscription change reaching its own pharmacy and no other, replay after a reconnect, and a feature locking and unlocking on the server the moment the plan changes |
@@ -797,7 +803,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.4.0 · Server 2.4.0 — up to date", or
+System) compares the two: "Website 2.5.0 · Server 2.5.0 — up to date", or
 which one still has to redeploy from `main` (Railway › the service ›
 Deployments, or Vercel › Deployments).
 

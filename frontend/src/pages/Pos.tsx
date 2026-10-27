@@ -148,12 +148,16 @@ export default function Pos() {
   const scan = useCallback(async (code: string, source: ScanSource = 'typed') => {
     const trimmed = code.trim();
     if (!trimmed) return;
-    /* A scan answers with a sound and the button; typing does not need to. */
+    /* A scan answers with a sound, the card and the button; so does a barcode
+       that arrived in the search box (typed, or from a scanner too slow to be
+       told from typing). A word typed into the search does not need to. */
+    const scanned = source !== 'typed' || looksLikeBarcode(trimmed);
     const record = (outcome: LastScan['outcome'], name?: string) => {
       setLastScan({ code: trimmed, at: new Date().toISOString(), outcome, name });
-      if (source === 'typed') return;
+      if (!scanned) return;
       const good = outcome === 'added';
-      beep(good ? 'ok' : 'error');
+      /* The camera beeped the moment it read the code. */
+      if (!(good && source === 'camera')) beep(good ? 'ok' : 'error');
       setFlash(good ? 'ok' : 'error');
       window.clearTimeout(flashTimer.current);
       flashTimer.current = window.setTimeout(() => setFlash(null), 1600);
@@ -164,16 +168,16 @@ export default function Pos() {
       const matches = found.data ?? [];
       if (matches.length === 1) {
         const [medicine] = matches;
-        const refusal = add(medicine, source !== 'typed');
+        const refusal = add(medicine, scanned);
         record(refusal ? 'refused' : 'added', medicine.name);
-        if (source !== 'typed') announceAdded(medicine, refusal);
+        if (scanned) announceAdded(medicine, refusal);
         return;
       }
       if (matches.length > 1) {
         /* Two products sharing a code. Show them and let the person choose —
            picking one by sort order is how the wrong medicine gets sold. */
         record('several');
-        if (source === 'typed') fail(new Error(`More than one medicine carries the code ${trimmed}. Pick the right one from the list and fix the duplicate in Medicines.`));
+        if (!scanned) fail(new Error(`More than one medicine carries the code ${trimmed}. Pick the right one from the list and fix the duplicate in Medicines.`));
         else announce('error', `${matches.length} medicines share this barcode`, 'Pick the right one from the list, then fix the duplicate in Medicines');
         setTerm(found.barcode ?? trimmed);
         return;
@@ -193,7 +197,7 @@ export default function Pos() {
           : `"${trimmed}" is not a barcode in the catalogue. Tap the right medicine from the ${medicines.length} matches.`
       ));
     } catch (problem) {
-      if (source !== 'typed') beep('error');
+      if (scanned) beep('error');
       fail(problem);
     } finally {
       setScanning(false);

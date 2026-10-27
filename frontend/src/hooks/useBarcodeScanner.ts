@@ -51,7 +51,10 @@ export function useBarcodeScanner(onScan: (code: string) => void, enabled = true
       if (event.isComposing) return;
       /* The GS separator of a GS1 DataMatrix: Ctrl+] from most scanners. */
       const separator = event.key === GS || (event.ctrlKey && (event.key === ']' || event.code === 'BracketRight'));
-      const key = separator ? GS : event.key;
+      /* A scanner that types on the number pad with Num Lock off sends
+         "End", "ArrowDown"…; the key's place still says which digit it is. */
+      const pad = /^Numpad(\d)$/.exec(event.code);
+      const key = separator ? GS : pad && event.key.length > 1 ? pad[1] : event.code === 'NumpadDecimal' && event.key.length > 1 ? '.' : event.key;
       const wasScan = detector.confirmed;
       const step = detector.key(key, performance.now(), (!separator && (event.ctrlKey || event.altKey || event.metaKey)) || event.repeat);
       if (step.kind === 'passive') return;

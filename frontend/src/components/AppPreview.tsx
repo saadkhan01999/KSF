@@ -10,13 +10,15 @@
    useless. The surrounding prose carries the meaning.
    ========================================================================== */
 
+import { KsfMark } from './Brand';
+
 const BARS = [38, 46, 41, 55, 62, 58, 71, 84, 77, 88, 94, 100];
 
 export function DashboardPreview() {
   return (
     <div className="preview preview-dashboard" aria-hidden="true">
       <div className="preview-rail">
-        <div className="preview-logo">KSF</div>
+        <div className="preview-logo"><KsfMark height={20} title="" /></div>
         {['Dashboard', 'New sale', 'Medicines', 'Inventory', 'Expiry', 'Reports'].map((label, index) => (
           <div key={label} className={`preview-rail-item ${index === 0 ? 'is-active' : ''}`}>{label}</div>
         ))}

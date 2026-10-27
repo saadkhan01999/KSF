@@ -1,134 +1,77 @@
 /* ==========================================================================
    The KSF identity.
    --------------------------------------------------------------------------
-   The letterforms here are not a typeface and not a redraw. They are the
-   outlined vector paths taken from the approved print artwork
-   (KSF-print-artwork.pdf), so the wordmark on a screen is the same shape as
-   the wordmark on a printed sheet — same geometry, same emerald, same
-   proportions. Nothing about the mark depends on a font being installed.
+   The pharmacy's own artwork: the interlocking K, S and F, and "KSF
+   Pharmacy" set beneath it, with the line "Dispensing care. Inspiring
+   trust." The shapes are the artwork's own outlines, traced to vectors, so
+   they are sharp at any size and have no background — the page shows through
+   the counters of the S, as on the printed logo.
 
    The set:
 
-     KsfWordmark   the three letters, 368 x 102, on their own
-     BrandMark     the icon: the geometric K in a rounded tile, with a
-                   capsule lying in the crook above the K's arm
-     BrandLogo     mark + wordmark + strapline, horizontal or stacked
+     KsfMark       the interlocking letters, at their own proportions
+     BrandMark     the same mark centred in a square: favicon, collapsed
+                   sidebar, loading screen
+     KsfWordmark   "KSF Pharmacy"
+     BrandLogo     mark + wordmark (+ strapline), side by side or stacked
 
-   The capsule is the only addition to the artwork. It is there because a
-   pharmacy needs to be recognisable as a pharmacy at 16 pixels, where three
-   letters are unreadable, and it is small and gold on purpose: the brief
-   asked for restrained gold, not a second focal point.
-
-   Gradient and clip identifiers come from useId(), because a page can show
-   two marks at once — the sidebar and a dialog — and duplicate SVG ids
-   silently make the second one pick the wrong fill.
+   The colour is the artwork's deep green (#14442E). On a dark screen that
+   green would disappear, so in dark mode the same shapes are drawn in a pale
+   green (--logo-ink); on a photograph or a dark panel they are white.
    ========================================================================== */
 
-import { useId } from 'react';
 import { BRAND } from '../brand';
 
 type Tone = 'auto' | 'invert' | 'mono';
 
-/* The approved outlines. y increases downward, as in SVG. */
-const K_PATH = 'M0 0 L28 0 L28 38 L66 0 L106 0 L58 49 L108 102 L69 102 L28 59 L28 102 L0 102 Z';
-const S_PATH = 'M246 0 L164 0 C138 0 124 12 124 31 C124 48 137 57 161 61 L202 67 C208 68 212 70 212 74 C212 78 208 80 201 80 L140 80 L122 102 L204 102 C232 102 246 91 246 71 C246 53 234 43 211 39 L170 33 C163 32 159 30 159 27 C159 23 163 22 170 22 L229 22 Z';
-const F_PATH = 'M260 0 L368 0 L349 24 L290 24 L290 39 L337 39 L319 63 L290 63 L290 102 L260 102 Z';
+/* The traced outlines. y increases downward, as in SVG. */
+const MARK = { width: 959, height: 632, d: 'M17.5 631.1C10.3 629.3 4.2 624.1 1.3 617.3C0.2 614.6 0.0 563.7 0.0 315.3C0.0 26.8 0.1 16.4 1.9 12.4C4.1 7.6 10.1 2.3 15.0 1.0C20.8 -0.6 133.3 -0.3 137.3 1.3C142.3 3.4 146.6 7.6 148.9 12.5L151.0 17.0L151.0 145.5C151.0 216.2 151.3 274.0 151.8 274.0C152.2 273.9 155.6 269.6 159.4 264.2C163.3 258.9 176.2 241.2 188.1 224.9C200.0 208.7 217.0 185.5 225.7 173.4C234.5 161.4 250.3 139.6 261.0 125.0C271.7 110.4 294.3 79.4 311.3 56.0C345.8 8.5 345.9 8.4 354.4 3.8L360.5 0.5L423.0 0.3L485.5 0.1L477.2 2.6C399.5 25.7 349.8 83.8 342.0 160.9C336.0 221.1 357.7 276.4 401.4 311.9C434.1 338.4 469.0 355.4 543.5 380.9C591.4 397.4 610.1 412.9 614.0 439.5C619.2 474.6 596.5 500.8 558.5 503.4C517.9 506.3 486.7 486.6 478.4 453.0C475.4 440.8 469.0 433.8 459.6 432.5C457.4 432.2 431.6 432.0 402.5 432.2C349.9 432.5 349.5 432.5 345.3 434.7C332.8 441.5 330.8 451.7 336.5 480.5C350.4 550.2 398.9 603.8 468.5 626.3C487.4 632.4 491.4 631.9 427.5 631.7L369.5 631.5L363.9 628.9C356.5 625.4 351.4 620.7 344.9 611.2C335.9 598.1 296.9 542.6 273.1 509.0C265.1 497.7 253.4 481.1 247.0 472.0C234.0 453.6 206.5 414.8 195.5 399.5C191.6 394.0 180.1 377.8 169.9 363.6L151.5 337.6L151.0 476.6L150.5 615.7L147.5 620.6C145.6 623.6 142.6 626.6 139.6 628.5L134.7 631.5L77.6 631.7C46.2 631.8 19.1 631.5 17.5 631.1ZM608.1 631.6C608.3 631.4 614.8 629.1 622.5 626.6C666.7 612.1 704.3 583.9 729.2 546.5C742.4 526.6 754.3 496.4 756.6 476.7C757.0 473.5 757.6 470.8 757.9 470.6C758.2 470.4 758.5 502.4 758.5 541.8C758.4 620.9 758.7 617.5 752.2 624.3C745.0 631.9 749.3 631.5 674.6 631.8C637.7 631.9 607.8 631.9 608.1 631.6ZM756.5 415.3C754.2 397.0 743.2 369.0 731.5 351.5C703.3 309.6 664.8 285.0 577.0 252.7C542.8 240.1 523.5 231.5 512.1 223.8C468.2 193.8 480.4 136.6 532.6 127.5C576.1 119.9 609.3 139.9 616.5 178.0C618.1 186.4 624.7 193.7 632.8 196.1C641.7 198.7 669.5 193.7 686.8 186.4C715.1 174.4 740.7 146.5 743.6 124.6C745.3 112.3 734.4 88.9 716.7 66.8C694.8 39.3 661.3 16.6 626.2 5.5C619.8 3.4 613.4 1.4 612.0 1.0C610.6 0.5 684.2 0.1 775.5 0.1C961.5 0.0 945.4 -0.6 952.7 7.1C958.9 13.8 959.1 15.5 958.8 65.5C958.5 115.1 958.6 114.4 951.8 120.7C945.9 126.2 949.6 126.0 850.6 126.0C778.4 126.0 759.1 126.3 758.8 127.3C758.6 127.9 758.5 156.8 758.5 191.5L758.5 254.5L831.0 255.0C870.9 255.3 904.4 255.9 905.5 256.4C909.8 258.3 914.1 262.3 916.3 266.3C919.8 272.9 919.8 363.1 916.3 369.7C915.0 372.0 912.7 374.8 911.0 376.0C904.0 381.0 903.5 381.0 828.3 381.0L757.9 381.0L758.2 401.0C758.5 420.9 757.9 426.2 756.5 415.3Z' };
+const WORD = { width: 789.3, height: 98.3, d: 'M734.3 97.8C733.5 97.6 732.4 97.3 732.0 97.3C731.5 97.3 730.9 97.1 730.7 96.8C730.4 96.6 730.0 96.3 729.7 96.3C729.0 96.3 726.1 94.9 725.4 94.2C725.0 93.8 725.0 93.6 725.4 92.8C725.7 92.3 726.2 91.2 726.6 90.3C728.5 86.2 729.1 84.8 729.4 84.3C729.7 83.8 729.9 83.3 730.2 82.5C730.4 81.8 732.1 82.0 733.0 82.8C735.0 84.6 741.2 85.1 743.9 83.7C747.6 81.8 749.8 77.8 748.5 75.4C747.2 73.0 742.0 61.8 742.0 61.5C742.0 61.4 740.8 58.7 739.5 55.8C739.2 55.3 738.5 53.5 737.8 51.8C737.2 50.2 736.5 48.7 736.3 48.5C736.1 48.3 736.0 47.9 736.0 47.6C736.0 47.1 735.6 46.1 733.6 41.7C733.3 40.8 732.8 39.7 732.5 39.2C732.3 38.6 731.7 37.3 731.3 36.3C730.9 35.3 730.5 34.4 730.3 34.2C730.1 34.0 730.0 33.5 730.0 33.1C730.0 32.7 729.8 32.2 729.5 32.0C729.2 31.8 729.0 31.3 729.0 31.0C729.0 30.7 728.8 30.2 728.5 29.8C728.2 29.5 728.0 29.0 728.0 28.7C728.0 28.4 726.7 25.3 725.5 22.9C724.9 21.7 724.9 21.1 725.4 21.0C725.6 20.9 729.6 20.9 734.1 21.0C741.6 21.2 742.5 21.2 742.7 21.8C742.9 22.1 743.2 22.6 743.3 22.9C743.5 23.2 743.8 23.7 743.9 24.0C744.1 24.7 744.8 26.2 745.4 27.8C745.7 28.4 746.2 29.5 746.5 30.1C746.7 30.7 747.1 31.7 747.4 32.3C747.7 33.0 748.4 34.7 749.0 36.2C749.6 37.6 750.3 39.4 750.6 40.0C750.9 40.6 751.3 41.6 751.5 42.2C751.7 42.7 752.4 44.3 753.0 45.6C753.5 47.0 754.0 48.3 754.0 48.7C754.0 49.0 754.2 49.4 754.5 49.7C754.8 49.9 755.0 50.3 755.0 50.6C755.0 50.8 755.2 51.5 755.5 52.1C756.0 53.4 756.9 55.6 757.2 56.5C757.4 57.1 757.4 57.1 758.2 56.2C758.6 55.6 759.0 55.0 759.0 54.8C759.0 54.6 759.5 53.3 760.0 52.0C760.6 50.6 761.3 49.0 761.5 48.5C761.7 47.9 762.2 46.8 762.6 46.0C763.0 45.1 763.3 44.3 763.3 44.2C763.3 44.0 763.8 43.0 765.5 39.2C765.7 38.6 766.4 37.0 767.0 35.5C767.6 34.0 768.2 32.4 768.5 31.8C769.5 29.5 772.0 23.5 772.0 23.2C772.0 23.1 772.3 22.5 772.7 22.0L773.4 21.0L781.4 21.0L789.4 21.0L789.2 21.9C789.1 22.4 788.8 23.3 788.5 23.8C788.3 24.4 787.8 25.5 787.5 26.3C787.2 27.2 786.7 28.3 786.5 28.8C786.3 29.4 785.5 31.2 784.8 32.8C784.2 34.5 783.5 36.0 783.3 36.1C783.1 36.3 783.0 36.8 783.0 37.1C783.0 37.4 782.8 38.1 782.5 38.6C782.3 39.1 781.6 40.7 781.0 42.2C779.7 45.3 779.4 46.2 778.2 48.7C777.8 49.7 777.1 51.3 776.7 52.3C776.3 53.3 775.7 54.6 775.5 55.2C775.2 55.7 774.3 57.9 773.5 60.0C772.6 62.1 771.7 64.4 771.3 65.2C771.0 66.0 770.7 66.7 770.7 66.8C770.7 66.9 770.3 67.9 769.8 68.9C769.3 70.0 768.7 71.3 768.5 71.8C765.6 78.6 765.3 79.3 763.4 83.2C759.2 91.9 754.9 95.8 747.4 97.7C744.3 98.5 736.7 98.6 734.3 97.8ZM96.2 78.3C93.0 78.1 90.0 77.5 86.2 76.5C82.9 75.6 78.4 73.9 76.2 72.7C75.3 72.1 74.0 71.4 73.4 71.1C72.0 70.4 71.8 69.8 72.4 68.5C72.7 68.0 73.6 66.0 74.5 64.2C78.2 56.4 78.0 56.6 79.6 57.4C86.1 60.9 90.2 62.4 96.7 63.8C100.0 64.6 108.4 64.4 110.5 63.6C114.4 62.1 116.0 60.3 116.0 57.3C116.0 54.9 114.8 53.1 112.4 52.0C111.6 51.6 110.4 51.0 109.9 50.8C109.5 50.5 108.7 50.3 108.2 50.3C107.7 50.3 106.9 50.1 106.3 49.9C105.1 49.4 98.8 47.7 96.5 47.4C95.7 47.2 94.9 47.0 94.7 46.8C94.4 46.7 93.7 46.4 93.0 46.3C89.3 45.5 83.5 42.9 80.6 40.7C74.8 36.4 72.2 29.0 73.8 21.7C74.3 19.3 75.0 17.3 75.5 16.6C75.7 16.4 76.1 15.6 76.5 14.9C78.6 10.7 84.4 6.5 90.3 4.9C91.3 4.6 93.1 4.1 94.3 3.8C97.4 2.9 113.0 2.9 115.3 3.8C116.1 4.1 117.2 4.3 117.8 4.3C118.6 4.3 124.8 6.2 126.3 7.0C131.4 9.4 131.4 9.5 130.5 10.7C130.2 11.1 130.0 11.7 130.0 12.0C130.0 12.4 129.8 13.0 129.5 13.6C129.3 14.1 128.8 15.1 128.5 15.9C127.3 19.3 126.9 20.2 126.5 21.1C126.2 21.5 126.0 22.2 126.0 22.5C126.0 23.2 125.4 23.1 124.2 22.3C123.6 22.0 122.9 21.6 122.7 21.5C122.4 21.3 121.6 21.0 120.8 20.7C120.1 20.3 118.9 19.9 118.2 19.7C117.4 19.4 116.3 19.0 115.7 18.8C115.1 18.5 114.3 18.3 113.8 18.3C113.3 18.3 112.1 18.1 111.2 17.8C108.9 17.2 99.8 17.3 98.0 18.0C95.2 19.0 93.8 20.0 92.8 21.5C90.4 24.9 91.9 29.2 96.1 30.7C96.8 31.0 98.0 31.4 98.7 31.6C99.3 31.9 100.4 32.2 101.2 32.3C101.9 32.5 103.1 32.8 103.8 33.0C104.6 33.2 107.6 33.9 110.5 34.7C113.4 35.4 116.3 36.2 116.8 36.3C123.6 38.4 129.6 42.3 131.7 46.2C132.0 46.9 132.5 47.7 132.6 48.0C134.1 50.6 134.5 58.2 133.4 61.7C131.8 66.8 127.9 71.6 123.4 73.8C122.7 74.2 122.0 74.6 121.7 74.8C121.3 75.1 120.5 75.4 117.5 76.5C112.6 78.2 103.9 78.9 96.2 78.3ZM398.8 77.7C391.9 75.9 387.4 72.4 385.5 67.5C384.5 65.0 384.6 57.3 385.5 54.5C386.3 52.3 389.2 49.0 391.5 47.8C392.2 47.5 393.0 47.0 393.3 46.8C394.4 46.0 398.9 44.7 402.2 44.3C403.4 44.1 408.3 43.8 413.0 43.7C422.7 43.5 422.2 43.7 421.2 40.4C419.8 36.2 415.4 33.7 408.9 33.7C406.0 33.7 400.5 34.8 398.3 35.9C395.2 37.4 393.6 38.0 393.1 37.9C392.6 37.8 388.0 29.3 388.0 28.6C388.0 28.4 387.8 27.9 387.4 27.6C386.9 27.0 386.9 26.9 387.7 26.2C388.1 25.7 388.7 25.3 388.9 25.3C389.2 25.3 389.7 25.1 390.0 24.9C390.3 24.7 391.2 24.2 392.0 23.9C392.8 23.5 394.0 23.1 394.6 22.8C395.2 22.5 396.0 22.3 396.4 22.3C396.8 22.3 397.5 22.1 397.8 21.8C398.2 21.6 398.9 21.3 399.5 21.3C400.1 21.3 401.4 21.1 402.4 20.8C405.1 19.9 416.8 19.9 420.5 20.8C422.0 21.1 423.6 21.6 424.1 21.9C424.6 22.1 425.3 22.3 425.5 22.3C426.8 22.3 431.6 25.5 433.6 27.6C434.7 28.8 437.0 32.3 437.0 32.8C437.0 33.0 437.2 33.5 437.5 34.1C438.9 37.3 439.0 40.0 438.9 59.2L438.8 77.5L431.8 77.6C422.8 77.7 423.3 77.9 423.3 75.0C423.3 73.7 423.2 72.6 423.0 72.5C422.8 72.4 422.1 72.8 421.4 73.4C419.8 74.8 415.9 76.7 412.6 77.6C409.3 78.6 402.3 78.6 398.8 77.7ZM615.7 77.6C608.9 75.8 604.2 71.5 602.8 65.7C601.9 61.9 602.3 57.1 603.8 53.6C604.5 52.0 607.6 48.6 609.2 47.8C609.9 47.5 610.7 47.0 611.0 46.8C611.9 46.2 616.2 44.9 619.3 44.3C620.3 44.1 625.1 43.8 630.0 43.7L638.8 43.5L638.9 42.4C639.2 39.8 637.0 36.3 634.4 35.1C629.5 33.0 622.5 33.3 616.3 35.9C614.5 36.7 614.2 36.8 612.7 37.7C611.7 38.2 611.2 38.4 610.8 38.2C610.3 37.9 608.6 35.1 608.1 34.0C608.0 33.7 607.8 33.3 607.6 33.0C607.5 32.7 607.2 32.1 607.0 31.7C606.8 31.2 606.3 30.1 605.8 29.2C605.4 28.3 605.0 27.4 605.0 27.2C605.0 26.5 606.7 25.2 608.3 24.5C609.5 24.0 613.6 22.4 614.7 22.0C615.3 21.8 616.5 21.5 617.4 21.3C618.2 21.2 619.5 20.9 620.4 20.6C622.9 19.9 634.6 20.0 637.8 20.8C647.5 23.0 652.7 27.5 655.4 35.8C656.4 38.9 656.7 43.4 656.7 60.2C656.7 76.6 656.7 77.0 656.0 77.3C655.6 77.6 652.8 77.6 648.3 77.6L641.2 77.5L641.1 74.6C641.0 72.8 640.8 71.7 640.6 71.7C640.4 71.7 639.4 72.4 638.4 73.3C636.1 75.5 634.2 76.5 630.5 77.7C627.6 78.6 619.2 78.6 615.7 77.6ZM689.3 77.5C687.6 77.0 685.6 76.4 684.8 76.0C684.1 75.6 683.2 75.3 682.9 75.3C682.6 75.3 682.3 75.2 682.2 75.0C682.1 74.9 681.0 74.1 679.8 73.4C674.9 70.5 671.6 66.5 668.5 59.5C666.5 55.1 666.5 44.2 668.5 39.5C672.8 29.2 679.2 23.6 689.2 21.1C695.8 19.5 705.8 19.9 710.7 21.9C716.6 24.4 720.5 27.6 723.3 32.1C724.5 34.1 724.5 34.8 723.3 35.3C722.8 35.5 721.6 36.2 720.5 36.8C715.8 39.4 712.0 41.3 711.6 41.3C711.4 41.3 710.1 40.2 708.9 38.8C707.6 37.5 706.4 36.3 706.2 36.3C706.0 36.3 705.6 36.2 705.4 36.0C703.9 34.4 697.1 33.8 693.8 34.9C686.8 37.3 682.9 45.3 684.9 53.6C685.9 58.1 688.5 61.4 692.6 63.2C694.8 64.2 695.3 64.3 698.3 64.3C703.5 64.3 707.2 62.6 710.2 58.7C710.9 57.8 711.6 57.0 711.8 57.0C712.3 57.0 719.2 60.3 723.0 62.4C724.8 63.4 724.9 63.7 723.9 65.4C719.9 71.9 714.7 75.7 706.9 77.7C702.8 78.7 693.7 78.6 689.3 77.5ZM0.3 77.4C-0.2 77.2 -0.1 4.4 0.4 4.3C0.6 4.2 4.6 4.2 9.2 4.3L17.7 4.4L17.7 20.2C17.7 30.8 17.8 36.0 18.0 36.2C18.2 36.3 19.3 35.4 20.4 34.1C21.6 32.9 24.4 29.8 26.8 27.3C34.4 19.5 37.7 16.0 41.7 11.5C43.8 9.1 46.3 6.5 47.1 5.7L48.6 4.3L58.4 4.3C65.3 4.3 68.2 4.4 68.3 4.6C68.4 5.0 67.3 6.4 63.5 10.3C62.4 11.5 59.7 14.4 57.6 16.7C54.1 20.7 50.9 24.1 42.9 32.8C41.0 34.8 39.5 36.5 39.4 36.7C39.3 36.9 39.9 37.7 40.6 38.6C42.7 41.2 46.8 46.3 48.7 48.9C50.6 51.4 58.3 61.2 62.8 66.8C64.2 68.7 65.9 70.8 66.5 71.7C67.2 72.5 68.3 74.0 69.0 74.9C71.2 77.7 71.5 77.7 60.4 77.7C55.1 77.7 50.3 77.5 49.9 77.4C49.4 77.2 48.1 75.8 47.0 74.3C45.8 72.7 44.7 71.4 44.6 71.3C44.4 71.2 44.0 70.7 43.7 70.3C43.0 69.2 38.9 63.9 35.3 59.5C33.9 57.7 31.5 54.6 30.1 52.8C28.7 50.9 27.3 49.4 27.1 49.3C26.6 49.3 18.8 57.3 18.1 58.5C17.8 59.0 17.7 61.8 17.7 68.2C17.7 76.7 17.6 77.3 17.1 77.3C16.8 77.3 12.9 77.4 8.6 77.4C4.2 77.5 0.5 77.4 0.3 77.4ZM145.5 77.3C145.2 76.8 145.1 5.1 145.4 4.6C145.5 4.4 154.0 4.3 172.9 4.3C187.9 4.3 200.4 4.3 200.6 4.3C200.9 4.3 201.0 6.0 201.0 11.3L201.0 18.3L182.1 18.4L163.2 18.5L163.2 27.5L163.2 36.5L179.7 36.7L196.2 36.8L196.2 44.0L196.2 51.2L179.7 51.3L163.2 51.5L163.1 64.3C163.0 72.6 162.9 77.2 162.7 77.3C161.9 77.8 145.7 77.7 145.5 77.3ZM241.2 77.2C241.1 77.0 241.0 60.5 241.1 40.5L241.2 4.2L260.7 4.2L280.2 4.2L283.6 5.1C285.5 5.6 287.7 6.3 288.6 6.7C289.4 7.0 290.2 7.3 290.4 7.3C291.0 7.3 296.3 10.7 297.9 12.2C301.5 15.4 304.4 20.6 305.0 25.0C305.6 29.1 305.2 36.5 304.3 39.0C300.8 48.6 292.9 54.6 281.5 56.4C280.2 56.6 274.7 56.9 269.2 57.0L259.2 57.2L259.1 67.0C259.0 73.5 258.9 76.9 258.6 77.2C258.1 77.8 241.4 77.9 241.2 77.2ZM316.2 77.5C315.8 77.0 316.0 0.8 316.4 0.4C316.9 -0.0 331.9 -0.1 332.6 0.3C332.9 0.5 333.0 3.5 333.1 13.0C333.2 26.0 333.2 26.4 334.6 25.1C335.3 24.5 335.7 24.2 337.8 23.1C342.4 20.8 345.2 20.2 351.2 20.2C356.4 20.2 359.5 20.9 362.7 22.7C362.9 22.8 363.8 23.3 364.6 23.7C366.5 24.7 370.3 28.8 371.3 30.9C374.3 37.0 374.1 35.9 374.3 57.8C374.4 73.6 374.3 77.1 373.9 77.4C373.3 77.8 357.8 77.7 357.5 77.4C357.4 77.2 357.3 69.6 357.2 60.5C357.1 41.7 357.0 41.0 354.7 38.3C352.3 35.5 351.4 35.2 346.3 35.2C341.9 35.2 341.8 35.2 339.7 36.3C337.5 37.5 335.6 39.4 334.8 41.3C333.2 44.9 333.2 45.1 333.0 61.7L332.8 77.5L324.6 77.6C320.1 77.6 316.4 77.6 316.2 77.5ZM452.7 77.3C452.4 77.0 452.3 70.3 452.3 49.1C452.3 22.5 452.4 21.3 452.9 21.0C453.3 20.8 456.7 20.7 461.2 20.8L468.8 20.8L468.9 23.9C469.0 25.6 469.2 27.0 469.3 27.0C469.5 27.0 470.3 26.3 471.1 25.5C474.3 22.5 479.9 20.5 485.3 20.5L488.2 20.5L488.3 28.0C488.3 32.1 488.2 35.6 488.1 35.7C487.9 35.9 485.9 36.1 483.5 36.2C478.6 36.4 476.3 37.2 473.8 39.6C470.3 43.0 470.0 44.8 469.8 62.6C469.7 73.5 469.5 77.2 469.2 77.4C468.5 77.8 453.2 77.7 452.7 77.3ZM497.2 77.4C496.8 77.0 497.0 21.4 497.4 21.1C497.9 20.8 512.8 20.9 513.3 21.2C513.5 21.3 513.7 22.4 513.7 23.7C513.7 26.2 514.0 26.6 515.2 25.4C515.8 24.6 519.5 22.3 520.1 22.3C520.2 22.3 520.8 22.1 521.3 21.9C525.9 19.4 536.7 19.7 541.8 22.5C543.8 23.5 546.7 25.8 547.8 27.0C549.1 28.5 549.2 28.5 551.5 26.4C554.3 23.8 558.2 21.9 562.5 20.8C567.0 19.8 576.3 20.3 578.7 21.7C578.9 21.9 579.4 22.1 579.7 22.2C581.5 22.9 583.4 24.1 585.3 25.8C587.5 27.9 590.0 31.3 590.0 32.3C590.0 32.6 590.1 33.0 590.3 33.2C592.0 34.9 592.7 45.0 592.6 65.6C592.5 75.2 592.4 77.1 592.0 77.4C591.7 77.5 588.0 77.7 583.8 77.7C577.3 77.7 576.0 77.6 575.7 77.2C575.3 76.8 575.3 74.4 575.4 66.5C575.6 53.8 575.3 43.5 574.5 41.2C573.9 39.4 572.0 36.7 571.0 36.4C570.7 36.3 570.2 36.0 569.9 35.7C569.4 35.3 568.5 35.2 565.2 35.2C560.5 35.2 559.3 35.6 556.9 38.4C553.9 41.6 553.7 43.3 553.7 62.2C553.7 73.1 553.6 77.0 553.3 77.3C552.8 77.7 537.5 77.8 536.8 77.4C536.5 77.2 536.4 72.5 536.3 60.0C536.1 44.4 536.1 42.7 535.5 41.2C534.5 38.4 533.4 37.0 531.3 35.9C529.5 34.8 522.7 34.9 520.8 35.9C518.7 37.1 517.1 38.9 515.9 41.3L514.9 43.5L514.6 60.3C514.3 72.3 514.1 77.2 513.9 77.4C513.4 77.7 497.5 77.7 497.2 77.4ZM630.3 66.5C631.6 66.3 632.9 65.9 633.1 65.7C633.3 65.5 633.7 65.3 634.0 65.3C634.7 65.3 637.8 62.2 638.5 60.9C639.2 59.3 639.6 54.6 639.0 54.1C638.6 53.9 636.2 53.9 631.2 54.0C622.9 54.3 622.0 54.5 620.0 56.9C618.4 58.9 618.7 62.3 620.7 64.7C621.5 65.5 622.7 66.1 624.7 66.5C627.1 67.1 627.4 67.1 630.3 66.5ZM413.2 66.3C416.9 65.5 419.5 63.7 421.0 60.9C421.9 59.2 422.0 58.8 421.9 56.6L421.8 54.2L414.3 54.2C406.2 54.3 404.8 54.5 402.8 56.4C400.4 58.6 401.4 64.0 404.4 65.6C406.6 66.7 410.2 67.0 413.2 66.3ZM278.4 41.8C279.5 41.5 281.0 41.0 281.8 40.6C283.3 39.8 286.0 37.2 286.0 36.4C286.0 36.1 286.2 35.5 286.5 35.2C287.3 34.2 287.2 26.6 286.4 25.2C283.4 19.8 278.8 18.2 266.2 18.4L259.2 18.5L259.1 30.0C259.0 36.3 259.1 41.7 259.2 41.9C259.4 42.6 275.8 42.5 278.4 41.8Z' };
 
-/** The same K, scaled and positioned for a 64 x 64 icon. */
-const K_ICON_PATH = 'M6.59 8 L19.766 8 L19.766 25.882 L37.649 8 L56.472 8 L33.884 31.059 L57.414 56 L39.061 56 L19.766 35.765 L19.766 56 L6.59 56 L6.59 8 Z';
+/** What the shapes are filled with, for each tone. */
+const inkOf = (tone: Tone, colour?: string): string =>
+  colour ?? (tone === 'auto' ? 'var(--logo-ink)' : tone === 'invert' ? 'var(--on-dark)' : 'currentColor');
 
-/**
- * The wordmark alone. Inherits `currentColor` unless a colour is given, so it
- * can be dropped into a dark panel, a receipt or an e-mail without edits.
- */
-export function KsfWordmark({
-  height = 24,
-  colour,
-  className = '',
-  title = BRAND.name
-}: {
-  height?: number;
-  colour?: string;
-  className?: string;
-  title?: string;
-}) {
+/** The interlocking K, S and F, `height` pixels tall. */
+export function KsfMark({
+  height = 32, tone = 'auto', colour, className = '', title = BRAND.name
+}: { height?: number; tone?: Tone; colour?: string; className?: string; title?: string }) {
   return (
     <svg
-      height={height}
-      viewBox="0 0 368 102"
-      className={className}
-      role="img"
-      aria-label={title}
-      style={{ display: 'block' }}
+      height={height} width={(height * MARK.width) / MARK.height} viewBox={`0 0 ${MARK.width} ${MARK.height}`}
+      className={className} role="img" aria-label={title} style={{ display: 'block', flex: '0 0 auto' }}
     >
-      <path d={`${K_PATH} ${S_PATH} ${F_PATH}`} fill={colour ?? 'currentColor'} fillRule="evenodd" />
+      <path d={MARK.d} fill={inkOf(tone, colour)} />
     </svg>
   );
 }
 
-/** The icon: the tile, the K, and the capsule. Favicon, collapsed sidebar,
-    loading screen, avatar. */
-export function BrandMark({
-  size = 40,
-  tone = 'auto',
-  className = '',
-  title = BRAND.name
-}: {
-  size?: number;
-  tone?: Tone;
-  className?: string;
-  title?: string;
-}) {
-  const uid = useId().replace(/:/g, '');
-  const tile = `tile-${uid}`;
-
-  /* One colour, no gradient: a monochrome print, a stamp, a fax, or an
-     e-mail client that strips backgrounds. */
-  if (tone === 'mono') {
-    return (
-      <svg
-        width={size} height={size} viewBox="0 0 64 64" className={className}
-        role="img" aria-label={title} style={{ flex: `0 0 ${size}px` }}
-      >
-        <rect width="64" height="64" rx="14" fill="none" stroke="currentColor" strokeWidth="3" />
-        <path d={K_ICON_PATH} fill="currentColor" transform="translate(-2 0) scale(0.94) translate(4 2)" />
-      </svg>
-    );
-  }
-
+/** "KSF Pharmacy", `height` pixels tall (from the top of the capitals to the foot of the y). */
+export function KsfWordmark({
+  height = 16, tone = 'auto', colour, className = '', title = `${BRAND.name} Pharmacy`
+}: { height?: number; tone?: Tone; colour?: string; className?: string; title?: string }) {
   return (
     <svg
-      width={size} height={size} viewBox="0 0 64 64" className={className}
-      role="img" aria-label={title} style={{ flex: `0 0 ${size}px` }}
+      height={height} width={(height * WORD.width) / WORD.height} viewBox={`0 0 ${WORD.width} ${WORD.height}`}
+      className={className} role="img" aria-label={title} style={{ display: 'block' }}
     >
-      <defs>
-        <linearGradient id={tile} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#12996A" />
-          <stop offset=".55" stopColor="#0E7A50" />
-          <stop offset="1" stopColor="#172A24" />
-        </linearGradient>
-      </defs>
+      <path d={WORD.d} fill={inkOf(tone, colour)} />
+    </svg>
+  );
+}
 
-      <rect width="64" height="64" rx="14" fill={`url(#${tile})`} />
-      {/* In dark mode the tile's deep corner meets a dark sidebar: a hairline
-          edge (transparent in light mode) keeps its outline. */}
-      <rect x=".5" y=".5" width="63" height="63" rx="13.5" fill="none" stroke="var(--brand-mark-edge, transparent)" />
-      {/* A sheen across the top-left corner. Without it the tile reads flat at
-          the sizes where a logo is actually judged. */}
-      <path d="M14 0h30C29 6 14 19 8 38 3 34 0 28 0 22V14C0 6.3 6.3 0 14 0Z" fill="#FFFFFF" opacity=".10" />
-
-      {/* The K, from the print artwork. */}
-      <path d={K_ICON_PATH} fill="#FFFFFF" transform="translate(-4 2) scale(0.93)" />
-
-      {/* The capsule, lying in the crook above the K's arm and on the same
-          45° as the letter's diagonals. It is small and gold on purpose: the
-          brief asked for restrained gold, not a second focal point. At 16px
-          it reduces to a faint gold tick, which is the intent — the K has to
-          carry the mark at that size, and it does. */}
-      <g transform="rotate(-45 49 14)">
-        <rect x="41.5" y="10.5" width="15" height="7" rx="3.5" fill="#E7B84A" />
-        <rect x="48.4" y="10.5" width="1.4" height="7" fill="#172A24" opacity=".3" />
-      </g>
+/** The mark in a `size` x `size` square, centred, with a little air: for
+    the places that expect a square icon. */
+export function BrandMark({
+  size = 40, tone = 'auto', className = '', title = BRAND.name
+}: { size?: number; tone?: Tone; className?: string; title?: string }) {
+  const side = MARK.width * 1.06;
+  return (
+    <svg
+      width={size} height={size} viewBox={`${(MARK.width - side) / 2} ${(MARK.height - side) / 2} ${side} ${side}`}
+      className={className} role="img" aria-label={title} style={{ flex: `0 0 ${size}px` }}
+    >
+      <path d={MARK.d} fill={inkOf(tone)} />
     </svg>
   );
 }
@@ -136,18 +79,21 @@ export function BrandMark({
 /**
  * Mark plus wordmark.
  *
+ * `size` is the height of the lock-up's mark.
  * `tone`
- *   auto    themed text — the ordinary case, correct in light and dark
+ *   auto    the artwork's green (pale green in dark mode)
  *   invert  white, for a dark panel or a photograph
- *   mono    one colour throughout, inheriting currentColor
+ *   mono    one colour throughout, inheriting currentColor (print)
  *
- * `stacked` puts the wordmark under the mark, for a square space.
+ * `stacked` puts the wordmark and strapline under the mark, as on the
+ * artwork; side by side, the strapline is off unless asked for, because at
+ * sidebar size it would be too small to read.
  */
 export function BrandLogo({
-  size = 38,
+  size = 36,
   tone = 'auto',
   strapline = BRAND.strapline,
-  showStrapline = true,
+  showStrapline = false,
   stacked = false,
   className = ''
 }: {
@@ -158,31 +104,29 @@ export function BrandLogo({
   stacked?: boolean;
   className?: string;
 }) {
-  /* Tokens, not literals: "white on a dark panel" has a value in both themes,
-     so the wordmark cannot be the one thing left bright when the rest of the
-     screen goes dark. */
-  const wordColour = tone === 'auto' ? 'var(--text)' : tone === 'mono' ? 'currentColor' : 'var(--on-dark)';
-  const subColour = tone === 'auto' ? 'var(--text-dim)' : tone === 'mono' ? 'currentColor' : 'var(--on-dark-dim)';
-
+  const ink = inkOf(tone);
+  const wordHeight = stacked ? size * 0.3 : size * 0.4;
   return (
     <span
       className={`brand-logo ${stacked ? 'is-stacked' : ''} ${className}`}
-      style={{ gap: stacked ? size * 0.26 : size * 0.3 }}
+      style={{ gap: stacked ? size * 0.2 : size * 0.28 }}
+      role="img"
+      aria-label={`${BRAND.name} Pharmacy`}
     >
-      <BrandMark size={size} tone={tone} />
-      <span className="brand-words" style={stacked ? { textAlign: 'center' } : undefined}>
-        <KsfWordmark height={size * 0.42} colour={wordColour} className="brand-name" />
+      <KsfMark height={stacked ? size : size * 0.82} tone={tone} title="" />
+      <span className="brand-words" aria-hidden="true">
+        <KsfWordmark height={wordHeight} tone={tone} className="brand-name" title="" />
         {showStrapline && (
           <span
             className="brand-strapline"
             style={{
-              marginTop: size * 0.14,
-              fontSize: Math.max(8, size * 0.19),
-              color: subColour,
-              opacity: tone === 'mono' ? 0.66 : 1
+              marginTop: wordHeight * 0.42,
+              fontSize: Math.max(8, size * (stacked ? 0.16 : 0.2)),
+              color: ink,
+              opacity: tone === 'mono' ? 0.7 : 0.9
             }}
           >
-            {strapline}
+            {stacked ? `• ${strapline} •` : strapline}
           </span>
         )}
       </span>

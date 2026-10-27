@@ -22,6 +22,8 @@ import {
 } from '../components/ui';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { CameraScanner } from './pos/CameraScanner';
+import { ScanToast, type ScanNote } from './pos/ScanToast';
+import { beep } from '../utils/beep';
 import { FILLABLE, productLine, sourceLine, type BarcodeInfo } from '../utils/barcodeInfo';
 import { readable } from '../utils/scanner';
 import { rupees, toPaisa, toRupeeInput, number, date, downloadCsv } from '../utils/format';
@@ -68,6 +70,14 @@ export default function Medicines() {
   const [filled, setFilled] = useState<string[]>([]);
   const [cameraOpen, setCameraOpen] = useState(false);
   const lookupRun = useRef(0);
+  /* The same card the till shows: what a scan found. */
+  const [scanNote, setScanNote] = useState<ScanNote | null>(null);
+  const noteId = useRef(0);
+  const clearNote = useCallback(() => setScanNote(null), []);
+  const announce = useCallback((note: Omit<ScanNote, 'id'>) => {
+    noteId.current += 1;
+    setScanNote({ id: noteId.current, ...note });
+  }, []);
   const [fieldError, setFieldError] = useState<{ field?: string; message: string } | null>(null);
   const [removing, setRemoving] = useState<Medicine | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -82,8 +92,16 @@ export default function Medicines() {
       const info = await api.get<BarcodeInfo>(`/medicines-barcode-info${query({ code: text })}`);
       if (run !== lookupRun.current) return;
       setForm((current) => ({ ...current, barcode: info.barcode }));
-      if (info.existing) { setLookup({ state: 'existing', code: text, info }); return; }
-      if (!info.fields) { setLookup({ state: 'unknown', code: text, info }); return; }
+      if (info.existing) {
+        setLookup({ state: 'existing', code: text, info });
+        announce({ tone: 'info', kicker: 'Already in your catalogue', title: info.existing.name, detail: `Barcode ${info.barcode}` });
+        return;
+      }
+      if (!info.fields) {
+        setLookup({ state: 'unknown', code: text, info });
+        announce({ tone: 'info', kicker: 'New barcode', title: info.barcode, detail: 'Not known yet: fill it in once' });
+        return;
+      }
       const patch: Record<string, string | boolean> = {};
       for (const [key] of FILLABLE) {
         const value = info.fields[key];
@@ -94,14 +112,22 @@ export default function Medicines() {
       setForm((current) => ({ ...current, ...patch }));
       setFilled(Object.keys(patch));
       setLookup({ state: 'found', code: text, info });
+      announce({
+        tone: 'ok', kicker: 'Details filled in', title: info.fields.name ?? info.barcode,
+        detail: [info.fields.strength, info.fields.form, info.fields.packSize].filter(Boolean).join(' · ') || 'Check them, then add the prices'
+      });
     } catch {
-      if (run === lookupRun.current) setLookup({ state: 'failed', code: text });
+      if (run !== lookupRun.current) return;
+      setLookup({ state: 'failed', code: text });
+      beep('error');
     }
-  }, []);
+  }, [announce]);
 
   /* A hardware scanner while the form is open: the code goes into the
      barcode field wherever the cursor is, and a new medicine is filled in. */
-  const onFormScan = useCallback((code: string) => {
+  const onFormScan = useCallback((code: string, fromCamera = false) => {
+    /* The camera beeps as it reads; a hardware scan beeps here. */
+    if (!fromCamera) beep('ok');
     edit({ barcode: readable(code) });
     if (!editing) { void fillFrom(code); return; }
     /* Editing: only the barcode changes — as printed on the box, for a 2D code. */
@@ -525,8 +551,10 @@ export default function Medicines() {
       <CameraScanner
         open={cameraOpen}
         onClose={() => setCameraOpen(false)}
-        onCode={(code) => { setCameraOpen(false); onFormScan(code); }}
+        onCode={(code) => { setCameraOpen(false); onFormScan(code, true); }}
       />
+
+      <ScanToast note={scanNote} onDone={clearNote} />
 
       {/* ------------------------------ detail ---------------------------- */}
       <Modal
