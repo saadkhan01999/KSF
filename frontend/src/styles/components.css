@@ -1269,20 +1269,21 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
 }
 .pick-go { color: var(--brand-500); flex: 0 0 auto; }
 
-/* The lock-up. The wordmark is vector, so there is no font weight or letter
-   spacing to set here — only the arrangement. */
+/* The lock-up. The mark and wordmark are vector, so there is no font weight
+   or letter spacing to set for them — only the arrangement, and the
+   strapline, which is set like the artwork's: bold capitals, a little apart. */
 .brand-logo { display: inline-flex; align-items: center; text-decoration: none; }
 .brand-logo.is-stacked { flex-direction: column; }
-.brand-words { line-height: 1; min-width: 0; }
+.brand-words { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; min-width: 0; }
+.brand-logo.is-stacked .brand-words { align-items: center; }
 .brand-name { display: block; }
 .brand-strapline {
   display: block;
   font-weight: 700;
-  letter-spacing: .2em;
+  letter-spacing: .08em;
+  text-transform: uppercase;
   white-space: nowrap;
-  text-align: left;
 }
-.brand-logo.is-stacked .brand-strapline { text-align: center; }
 
 /* A <details> holding the fields somebody can skip. Named for what it is
    rather than for the wizard it used to live in — the wizard is gone and this

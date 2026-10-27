@@ -21,7 +21,7 @@ const { readFileSync } = await import('node:fs');
 const { PLATFORM_PERMISSION_KEYS, TEAM_MANAGE } = await import('../backend/src/domain/platform.ts');
 const calc = await import('../frontend/src/utils/calculator.ts');
 const { compareVersions } = await import('../frontend/src/utils/version.ts');
-const { ScanDetector, looksLikeBarcode, readable, GS } = await import('../frontend/src/utils/scanner.ts');
+const { ScanDetector, looksLikeBarcode, readable, GS, ReadConfirmer, gtinValid } = await import('../frontend/src/utils/scanner.ts');
 
 describe('reading imported files', () => {
   it('detects semicolons and keeps quoted commas and newlines', () => {
@@ -504,6 +504,21 @@ describe('telling a barcode scanner from a person', () => {
     type(ctrl, '0108964000111222', 6);
     assert.deepEqual(ctrl.key('Control', 1100), { kind: 'passive' });
     assert.ok(ctrl.confirmed);
+  });
+
+  it('believes a camera read with a check digit at once, and one without only when it reads the same twice', () => {
+    assert.ok(gtinValid('8964000111222') && gtinValid('96385074') && gtinValid('030045044400') && gtinValid('08964000111222'));
+    assert.ok(!gtinValid('8964000111223') && !gtinValid('12345') && !gtinValid('KSF-BRU-400'));
+    const camera = new ReadConfirmer(1500);
+    assert.ok(camera.accept('8964000111222', 'ean_13', 1000), 'EAN-13 carries a check digit');
+    assert.ok(camera.accept('https://id.gs1.org/01/08964000111222', 'qr_code', 1010), '2D codes correct their own errors');
+    assert.ok(camera.accept('08964000111222', 'itf', 1020), 'an ITF-14 whose check digit is right');
+    assert.equal(camera.accept('BRU400', 'code_39', 2000), false, 'Code 39: not yet');
+    assert.equal(camera.accept('BRU4OO', 'code_39', 2100), false, 'a different read starts again');
+    assert.equal(camera.accept('BRU400', 'code_39', 2200), false);
+    assert.equal(camera.accept('BRU400', 'code_39', 2300), true, 'the same twice in a row');
+    assert.equal(camera.accept('A1234B', 'codabar', 5000), false);
+    assert.equal(camera.accept('A1234B', 'codabar', 7000), false, 'too far apart to be one look at one label');
   });
 
   it('knows a barcode from a search word', () => {

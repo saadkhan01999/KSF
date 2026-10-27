@@ -1,6 +1,7 @@
-/* The till's sounds: a bright two-note chime when a scan is added, a low
-   double tone when it is not — so the cashier knows without looking at the
-   screen. Each device remembers whether sound is on.
+/* The till's sounds: the short, bright "beep" of a checkout scanner when a
+   code is read and the medicine picked, and a low double buzz when it is not
+   — so the cashier knows without looking at the screen. On a phone each also
+   buzzes the handset. Each device remembers whether sound is on.
 
    Browsers keep sound off until the person has pressed a key or touched the
    page, so the sound is woken at the first touch, click or key press (a
@@ -41,30 +42,39 @@ if (typeof window !== 'undefined') {
 }
 
 /* [frequency in Hz, start, length, loudness] — start and length in seconds. */
-const TONES: Record<'ok' | 'error', { wave: OscillatorType; notes: Array<[number, number, number, number]> }> = {
-  /* E6 then A6: short, bright and friendly, heard over a busy counter. */
-  ok: { wave: 'sine', notes: [[1318.5, 0, 0.07, 0.2], [1760, 0.075, 0.11, 0.22]] },
-  error: { wave: 'triangle', notes: [[392, 0, 0.13, 0.22], [294, 0.16, 0.18, 0.22]] }
+const TONES: Record<'ok' | 'error', { wave: OscillatorType; notes: Array<[number, number, number, number]>; buzz: number | number[] }> = {
+  /* The checkout beep: one square-wave tone near 2.7 kHz, a tenth of a second,
+     softened a little so it is crisp rather than shrill. */
+  ok: { wave: 'square', notes: [[2730, 0, 0.11, 0.16]], buzz: 45 },
+  error: { wave: 'square', notes: [[440, 0, 0.12, 0.13], [330, 0.17, 0.16, 0.13]], buzz: [70, 50, 70] }
 };
 
 export function beep(kind: 'ok' | 'error'): void {
   if (!scannerSound()) return;
+  try { navigator.vibrate?.(TONES[kind].buzz); } catch { /* no vibration motor */ }
   const sound = context();
   if (!sound) return;
   try {
     const { wave, notes } = TONES[kind];
+    /* Take the edge off the square wave's highest harmonics. */
+    const soften = sound.createBiquadFilter();
+    soften.type = 'lowpass';
+    soften.frequency.value = kind === 'ok' ? 6500 : 2400;
+    soften.connect(sound.destination);
     for (const [frequency, start, length, loudness] of notes) {
-      const begin = sound.currentTime + 0.01 + start;
+      const begin = sound.currentTime + 0.005 + start;
       const tone = sound.createOscillator();
       const volume = sound.createGain();
       tone.type = wave;
       tone.frequency.value = frequency;
+      /* A flat top and a fast edge: the scanner's "beep", not a chime. */
       volume.gain.setValueAtTime(0.0001, begin);
-      volume.gain.exponentialRampToValueAtTime(loudness, begin + 0.008);
-      volume.gain.exponentialRampToValueAtTime(0.0001, begin + length);
-      tone.connect(volume).connect(sound.destination);
+      volume.gain.linearRampToValueAtTime(loudness, begin + 0.004);
+      volume.gain.setValueAtTime(loudness, begin + length - 0.012);
+      volume.gain.linearRampToValueAtTime(0.0001, begin + length);
+      tone.connect(volume).connect(soften);
       tone.start(begin);
-      tone.stop(begin + length + 0.03);
+      tone.stop(begin + length + 0.02);
     }
   } catch { /* no sound on this device; the screen still says what happened */ }
 }

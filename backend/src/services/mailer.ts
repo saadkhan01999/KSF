@@ -288,7 +288,7 @@ export function readDevOutbox(limit = 10): Array<{ name: string; to: string; sub
 const shell = (heading: string, lines: string[], footer = ''): string => `
 <div style="font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#F4F7F5;padding:32px">
   <div style="max-width:520px;margin:0 auto;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E2E8E5">
-    <div style="background:#0E7A50;padding:16px 28px;color:#FFFFFF;font-weight:700;font-size:20px;letter-spacing:.02em"><img src="${APP_URL}/brand/ksf-email-logo.png" width="154" height="40" alt="KSF" style="display:block;border:0;height:40px;width:154px;color:#FFFFFF;font-weight:700;font-size:20px"></div>
+    <div style="background:#FFFFFF;border-bottom:3px solid #14442E;padding:18px 28px;color:#14442E;font-weight:700;font-size:20px;letter-spacing:.02em"><img src="${APP_URL}/brand/ksf-email-logo.png" width="214" height="40" alt="KSF Pharmacy" style="display:block;border:0;height:40px;width:214px;color:#14442E;font-weight:700;font-size:20px"></div>
     <div style="padding:28px">
       <h1 style="margin:0 0 12px;font-size:20px;color:#132A22">${heading}</h1>
       ${lines.map((line) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#3A4A44">${line}</p>`).join('')}

@@ -127,7 +127,7 @@ export function SiteFooter() {
     <footer className="site-footer">
       <div className="site-footer-grid">
         <div className="site-footer-brand">
-          <BrandLogo size={32} />
+          <BrandLogo size={40} showStrapline />
           {business.edition === 'university' && <span className="edition-tag">University project edition</span>}
           <p>
             Pharmacy management built for Pakistan — in rupees, on the devices you already own,

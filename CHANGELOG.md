@@ -3,6 +3,77 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.5.0] — 2026-10-27
+
+### The pharmacy's own logo, everywhere
+- **The approved KSF artwork** — the interlocking K, S and F, "KSF Pharmacy"
+  and "Dispensing care. Inspiring trust." — traced to vector outlines,
+  transparent, and used everywhere the logo appears:
+  - the app's sidebar and loading screen;
+  - the website header and footer;
+  - sign-in and forgotten password;
+  - printed statements and invoices;
+  - the website's product preview.
+- **Colours:** the artwork's deep green (`#14442E`) in light mode, a pale green
+  in dark mode so it never disappears, and white on the dark sign-in panel.
+- **The favicon is the transparent mark.** It turns pale green when the
+  browser is dark.
+- **App icons:** the Android, desktop and iPhone home-screen icons carry the
+  mark on white (a phone shows a transparent icon on black).
+- **E-mails:** the header is now white with the logo and a green rule.
+- **Browser theme colour** is the logo green. The designer's pack in
+  `docs/brand/` and `docs/BRAND_GUIDE.md` describe the new artwork.
+
+### A stronger scanner
+- **The camera reads what it missed before.** It is asked for full HD with
+  continuous focus, and offers **tap to focus** and **zoom** where the phone
+  has them.
+- **Two readers work at once:** the browser's own and ZXing in a background
+  worker (so the picture never stutters). Each frame is looked at a
+  different way in turn:
+  - the whole frame;
+  - the scan area at full resolution;
+  - the middle enlarged twice over, for a tiny barcode on a strip or dropper
+    bottle far from the lens;
+  - turned a quarter turn, for a barcode printed upright on a narrow box;
+  - sharpened, for faded or slightly blurred print;
+  - a second binariser;
+  - inverted, for light bars on dark foil.
+- **Tested against 2.4.0:** on five such packs, 2.4.0's reader read one. The
+  new one reads all five, live in 0.3–2.1 seconds and from a photo.
+- **No wrong medicine from a smudge.** Codes with a check digit or error
+  correction (EAN, UPC, Code 128, DataBar, QR, DataMatrix, PDF417, Aztec) are
+  taken at the first read. Code 39, Code 93, Codabar and short ITF codes must
+  read the same twice in a row.
+- **Scan a photo** tries every one of those ways on the picture.
+- **The checkout beep.** A short, bright scanner beep (and a buzz on a phone)
+  the moment a code is read and the medicine picked. A low double buzz means
+  it was not added.
+- **The same beep and card for barcodes that arrive in the search box,**
+  whether typed or from a scanner too slow to be told from typing.
+- A scanner that types on the number pad with Num Lock off is understood.
+- **The Add medicine form** beeps on a scan and shows a card: "Details filled
+  in", "New barcode" or "Already in your catalogue".
+
+### The website
+- **Buttons are centred.** "Sign in" and every other button without an arrow
+  had their words pushed off-centre by padding meant for the arrow badge.
+  Only pills with the arrow tuck their right side in now. On every public page,
+  at desktop, phone and 320-pixel widths, every button's words are measured
+  centred.
+- **The hero and closing buttons** ("Start free trial", "Sign in") are the same
+  width. On a phone they stack, full width.
+- **The scrollbar thumb is green**, in light and dark.
+
+### Tests
+- **Unit:** believing a camera read (check digits, the double read).
+- **In a real browser:**
+  - the live camera and photos on tiny, upright, inverted, faded and small
+    DataMatrix packs;
+  - every public page's buttons, measured centred;
+  - the logo in light, dark and on a phone;
+  - the 2.4.0 scanning checks again.
+
 ## [2.4.0] — 2026-10-26
 
 ### Every kind of barcode

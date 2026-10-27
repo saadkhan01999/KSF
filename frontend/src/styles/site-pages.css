@@ -77,7 +77,7 @@
   align-items: center;
 }
 .site-nav-drawer a:hover { background: var(--surface-3); color: var(--text); }
-.site-nav-drawer a.btn { justify-content: center; color: var(--text-invert); }
+.site-nav-drawer a.btn { justify-content: center; color: var(--text-invert); padding-inline: var(--s-5); font-weight: 600; }
 
 @media (min-width: 861px) {
   .site-nav-drawer { display: none; }

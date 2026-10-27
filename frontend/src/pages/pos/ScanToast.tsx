@@ -11,14 +11,17 @@ import { createPortal } from 'react-dom';
 export interface ScanNote {
   /** A new id restarts the card, even for the same medicine. */
   id: number;
-  tone: 'ok' | 'error';
+  /** ok: green tick; error: red cross; info: an amber note, nothing wrong. */
+  tone: 'ok' | 'error' | 'info';
+  /** The small line on top; "Medicine selected" or "Not added" unless given. */
+  kicker?: string;
   /** The medicine's name, or the code that was scanned. */
   title: string;
   /** One quiet line: strength, price, how many are in the sale — or the reason. */
   detail: string;
 }
 
-const SHOW_FOR = { ok: 2600, error: 3400 };
+const SHOW_FOR = { ok: 2600, error: 3400, info: 3400 };
 const LEAVE = 220;
 
 export function ScanToast({ note, onDone }: { note: ScanNote | null; onDone: () => void }) {
@@ -45,18 +48,18 @@ export function ScanToast({ note, onDone }: { note: ScanNote | null; onDone: () 
     <div
       key={note.id}
       style={centre === null ? undefined : { left: centre }}
-      className={`scan-toast ${ok ? 'is-ok' : 'is-error'} ${leaving ? 'is-leaving' : ''}`}
-      role={ok ? 'status' : 'alert'}
+      className={`scan-toast is-${note.tone} ${leaving ? 'is-leaving' : ''}`}
+      role={note.tone === 'error' ? 'alert' : 'status'}
       onClick={() => setLeaving(true)}
     >
       <span className="scan-toast-mark" aria-hidden="true">
         <svg viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="10" />
-          {ok ? <path d="M7.5 12.5l3 3 6-6.5" /> : <path d="M8.5 8.5l7 7m0-7l-7 7" />}
+          {ok ? <path d="M7.5 12.5l3 3 6-6.5" /> : note.tone === 'info' ? <path d="M12 7.5v5.5m0 3.4v.1" /> : <path d="M8.5 8.5l7 7m0-7l-7 7" />}
         </svg>
       </span>
       <span className="scan-toast-body">
-        <small>{ok ? 'Medicine selected' : 'Not added'}</small>
+        <small>{note.kicker ?? (ok ? 'Medicine selected' : 'Not added')}</small>
         <strong>{note.title}</strong>
         <span>{note.detail}</span>
       </span>

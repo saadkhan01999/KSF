@@ -22,6 +22,11 @@
    ========================================================================== */
 
 :root {
+  /* The logo artwork's green (components/Brand.tsx); pale in dark mode. */
+  --logo-ink: #14442E;
+  /* The scrollbar thumb: green whatever the theme. */
+  --scroll-thumb: #22A06B;
+  --scroll-thumb-hover: #14442E;
   color-scheme: light;
 
   /* -- Brand: KSF Green, the default theme; printed receipts match it -- */
@@ -249,8 +254,10 @@
    ========================================================================== */
 
 :root[data-theme='dark'] {
-  /* The logo tile's outline against a dark surface (components/Brand.tsx). */
-  --brand-mark-edge: rgba(255, 255, 255, 0.16);
+  /* The logo's deep green would vanish on a dark surface (components/Brand.tsx). */
+  --logo-ink: #8EDCB8;
+  --scroll-thumb: #2FB57C;
+  --scroll-thumb-hover: #5FD3A2;
   color-scheme: dark;
 
   --canvas: #0B0F17;
@@ -373,6 +380,9 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
+    --logo-ink: #8EDCB8;
+    --scroll-thumb: #2FB57C;
+    --scroll-thumb-hover: #5FD3A2;
     --canvas: #0B0F17;
     --bg: #101623;
     --surface: #101623;

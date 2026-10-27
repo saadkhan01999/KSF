@@ -19,12 +19,12 @@ export const BRAND = {
   name: 'KSF',
   /** The full title: browser tab, manifest, invoices, letterheads. */
   fullName: 'KSF Pharmacy Management System',
-  /** Under the wordmark. Kept short — it sits at 8-9px in the sidebar. */
-  strapline: 'PHARMACY SYSTEM',
+  /** The line on the logo artwork, under "KSF Pharmacy". */
+  strapline: 'Dispensing care. Inspiring trust.',
   /** One line, for the tab title and the marketing meta description. */
   tagline: 'Pharmacy management, built for Pakistan',
-  version: '2.4.0'
+  version: '2.5.0'
 } as const;
 
-/** "KSF 2.4.0" — the string the footer, About and Settings all show. */
+/** "KSF 2.5.0" — the string the footer, About and Settings all show. */
 export const versionLabel = `${BRAND.name} ${BRAND.version}`;

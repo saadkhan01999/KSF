@@ -134,3 +134,34 @@ export function looksLikeBarcode(code: string): boolean {
 
 /** A code as a person reads it: the invisible GS separators as spaces. */
 export const readable = (code: string): string => code.replace(/\u001d/g, ' ').trim();
+
+/* ------------------------------------------------- believing a camera read
+   A camera sees a barcode many times a second, at angles and in glare.
+   Codes that carry a check digit or error correction (EAN, UPC, Code 128,
+   GS1 DataBar, and every 2D code) are believed at the first read. The rest
+   — Code 39, Code 93, Codabar, a short ITF — can be misread from a smudge, so
+   they must read the same twice in a row before anything happens. */
+const SELF_CHECKING = new Set(['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'databar', 'qr_code', 'data_matrix', 'pdf417', 'aztec']);
+
+/** The GS1 check digit of an EAN-8, UPC-A, EAN-13 or GTIN-14 is right. */
+export function gtinValid(code: string): boolean {
+  if (!/^(\d{8}|\d{12,14})$/.test(code)) return false;
+  const digits = [...code].map(Number);
+  const check = digits.pop()!;
+  const sum = digits.reverse().reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === check;
+}
+
+export class ReadConfirmer {
+  private last: { text: string; at: number } | null = null;
+
+  constructor(private readonly within = 1500) {}
+
+  /** Whether to act on this read now. */
+  accept(text: string, format: string | null, at: number): boolean {
+    if (!format || SELF_CHECKING.has(format) || (format === 'itf' && gtinValid(text))) { this.last = null; return true; }
+    const again = !!this.last && this.last.text === text && at - this.last.at <= this.within;
+    this.last = { text, at };
+    return again;
+  }
+}

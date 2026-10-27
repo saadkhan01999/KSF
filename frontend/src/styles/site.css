@@ -194,13 +194,26 @@
 }
 
 .hero-cta { display: flex; align-items: center; justify-content: center; gap: var(--s-4); flex-wrap: wrap; margin-top: var(--s-6); }
+/* The two choices are the same width, so neither looks like an afterthought;
+   on a phone they stack, full width and centred. */
+.hero-cta > .btn, .site-cta-actions > .btn { min-width: 176px; }
+@media (max-width: 560px) {
+  .hero-cta, .site-cta-actions { flex-direction: column; align-items: stretch; width: 100%; max-width: 360px; margin-inline: auto; gap: var(--s-3); }
+  .hero-cta > .btn, .site-cta-actions > .btn { width: 100%; min-width: 0; }
+}
 
-/* The pill CTA with the circular arrow badge inside it. */
+/* The pill CTA. Its words sit dead centre; only a pill that carries the
+   circular arrow badge tucks its right padding in, so the badge sits snug
+   against the edge and the words plus badge are centred together. */
 .btn-pill {
   border-radius: var(--r-pill);
-  padding-right: 6px;
+  padding-inline: var(--s-5);
   gap: 10px;
+  text-align: center;
+  line-height: 1.2;
 }
+.btn-pill.btn-sm { padding-inline: var(--s-4); }
+.btn-pill:has(> .arrow) { padding-right: 6px; padding-left: var(--s-5); }
 .btn-pill .arrow {
   display: grid;
   place-items: center;

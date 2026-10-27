@@ -113,6 +113,7 @@
   animation: ksf-scan-toast-in .34s cubic-bezier(.2, .9, .3, 1.15) both;
 }
 .scan-toast.is-error { --tone: var(--danger-500); --tone-deep: var(--danger-600); }
+.scan-toast.is-info { --tone: var(--warn-500); --tone-deep: var(--warn-600); }
 .scan-toast.is-leaving { animation: ksf-scan-toast-out .22s var(--ease) both; pointer-events: none; }
 @keyframes ksf-scan-toast-in { from { opacity: 0; transform: translate(-50%, -14px) scale(.94); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
 @keyframes ksf-scan-toast-out { to { opacity: 0; transform: translate(-50%, -10px) scale(.97); } }

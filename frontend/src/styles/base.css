@@ -71,12 +71,13 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--s-5) 0; }
   [data-parallax] { transform: none !important; }
 }
 
-/* Scrollbars that match the theme instead of fighting it */
-* { scrollbar-width: thin; scrollbar-color: var(--ink-200) transparent; }
-::-webkit-scrollbar { width: 10px; height: 10px; }
+/* Scrollbars: a green thumb on a quiet track, in light and dark alike. */
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--ink-200); border-radius: var(--r-pill); border: 3px solid transparent; background-clip: content-box; }
-::-webkit-scrollbar-thumb:hover { background: var(--ink-300); background-clip: content-box; }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: var(--r-pill); border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
 
 /* --------------------------- Utilities --------------------------- */
 .sr-only {
