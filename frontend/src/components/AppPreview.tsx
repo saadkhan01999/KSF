@@ -18,7 +18,7 @@ export function DashboardPreview() {
   return (
     <div className="preview preview-dashboard" aria-hidden="true">
       <div className="preview-rail">
-        <div className="preview-logo"><KsfMark height={20} title="" /></div>
+        <div className="preview-logo"><KsfMark height={26} title="" /></div>
         {['Dashboard', 'New sale', 'Medicines', 'Inventory', 'Expiry', 'Reports'].map((label, index) => (
           <div key={label} className={`preview-rail-item ${index === 0 ? 'is-active' : ''}`}>{label}</div>
         ))}

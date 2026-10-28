@@ -640,7 +640,7 @@ export function Spinner({ large }: { large?: boolean }) {
 export function PageLoader({ message = 'Loading…' }: { message?: string }) {
   return (
     <div className="page-loader">
-      <BrandMark size={44} />
+      <BrandMark size={64} />
       <Spinner large />
       <span className="t-soft">{message}</span>
     </div>

@@ -1,6 +1,9 @@
 # Deploying KSF
 
-**KSF Pharmacy Management System 2.0**
+**KSF Pharmacy Management System 2.5**
+
+> **On Hostinger?** Follow `deploy/HOSTINGER_DEPLOYMENT.txt`: the whole
+> journey, step by step, from choosing the plan to backups and updates.
 
 The production stack is three containers, defined in `docker-compose.yml`:
 

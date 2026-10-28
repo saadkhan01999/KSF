@@ -36,7 +36,7 @@ export function PrintSheet({
   return createPortal(
     <section className="print-sheet" aria-hidden="true">
       <header className="ps-head">
-        <BrandLogo size={30} tone="mono" />
+        <BrandLogo size={38} tone="mono" />
         {issuer && <div className="ps-issuer">{issuer}</div>}
       </header>
       <h1 className="ps-title">{title}</h1>

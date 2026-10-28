@@ -46,7 +46,7 @@ export function SiteHeader() {
   return (
     <header className={`site-nav ${stuck ? 'is-stuck' : ''} ${open ? 'is-open' : ''}`}>
       <Link to="/" aria-label="KSF, home" className="site-brand">
-        <BrandLogo size={34} />
+        <BrandLogo size={42} />
       </Link>
 
       <nav className="site-nav-links" aria-label="Main">
@@ -128,7 +128,7 @@ export function SiteFooter() {
     <footer className="site-footer">
       <div className="site-footer-grid">
         <div className="site-footer-brand">
-          <BrandLogo size={40} showStrapline />
+          <BrandLogo size={48} showStrapline />
           {business.edition === 'university' && <span className="edition-tag">University project edition</span>}
           <p>
             Pharmacy management built for Pakistan — in rupees, on the devices you already own,
