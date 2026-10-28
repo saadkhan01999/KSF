@@ -83,7 +83,7 @@ export default function ForgotPassword() {
         <ThemeToggle />
       </div>
 
-      <div className="auth-mark"><BrandLogo size={56} stacked showStrapline /></div>
+      <div className="auth-mark"><BrandLogo size={72} stacked showStrapline /></div>
 
       {/* -------------------------------- ask ---------------------------- */}
       {stage === 'ask' && (

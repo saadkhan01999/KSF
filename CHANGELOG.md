@@ -3,6 +3,41 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.5.2] — 2026-10-28
+
+### A bigger logo
+- **The KSF logo is larger everywhere:**
+  - the sidebar: the mark about 28% taller, "KSF Pharmacy" about 17%;
+  - the collapsed sidebar;
+  - the website header and footer;
+  - the sign-in panel;
+  - the forgotten-password page;
+  - the loading screen;
+  - printed documents;
+  - e-mails: the logo is now 48 px tall, drawn at twice that for sharp
+    screens.
+- Side by side, the mark is now 0.9 of the lock-up's size (it was 0.82).
+- It still fits the sidebar and a 320-pixel phone's header, with no
+  sideways scroll.
+
+### Deploying on Hostinger
+- **`deploy/HOSTINGER_DEPLOYMENT.txt`:** the step-by-step guide.
+  - **Which plan, and why:** a KVM 2 VPS with "Ubuntu 24.04 with Docker",
+    in Mumbai.
+  - **Every step:** the server's security, the code, the settings, HTTPS
+    with automatic renewal, the first sign-in, payments, nightly verified
+    backups with copies off the server, updates and going back, monitoring,
+    moving over from Railway and Vercel without losing a sale, and fixes
+    for common problems.
+  - **Rehearsed:** its commands were rehearsed on the real production stack.
+- **Fixed in the deploy kit (`deploy/nginx/ksf.conf`):**
+  - Nginx no longer fails to start where the container has no IPv6. It
+    listened on `[::]` inside the container; IPv6 visitors still arrive
+    through Docker's port publishing.
+  - The payment-webhook rule now matches the address the app actually uses
+    (`/api/v1/payments/webhook/<provider>`), so payment callbacks are not
+    held to the browser rate limit.
+
 ## [2.5.1] — 2026-10-27
 
 ### Fixed

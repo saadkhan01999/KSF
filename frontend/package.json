@@ -1,7 +1,7 @@
 {
   "name": "@ksf/frontend",
   "private": true,
-  "version": "2.5.1",
+  "version": "2.5.2",
   "type": "module",
   "description": "KSF Pharmacy — the browser application: React 18, TypeScript (strict) and Vite. Talks to the API in ../backend through /api.",
   "scripts": {

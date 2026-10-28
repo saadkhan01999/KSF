@@ -89,9 +89,10 @@ colour that is not in that file** — add it there first.
 | **Mark + KSF Pharmacy** | The app sidebar, the website header, printed documents, e-mails |
 | **Mark alone** | Collapsed sidebar, favicon, app icons, loading screen |
 
-`BrandLogo`'s `size` is the mark's height. Side by side, the wordmark is 0.4 ×
-that height; the strapline is shown only where it can be read (never below
-8px), and in the stacked lock-up it carries the artwork's bullets.
+`BrandLogo`'s `size` sets the lock-up: side by side the mark is 0.9 × it and
+the wordmark 0.4 × it (stacked, the mark is the full size); the strapline is
+shown only where it can be read (never below 8px), and in the stacked lock-up
+it carries the artwork's bullets.
 
 **Clear space:** half the mark's height on all four sides.
 **Minimum sizes:** mark alone **16px** wide; mark + wordmark **24px** tall.

@@ -54,7 +54,7 @@ export function AuthScreen({
         <aside className="auth-brand">
           <div className="auth-brand-top">
             <Link to="/" aria-label={`${BRAND.name}, home`}>
-              <BrandLogo size={42} tone="invert" showStrapline />
+              <BrandLogo size={52} tone="invert" showStrapline />
             </Link>
             <ThemeToggle />
           </div>

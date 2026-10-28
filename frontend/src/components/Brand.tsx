@@ -113,7 +113,7 @@ export function BrandLogo({
       role="img"
       aria-label={`${BRAND.name} Pharmacy`}
     >
-      <KsfMark height={stacked ? size : size * 0.82} tone={tone} title="" />
+      <KsfMark height={stacked ? size : size * 0.9} tone={tone} title="" />
       <span className="brand-words" aria-hidden="true">
         <KsfWordmark height={wordHeight} tone={tone} className="brand-name" title="" />
         {showStrapline && (

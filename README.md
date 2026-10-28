@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.5.1** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.5.2** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -790,6 +790,10 @@ stock, sales, purchases, accounts and a prescription — and the copy's
 
 ## Deployment
 
+**Hostinger:** `deploy/HOSTINGER_DEPLOYMENT.txt` is the step-by-step guide,
+from buying the VPS (KVM 2 recommended, Ubuntu 24.04 with Docker, Mumbai) to
+HTTPS, backups, updates and moving over from Railway and Vercel.
+
 `deploy/README.md` covers a production server with Docker (the app, Nginx
 with HTTPS, and MongoDB Atlas or a bundled replica set), Railway (API) with
 Vercel (website), and the settings that must change for production:
@@ -803,7 +807,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.5.1 · Server 2.5.1 — up to date", or
+System) compares the two: "Website 2.5.2 · Server 2.5.2 — up to date", or
 which one still has to redeploy from `main` (Railway › the service ›
 Deployments, or Vercel › Deployments).
 

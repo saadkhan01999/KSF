@@ -1,0 +1,738 @@
+==============================================================================
+ KSF PHARMACY MANAGEMENT SYSTEM - DEPLOYING ON HOSTINGER, FROM A TO Z
+ Version 2.5.2 - October 2026
+==============================================================================
+
+ Who this is for: the person putting KSF on the internet for real pharmacies.
+ You do not need to be a Linux expert. Copy each command exactly, one at a
+ time, and check the result before you go on. Anything in CAPITALS between
+ < and > (like <YOUR-DOMAIN>) is something you replace with your own value.
+
+ Two kinds of block:
+   - Indented lines are commands: copy and run them one by one.
+   - Lines between "----- copy from here -----" and "----- to here -----"
+     start at the left edge on purpose. They are the contents of a file you
+     paste into the nano editor. Keep them at the left edge.
+
+ The commands in sections 6 to 12 were rehearsed end to end on the real
+ production stack from this repository (deploy/docker-compose.yml):
+
+   - the MongoDB replica set;
+   - the app with transactions on;
+   - Nginx with HTTPS and HTTP-to-HTTPS redirects;
+   - secure sign-in cookies;
+   - the live feed through Nginx;
+   - a backup, verified, copied off and restored.
+
+ The image itself was assembled from a build made outside Docker, because
+ the rehearsal machine's network blocks npm and Alpine inside containers.
+ A Hostinger VPS has open internet, so there the normal build in step 7
+ runs as written.
+
+
+------------------------------------------------------------------------------
+ PART 0 - THE DECISION: WHICH HOSTINGER PLAN, AND WHY
+------------------------------------------------------------------------------
+
+ RECOMMENDED:  Hostinger VPS  "KVM 2"
+               2 vCPU - 8 GB RAM - 100 GB NVMe disk - 8 TB bandwidth
+               Operating system template: "Ubuntu 24.04 with Docker"
+               Data centre: India (Mumbai) - the closest to Pakistan
+               Billing: the 24-month term (the lowest monthly price; the
+               price goes up at renewal, so a long first term saves most)
+
+ Price guide (check the live checkout, prices change and are shown in your
+ currency):
+
+ | Plan              | 24-month offer  | Renewal     |
+ |-------------------|-----------------|-------------|
+ | KVM 1             | about $6.49/mo  | about $11.99 |
+ | KVM 2 (ours)      | about $8.99/mo  | about $14.99 |
+ | KVM 4             | about $12.99/mo | about $28.99 |
+
+ WHY A VPS, AND NOT HOSTINGER'S "WEB" OR "CLOUD" HOSTING
+
+  KSF is a Node.js server plus a MongoDB database. Hostinger's web and
+  cloud plans (even Business and Cloud, which can run Node.js apps):
+
+   - do not host MongoDB at all; Hostinger's own help page says MongoDB
+     needs a VPS;
+   - stop any request after 120 seconds and do not allow always-running
+     background work. KSF keeps a live connection open to every screen (a
+     price change appears everywhere at once) and runs background checks
+     (renewals, stock alerts). On those plans these would break;
+   - do not run Docker, which is how KSF ships ("deploy/" in this repo).
+
+  A VPS is a whole server that is yours: Docker, MongoDB, Nginx with HTTPS,
+  your own backups. It is the right home for a business system that holds
+  prescriptions, sales and money.
+
+ WHY KVM 2, AND NOT KVM 1 OR KVM 4
+
+  - KVM 1 (1 vCPU, 4 GB RAM) runs KSF, but it is tight. The app, MongoDB and
+    an update's build (a few minutes, about 2 GB of memory) all share 4 GB,
+    and one slow report can hold the single CPU. It is fine for a trial
+    with a few pharmacies.
+  - KVM 2 (2 vCPU, 8 GB RAM) runs the app, MongoDB and an update side by
+    side, with room for dozens of pharmacies and years of sales history on
+    100 GB. It costs only about $2.50 a month more than KVM 1.
+  - KVM 4: move to it later, from hPanel, when the server is busy (CPU
+    above 70% most of the day, memory above 80%, or the disk past 60 GB).
+    The upgrade keeps everything on the server.
+
+ THE DATABASE: ON THE SAME SERVER (RECOMMENDED TO START)
+
+  KSF's deploy kit can run MongoDB in a container on the same VPS, as a
+  one-node "replica set" (KSF's transactions need that). It is the
+  cheapest and simplest setup, the data stays in Mumbai next to your
+  users, and Part 10 below makes the backups safe.
+
+  The alternative is MongoDB Atlas, a managed database run by MongoDB
+  itself. Choose AWS Mumbai (ap-south-1), and a dedicated tier (M10 or
+  above) for automatic backups. It costs more, but someone else runs the
+  database. You can start on the VPS and move to Atlas later with the same
+  backup and restore commands.
+
+ WHAT ELSE YOU NEED
+
+  - A domain, for example <YOUR-DOMAIN> = ksfpharmacy.pk. Buy it from
+    Hostinger, or use one you own (.pk domains come from PKNIC resellers).
+  - An e-mail account to send sign-up codes and receipts from, for example
+    no-reply@<YOUR-DOMAIN>. Hostinger Business Email works; so does any
+    SMTP service.
+  - Your GitHub account, with access to the KSF repository.
+  - About 2 hours for the first setup.
+
+
+------------------------------------------------------------------------------
+ PART 1 - BUY AND SET UP THE VPS IN HOSTINGER
+------------------------------------------------------------------------------
+
+ 1.1  hostinger.com > VPS Hosting > choose KVM 2 > choose 24 months > pay.
+
+ 1.2  The setup wizard in hPanel:
+      a) Location: India (Mumbai). If it is not offered, choose the
+         nearest Asian location in the list.
+      b) Operating system: "Ubuntu 24.04 with Docker" (in the Applications
+         or OS templates list). If you only see plain "Ubuntu 24.04 LTS",
+         choose it; step 3.6 installs Docker.
+      c) Set a strong root password and save it in your password manager.
+      d) Optional but better: add your SSH public key (from your laptop,
+         ~/.ssh/id_ed25519.pub; make one with: ssh-keygen -t ed25519).
+      e) If hPanel offers a malware scanner, you can switch it on.
+
+ 1.3  When the VPS is ready, hPanel > VPS > Overview shows its IP ADDRESS.
+      Write it down: <SERVER-IP>.
+
+ 1.4  hPanel > VPS > Firewall: create a rule set that allows only
+      TCP 22 (SSH), TCP 80 (HTTP) and TCP 443 (HTTPS), and apply it.
+
+
+------------------------------------------------------------------------------
+ PART 2 - POINT YOUR DOMAIN AT THE SERVER
+------------------------------------------------------------------------------
+
+ 2.1  Where your domain's DNS is managed (Hostinger: hPanel > Domains >
+      <YOUR-DOMAIN> > DNS / Nameservers; or at your registrar), add:
+
+        Type   Name    Value         TTL
+        A      @       <SERVER-IP>   3600
+        A      www     <SERVER-IP>   3600
+
+      Delete any old A record for @ or www, for example one pointing to
+      Vercel.
+
+ 2.2  Wait until the domain answers with your server (5 minutes to a few
+      hours). Check from your laptop:
+
+        ping <YOUR-DOMAIN>
+
+      It must show <SERVER-IP>. Part 7 (the HTTPS certificate) only works
+      once this is true.
+
+
+------------------------------------------------------------------------------
+ PART 3 - FIRST LOGIN AND MAKING THE SERVER SAFE
+------------------------------------------------------------------------------
+
+ 3.1  Log in from your laptop (Windows: PowerShell or Windows Terminal;
+      or use the "Browser terminal" button in hPanel):
+
+        ssh root@<SERVER-IP>
+
+ 3.2  Update everything and set the clock to Pakistan time:
+
+        apt update && apt -y upgrade
+        timedatectl set-timezone Asia/Karachi
+
+ 3.3  Create your own user, "deploy", and stop using root:
+
+        adduser deploy
+        usermod -aG sudo deploy
+
+      If you added an SSH key in 1.2, copy it to the new user:
+
+        mkdir -p /home/deploy/.ssh
+        cp /root/.ssh/authorized_keys /home/deploy/.ssh/
+        chown -R deploy:deploy /home/deploy/.ssh
+        chmod 700 /home/deploy/.ssh
+        chmod 600 /home/deploy/.ssh/authorized_keys
+
+ 3.4  The server's own firewall: SSH, HTTP and HTTPS only:
+
+        ufw allow OpenSSH
+        ufw allow 80/tcp
+        ufw allow 443/tcp
+        ufw --force enable
+
+ 3.5  Protection against password guessing, and automatic security
+      updates:
+
+        apt -y install fail2ban unattended-upgrades
+        dpkg-reconfigure -plow unattended-upgrades     (answer "Yes")
+
+ 3.6  Docker. Check it is there (the "with Docker" template has it):
+
+        docker --version
+        docker compose version
+
+      If either command is not found, install Docker:
+
+        curl -fsSL https://get.docker.com | sh
+
+      Then, either way, let "deploy" use Docker and start it at every boot:
+
+        usermod -aG docker deploy
+        systemctl enable --now docker
+
+ 3.7  Keep Docker's logs from filling the disk:
+
+        echo '{ "log-driver": "json-file", "log-opts": { "max-size": "10m", "max-file": "5" } }' > /etc/docker/daemon.json
+        systemctl restart docker
+
+ 3.8  A 2 GB swap file, a safety margin while an update builds:
+
+        fallocate -l 2G /swapfile && chmod 600 /swapfile
+        mkswap /swapfile && swapon /swapfile
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+ 3.9  Log out, and from now on log in as deploy:
+
+        exit
+        ssh deploy@<SERVER-IP>
+
+      Only after you have checked that the "deploy" login works with your
+      key, switch off root and password logins:
+
+        sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+        sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+        sudo systemctl restart ssh
+
+
+------------------------------------------------------------------------------
+ PART 4 - GET THE KSF CODE ONTO THE SERVER
+------------------------------------------------------------------------------
+
+ The repository is private, so the server gets a read-only "deploy key".
+
+ 4.1  On the server, as deploy:
+
+        ssh-keygen -t ed25519 -f ~/.ssh/ksf_github -N ""
+        cat ~/.ssh/ksf_github.pub
+
+ 4.2  GitHub > the KSF repository > Settings > Deploy keys > Add deploy
+      key. Title: "Hostinger server". Paste the line printed above. Leave
+      "Allow write access" OFF. Save.
+
+ 4.3  Tell SSH to use that key for GitHub:
+
+        printf 'Host github.com\n  IdentityFile ~/.ssh/ksf_github\n  IdentitiesOnly yes\n' >> ~/.ssh/config
+        chmod 600 ~/.ssh/config
+
+ 4.4  Download the code into /srv/ksf:
+
+        sudo mkdir -p /srv/ksf && sudo chown deploy:deploy /srv/ksf
+        git clone git@github.com:saadkhan01999/KSF.git /srv/ksf
+        cd /srv/ksf
+        git log --oneline -1          (shows the latest release)
+
+
+------------------------------------------------------------------------------
+ PART 5 - THE SETTINGS FILE (deploy/.env)
+------------------------------------------------------------------------------
+
+ Every password and key lives in one file on the server, deploy/.env. It is
+ never put into Git. docs/ENVIRONMENT.md explains every line.
+
+ 5.1  Start from the example and lock it so only you can read it:
+
+        cd /srv/ksf
+        cp .env.example deploy/.env
+        chmod 600 deploy/.env
+
+ 5.2  Make two different random secrets (run it twice, copy both):
+
+        openssl rand -base64 48 | tr '+/' '-_' | tr -d '=\n'; echo
+
+ 5.3  Open the file (nano: Ctrl+O saves, Ctrl+X exits):
+
+        nano deploy/.env
+
+      Set these lines. Leave everything else as it is.
+
+      --- the address -------------------------------------------------------
+      PUBLIC_APP_URL=https://<YOUR-DOMAIN>
+      PUBLIC_ALLOWED_ORIGINS=https://<YOUR-DOMAIN>,https://www.<YOUR-DOMAIN>
+
+      --- the database: MongoDB on this server (Part 0) ---------------------
+      MONGODB_URI="mongodb://mongo:27017/?replicaSet=rs0"
+      MONGODB_DB=ksf_pharmacy
+        (With Atlas instead: MONGODB_URI="mongodb+srv://<user>:<password>@
+         <cluster>.mongodb.net/?retryWrites=true&w=majority", and in Atlas
+         > Network Access allow <SERVER-IP>.)
+
+      --- sign-in secrets (the two values from 5.2, different) --------------
+      JWT_ACCESS_SECRET=<FIRST SECRET>
+      JWT_REFRESH_SECRET=<SECOND SECRET>
+
+      --- the platform owner (you) ------------------------------------------
+      SUPER_ADMIN_NAME="<YOUR NAME>"
+      SUPER_ADMIN_EMAIL=<YOU@YOUR-DOMAIN>
+      SUPER_ADMIN_PASSWORD="<A STRONG PASSWORD, 12+ characters>"
+
+      --- e-mail (Hostinger Business Email shown) ---------------------------
+      MAIL_TRANSPORT=smtp
+      MAIL_HOST=smtp.hostinger.com
+      MAIL_PORT=465
+      MAIL_SECURE=true
+      MAIL_USER=no-reply@<YOUR-DOMAIN>
+      MAIL_PASSWORD="<THAT MAILBOX'S PASSWORD>"
+      MAIL_FROM=no-reply@<YOUR-DOMAIN>
+      MAIL_FROM_NAME="KSF Pharmacy"
+        (If port 465 fails, use MAIL_PORT=587 and MAIL_SECURE=false.)
+
+      --- your business, shown on the website --------------------------------
+      BUSINESS_LEGAL_NAME="<YOUR COMPANY>"
+      BUSINESS_CITY=<CITY>
+      BUSINESS_PHONE=<PHONE>
+      SUPPORT_EMAIL=support@<YOUR-DOMAIN>
+        (the other BUSINESS_* lines are optional)
+
+      --- payments (only what you use; docs/PAYMENTS.md) --------------------
+      Bank transfer:  BANK_ACCOUNT_TITLE, BANK_ACCOUNT_NUMBER, BANK_NAME,
+                      BANK_IBAN
+      Cards (Stripe): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (Part 9)
+
+      --- must stay as they are -----------------------------------------------
+      SHOW_SIGNUP_CODE=false     (true would let anyone sign up with any address)
+
+      NODE_ENV, PORT, COOKIE_SECURE and TRUST_PROXY do not matter in this
+      file: deploy/docker-compose.yml sets them for production.
+
+ 5.4  One short command for everything below. This makes "ksf" mean "Docker
+      Compose with KSF's files and the bundled database":
+
+        sudo nano /usr/local/bin/ksf
+
+----- copy from here -----
+#!/bin/sh
+exec docker compose --env-file /srv/ksf/deploy/.env -f /srv/ksf/deploy/docker-compose.yml --profile local-db "$@"
+----- to here -----
+
+        (Ctrl+O, Enter, Ctrl+X to save.) Then:
+
+        sudo chmod +x /usr/local/bin/ksf
+        ksf config --services          (must list: app, web, mongo)
+
+      (With Atlas, leave out "--profile local-db" in that line.)
+
+
+------------------------------------------------------------------------------
+ PART 6 - A TEMPORARY CERTIFICATE (SO NGINX CAN START)
+------------------------------------------------------------------------------
+
+ Nginx will not start without a certificate. Make a temporary one; Part 7
+ replaces it with a real one.
+
+        cd /srv/ksf
+        mkdir -p deploy/nginx/certs
+        openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+          -keyout deploy/nginx/certs/ksf.key -out deploy/nginx/certs/ksf.crt \
+          -subj "/CN=ksf.local"
+
+
+------------------------------------------------------------------------------
+ PART 7 - FIRST START
+------------------------------------------------------------------------------
+
+ 7.1  Build and start. The first build takes 3 to 6 minutes; it also checks
+      the whole code for type errors, and a mistake stops it:
+
+        ksf up -d --build
+
+ 7.2  After a minute, all three must be running, app and mongo "healthy":
+
+        ksf ps
+
+ 7.3  The app's log must end with "listening" and "transactions on":
+
+        ksf logs app --tail 20
+
+      On the first start it also prints that it created the subscription
+      plans, the medicine directory's starter set and the Super Admin.
+
+ 7.4  Check it through Nginx (-k accepts the temporary certificate):
+
+        curl -k https://localhost/api/v1/health
+
+      Expected: {"ok":true,"service":"KSF","version":"2.5.2",...,
+                 "transactions":true}
+
+
+------------------------------------------------------------------------------
+ PART 8 - THE REAL HTTPS CERTIFICATE (LET'S ENCRYPT, FREE)
+------------------------------------------------------------------------------
+
+ Only when Part 2 is done (the domain points at <SERVER-IP>).
+
+ 8.1  Issue it (put your own domain and e-mail):
+
+        sudo docker run --rm \
+          -v ksf-pharmacy_certbot-www:/var/www/certbot \
+          -v /etc/letsencrypt:/etc/letsencrypt \
+          certbot/certbot certonly --webroot -w /var/www/certbot \
+          -d <YOUR-DOMAIN> -d www.<YOUR-DOMAIN> \
+          --email <YOU@YOUR-DOMAIN> --agree-tos --no-eff-email
+
+ 8.2  Put it in place and reload Nginx:
+
+        sudo cp /etc/letsencrypt/live/<YOUR-DOMAIN>/fullchain.pem /srv/ksf/deploy/nginx/certs/ksf.crt
+        sudo cp /etc/letsencrypt/live/<YOUR-DOMAIN>/privkey.pem  /srv/ksf/deploy/nginx/certs/ksf.key
+        sudo chown deploy:deploy /srv/ksf/deploy/nginx/certs/*
+        ksf exec web nginx -s reload
+
+ 8.3  Open https://<YOUR-DOMAIN> in a browser: the padlock shows, and the
+      KSF website appears.
+
+ 8.4  Automatic renewal (certificates last 90 days). Create the script:
+
+        sudo nano /usr/local/bin/ksf-renew-cert
+
+----- copy from here -----
+#!/bin/sh
+docker run --rm -v ksf-pharmacy_certbot-www:/var/www/certbot -v /etc/letsencrypt:/etc/letsencrypt certbot/certbot renew --quiet
+cp /etc/letsencrypt/live/<YOUR-DOMAIN>/fullchain.pem /srv/ksf/deploy/nginx/certs/ksf.crt
+cp /etc/letsencrypt/live/<YOUR-DOMAIN>/privkey.pem /srv/ksf/deploy/nginx/certs/ksf.key
+/usr/local/bin/ksf exec -T web nginx -s reload
+----- to here -----
+
+        (Put your domain in both lines, save.) Then:
+
+        sudo chmod +x /usr/local/bin/ksf-renew-cert
+
+      Run it twice a month, at 03:15, from root's schedule:
+
+        sudo crontab -e
+
+      Add this line and save:
+
+        15 3 1,15 * * /usr/local/bin/ksf-renew-cert >> /var/log/ksf-cert.log 2>&1
+
+
+------------------------------------------------------------------------------
+ PART 9 - FIRST SIGN-IN, AND MAKING THE ACCOUNT SAFE
+------------------------------------------------------------------------------
+
+ 9.1  https://<YOUR-DOMAIN>/login > sign in with SUPER_ADMIN_EMAIL and
+      SUPER_ADMIN_PASSWORD.
+
+ 9.2  Immediately: My account > change the password; Security > switch on
+      two-step sign-in (an authenticator app on your phone).
+
+ 9.3  Check the e-mail: create a test pharmacy from the website's "Start
+      free trial". The six-digit code must arrive by e-mail. If it does not,
+      see Part 14.
+
+ 9.4  Payments, if you take cards (Stripe):
+      Stripe Dashboard > Developers > Webhooks > Add endpoint
+        URL:  https://<YOUR-DOMAIN>/api/v1/payments/webhook/stripe
+      Choose the events listed in docs/PAYMENTS.md, then copy the signing
+      secret into STRIPE_WEBHOOK_SECRET in deploy/.env. Apply it with:
+
+        ksf up -d
+
+      Other providers (JazzCash, Easypaisa, a gateway) use
+        https://<YOUR-DOMAIN>/api/v1/payments/webhook/<provider>
+      and their return pages, as listed in docs/PAYMENTS.md.
+
+ 9.5  The platform console > Overview shows "Website 2.5.2 - Server 2.5.2 -
+      up to date".
+
+
+------------------------------------------------------------------------------
+ PART 10 - BACKUPS (DO NOT SKIP THIS)
+------------------------------------------------------------------------------
+
+ KSF's own backup is a verified file of the whole database. A backup that
+ stays on the same disk is not enough: keep copies somewhere else too.
+
+ 10.1  The nightly backup script:
+
+        sudo nano /usr/local/bin/ksf-backup
+
+----- copy from here -----
+#!/bin/sh
+set -e
+/usr/local/bin/ksf exec -T app node backend/dist/cli/backup.js
+mkdir -p /srv/ksf-backups
+/usr/local/bin/ksf cp app:/app/.data/backups/. /srv/ksf-backups/
+find /srv/ksf-backups -name 'ksf-*' -mtime +30 -delete
+----- to here -----
+
+        (save) Then:
+
+        sudo chmod +x /usr/local/bin/ksf-backup
+
+       Try it now; it must print "Backup written" and "Verified":
+
+        sudo /usr/local/bin/ksf-backup
+        ls -lh /srv/ksf-backups
+
+       Schedule it for 23:30 every night (sudo crontab -e, add):
+
+        30 23 * * * /usr/local/bin/ksf-backup >> /var/log/ksf-backup.log 2>&1
+
+ 10.2  Copies off the server (choose at least one):
+       - Your laptop, weekly (run it on the laptop, not the server):
+           scp -r deploy@<SERVER-IP>:/srv/ksf-backups ./ksf-backups
+       - Google Drive, automatically: install rclone on the server
+         (sudo apt install rclone), run "rclone config" once to connect a
+         drive called "gdrive", then add to the backup script:
+           rclone copy /srv/ksf-backups gdrive:KSF-backups
+
+ 10.3  Hostinger's own backups: hPanel > VPS > Backups. Weekly backups of
+       the whole server are included. For a live business, also buy the
+       daily-backups add-on, and take a manual snapshot before every update
+       (Part 11).
+
+ 10.4  Restoring (practise it once, so you know it works):
+
+       Pick the file from /srv/ksf-backups (ls -lt /srv/ksf-backups; the
+       newest is at the top). Then:
+
+        ksf stop app
+        ksf run --rm -T -v /srv/ksf-backups:/restore:ro app node backend/dist/cli/restore.js /restore/<FILE>.ndjson.gz
+
+       That only describes what it would do. Read it, then:
+
+        ksf run --rm -T -v /srv/ksf-backups:/restore:ro app node backend/dist/cli/restore.js /restore/<FILE>.ndjson.gz --yes
+        ksf up -d
+
+       The restore checks the file first, and saves the current data before
+       it replaces anything, so it can be undone. Everyone signs in again
+       afterwards.
+
+ NEVER run "ksf down -v". The -v deletes the database volume. If you need
+ to stop everything, use "ksf down" without -v.
+
+
+------------------------------------------------------------------------------
+ PART 11 - INSTALLING A NEW VERSION
+------------------------------------------------------------------------------
+
+ When a new version is merged into "main" on GitHub:
+
+ 11.1  hPanel > VPS > Snapshots > Create snapshot.
+
+ 11.2  A fresh backup:
+
+        sudo /usr/local/bin/ksf-backup
+
+ 11.3  Update. The build runs first; then the app restarts with about 10 to
+       20 seconds of downtime, so do it outside opening hours:
+
+        cd /srv/ksf
+        git pull
+        ksf up -d --build
+        ksf ps
+        curl -fsS https://<YOUR-DOMAIN>/api/v1/health
+
+       There are no database steps to run by hand: KSF updates its indexes
+       itself on start. The website footer shows the new version.
+
+ 11.4  If something is wrong, go back to the previous version:
+
+        git log --oneline -5           (find the previous release's code)
+        git checkout <PREVIOUS-CODE>
+        ksf up -d --build
+
+       Later, "git checkout main" returns to the latest. If the data itself
+       went wrong, restore last night's backup (10.4), or the hPanel
+       snapshot (11.1).
+
+ 11.5  Clean old build layers now and then (it never touches your data):
+
+        docker image prune -f && docker builder prune -f
+
+
+------------------------------------------------------------------------------
+ PART 12 - KEEPING AN EYE ON IT
+------------------------------------------------------------------------------
+
+ | What                  | How                                              |
+ |-----------------------|--------------------------------------------------|
+ | Is it up?             | ksf ps   (app and mongo "healthy")               |
+ | Live log              | ksf logs -f app   (Ctrl+C to stop watching)      |
+ | Memory and CPU        | docker stats --no-stream                         |
+ | Disk space            | df -h /                                          |
+ | Database check        | ksf exec app node backend/dist/cli/check-database.js |
+ | Restart the app       | ksf restart app                                  |
+ | Sign everybody out    | new JWT secrets in deploy/.env, then: ksf up -d  |
+
+ - A free uptime alarm: uptimerobot.com > new HTTP(s) monitor >
+   https://<YOUR-DOMAIN>/api/v1/health, every 5 minutes, with a keyword
+   check for "ok":true. It e-mails or texts you when KSF stops answering.
+ - Hostinger's Kodee AI assistant in hPanel can read container logs if you
+   ask it, for example: "show me the logs of container ksf-pharmacy-app-1".
+ - Every month: check that /var/log/ksf-backup.log ends with "Verified",
+   that a copy is off the server, and run "df -h /".
+
+
+------------------------------------------------------------------------------
+ PART 13 - MOVING OVER FROM RAILWAY AND VERCEL (THE CURRENT SETUP)
+------------------------------------------------------------------------------
+
+ Today KSF runs on Railway (the server) and Vercel (the website), with the
+ database on MongoDB Atlas. To move it to Hostinger without losing a single
+ sale:
+
+ 13.1  Do Parts 1 to 9 first, on the new domain, while the old setup keeps
+       running.
+
+ 13.2  Choose ONE of these:
+
+       A) KEEP USING THE SAME ATLAS DATABASE (simplest, no data copy):
+          in deploy/.env set MONGODB_URI to the Atlas address Railway uses,
+          and remove "--profile local-db" from /usr/local/bin/ksf. In Atlas
+          > Network Access, add <SERVER-IP>. Then:
+
+            ksf up -d
+
+          Both old and new run on the same data, so switching is instant.
+
+       B) MOVE THE DATA ONTO THE SERVER (cheapest from then on). At a quiet
+          time, about 15 minutes:
+
+          1. Railway > the service > Settings > stop it (or remove its
+             domain), so nobody writes to Atlas during the copy.
+          2. Take a backup straight from Atlas (one line, the Atlas
+             address in quotes). Atlas > Network Access must allow
+             <SERVER-IP>; Railway's "allow from anywhere" already does.
+
+               ksf run --rm -T -e MONGODB_URI="<ATLAS ADDRESS>" app node backend/dist/cli/backup.js
+
+          3. Restore it into the server's database. The file name is in
+             the output of step 2 ("Backup written: /app/.data/backups/..."):
+
+               ksf stop app
+               ksf run --rm -T app node backend/dist/cli/restore.js /app/.data/backups/<FILE>.ndjson.gz --yes
+               ksf up -d
+
+          4. Sign in and check that the pharmacies, medicines and sales
+             are all there.
+
+ 13.3  Point the domain at the server (Part 2), and change the Stripe
+       webhook URL (9.4) to the new domain.
+
+ 13.4  Keep Railway and Vercel for one week, untouched, as a fallback.
+       Then delete the Railway service and the Vercel project, and with
+       choice B also the Atlas cluster.
+
+
+------------------------------------------------------------------------------
+ PART 14 - WHEN SOMETHING GOES WRONG
+------------------------------------------------------------------------------
+
+ "502 Bad Gateway" in the browser
+     The app is not running or not ready yet.
+     Fix: run "ksf ps" and "ksf logs app --tail 50", and look at the last
+     lines.
+
+ The app stops at start with a MongoDB or replica-set error
+     MongoDB is still starting, or MONGODB_URI is wrong.
+     Fix: wait one minute (the app restarts by itself), then check
+     MONGODB_URI. On the server's database it must be exactly
+     mongodb://mongo:27017/?replicaSet=rs0. With Atlas, check that
+     <SERVER-IP> is in Network Access.
+
+ The web container keeps restarting
+     Nginx is missing its certificate.
+     Fix: do Part 6 again, then run "ksf logs web".
+
+ The certificate cannot be issued
+     The domain does not point at <SERVER-IP> yet, or port 80 is closed.
+     Fix: check Part 2 and Part 1.4 / 3.4.
+
+ Signed out on every reload, or the sign-in never finishes
+     The site was opened on an address that is not PUBLIC_APP_URL, or over
+     http instead of https.
+     Fix: always use https://<YOUR-DOMAIN>, exactly as in deploy/.env.
+
+ No e-mails arrive
+     Usually a wrong SMTP setting or password.
+     Fix: check the MAIL_* lines, try MAIL_PORT=587 with MAIL_SECURE=false,
+     check "ksf logs app" for the mail error, and check the spam folder.
+
+ The camera on the till will not open
+     Browsers allow the camera only over https.
+     Fix: use https://<YOUR-DOMAIN>. "Scan a photo" works everywhere.
+
+ The disk is full
+     Old build layers are using the space.
+     Fix: run "docker image prune -f && docker builder prune -f", and
+     remove old files in /srv/ksf-backups (keep the copies that are off the
+     server).
+
+ Everything is slow
+     The server is at its limit.
+     Fix: run "docker stats --no-stream". If the CPU stays high or memory
+     stays above 80%, upgrade to KVM 4 in hPanel (Part 0).
+
+
+------------------------------------------------------------------------------
+ PART 15 - THE CHECKLIST
+------------------------------------------------------------------------------
+
+ [ ] KVM 2 VPS in Mumbai, Ubuntu 24.04 with Docker, 24-month term
+ [ ] hPanel firewall and ufw: only 22, 80, 443
+ [ ] Logged in as "deploy"; root and password logins off
+ [ ] Domain A records (@ and www) point at the server
+ [ ] deploy/.env filled in, chmod 600, SHOW_SIGNUP_CODE=false
+ [ ] "ksf ps": app and mongo healthy; health answers "ok":true
+ [ ] Let's Encrypt certificate in place; renewal in root's crontab
+ [ ] Super Admin password changed; two-step sign-in on
+ [ ] A sign-up e-mail arrived
+ [ ] Nightly backup in crontab; one restore practised; a copy off the
+     server
+ [ ] Hostinger weekly backups on (daily add-on for a live business)
+ [ ] Uptime monitor on /api/v1/health
+ [ ] Stripe webhook on the new domain (if you take cards)
+ [ ] After one calm week: Railway, Vercel (and Atlas, if you moved the data)
+     removed
+
+==============================================================================
+ Sources for the plan facts (October 2026; prices change, so check the live
+ page before buying):
+
+  - Hostinger VPS plans and prices:   https://www.hostinger.com/vps-hosting
+  - MongoDB on Hostinger needs a VPS:
+      https://www.hostinger.com/support/9196562-is-mongodb-supported-at-hostinger/
+  - Node.js limits on web and cloud plans (120 s, no background workers):
+      https://www.hostinger.com/support/hostinger-node-js-limits-for-web-and-cloud-plans/
+  - VPS server locations:
+      https://www.hostinger.com/support/1583267-where-are-your-servers-located
+  - VPS backups and snapshots:
+      https://www.hostinger.com/support/1583232-how-to-back-up-or-restore-a-vps
+  - Hostinger e-mail SMTP settings:
+      https://support.hostinger.com/en/articles/1575756-how-to-get-configuration-details-for-hostinger-email
+==============================================================================

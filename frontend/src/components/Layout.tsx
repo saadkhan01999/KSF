@@ -303,9 +303,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <aside className={`sidebar ${collapsed ? 'is-collapsed' : ''} ${drawerOpen ? 'is-open' : ''}`}>
         <div className="sidebar-brand">
           <Link to={home} style={{ textDecoration: 'none' }} aria-label="KSF home">
-            {collapsed ? <BrandMark size={36} /> : (
+            {collapsed ? <BrandMark size={46} /> : (
               <span className="sidebar-brand-stack">
-                <BrandLogo size={36} />
+                <BrandLogo size={42} />
                 {edition === 'university' && <span className="edition-tag">University edition</span>}
               </span>
             )}
