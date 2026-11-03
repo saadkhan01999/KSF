@@ -100,7 +100,7 @@ export function Billing() {
   useEffect(() => {
     if (!preselected || !data?.canManage) return;
     const offer = data.plans.find((plan) => plan.key === preselected);
-    if (offer?.available) void startPlan(offer);
+    if (offer && offer.available !== false) void startPlan(offer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselected, !!data]);
 
@@ -144,7 +144,9 @@ export function Billing() {
   const payingPlan = plans.find((plan) => plan.key === paying);
   const onTrial = subscription.status === 'trial';
   const paid = !!currentPlan && !currentPlan.isFree && !subscription.locked;
-  const referralPrice = referrals.prices[0];
+  /* A server from before 2.6 sends no referral prices and no availability:
+     the screen still works with it until it is updated. */
+  const referralPrice = (referrals.prices ?? [])[0];
 
   return (
     <div className="grid grid-2">
@@ -273,7 +275,7 @@ export function Billing() {
             const current = plan.key === subscription.plan && !subscription.locked;
             const note = plan.isTrial
               ? (onTrial ? `${subscription.daysLeft ?? 0} day(s) of your trial left` : 'Used once, when the pharmacy registered')
-              : !plan.available
+              : plan.available === false
                 ? <span className="is-warn">{plan.unavailableReason}</span>
                 : plan.cyclesLeft !== null && plan.cyclesUsed > 0
                   ? `${plan.cyclesLeft} of ${plan.maxCycles} month(s) left on this plan`
@@ -289,10 +291,10 @@ export function Billing() {
                   <Button
                     variant={plan.period === 'year' ? 'primary' : 'secondary'}
                     icon={<CreditCard size={16} />}
-                    disabled={!plan.available || busy}
+                    disabled={plan.available === false || busy}
                     onClick={() => { void startPlan(plan); }}
                   >
-                    {current ? `Pay for another ${plan.period}` : subscription.pendingPlan?.key === plan.key ? `Pay ${rupees(plan.yourPricePaisa)}` : `Choose ${plan.name} — ${rupees(plan.yourPricePaisa)}`}
+                    {current ? `Pay for another ${plan.period}` : subscription.pendingPlan?.key === plan.key ? `Pay ${rupees(plan.yourPricePaisa ?? plan.pricePaisa)}` : `Choose ${plan.name} — ${rupees(plan.yourPricePaisa ?? plan.pricePaisa)}`}
                   </Button>
                 ) : undefined}
               />
@@ -432,7 +434,7 @@ export function Billing() {
         onClose={() => setPaying(null)}
         icon={<Lock />}
         title={payingPlan ? `Pay for ${payingPlan.name}` : 'Pay'}
-        subtitle={payingPlan ? `${rupees(payingPlan.yourPricePaisa)} per ${payingPlan.period}${payingPlan.referralApplied ? ' (referral price)' : ''}${payingPlan.autoRenew ? ', renewing automatically until you stop it' : ''}${payingPlan.maxCycles > 0 ? `, for up to ${payingPlan.cyclesLeft ?? payingPlan.maxCycles} month(s)` : ''}` : ''}
+        subtitle={payingPlan ? `${rupees(payingPlan.yourPricePaisa ?? payingPlan.pricePaisa)} per ${payingPlan.period}${payingPlan.referralApplied ? ' (referral price)' : ''}${payingPlan.autoRenew ? ', renewing automatically until you stop it' : ''}${payingPlan.maxCycles > 0 ? `, for up to ${payingPlan.cyclesLeft ?? payingPlan.maxCycles} month(s)` : ''}` : ''}
         footer={(
           <>
             <Button variant="ghost" onClick={() => setPaying(null)}>Not now</Button>
