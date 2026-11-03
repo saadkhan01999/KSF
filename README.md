@@ -804,11 +804,14 @@ stock, sales, purchases, accounts and a prescription — and the copy's
 from buying the VPS (KVM 2 recommended, Ubuntu 24.04 with Docker, Mumbai) to
 HTTPS, backups, updates and moving over from Railway and Vercel.
 
-**Everything on Vercel, for testing:** `deploy/VERCEL_DEPLOYMENT.txt`. The
-root `vercel.json` builds the website and runs the whole API as one Vercel
-Function (`api/index.js`, in Mumbai), with MongoDB Atlas and a daily Vercel
-Cron for the housekeeping. A project whose Root Directory is `frontend`
-keeps working as before: the website on Vercel, the API on Railway.
+**Everything on Vercel, for testing:** `deploy/VERCEL_DEPLOYMENT.txt`.
+- A Vercel project with Root Directory `deploy/vercel` builds the website.
+- It runs the whole API as one Vercel Function, in Mumbai, with MongoDB
+  Atlas.
+- A daily Vercel Cron does the housekeeping.
+
+The project whose Root Directory is `frontend` keeps working as before: the
+website on Vercel, the API on Railway.
 
 `deploy/README.md` covers a production server with Docker (the app, Nginx
 with HTTPS, and MongoDB Atlas or a bundled replica set), Railway (API) with

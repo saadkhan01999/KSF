@@ -174,8 +174,18 @@ if (IS_PROD && env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
   process.exit(1);
 }
 
-/** The release number, typed once — in the root package.json. */
-export const VERSION: string = JSON.parse(readFileSync(fromRoot('package.json'), 'utf8')).version;
+/** The release number, typed once — in the root package.json. Read relative
+    to this file (backend/src/config or backend/dist/config, three levels
+    down), so a bundler that packs the server into one function (Vercel)
+    sees the file and takes it along. */
+export const VERSION: string = (() => {
+  try {
+    return String(JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).version);
+  } catch {
+    console.warn('[KSF] The root package.json could not be read, so the version is unknown.');
+    return '0.0.0';
+  }
+})();
 
 export const STATIC_FOLDER = (): string => fromRoot(env.STATIC_DIR);
 export const OUTBOX_FOLDER = (): string => fromRoot(env.MAIL_OUTBOX);

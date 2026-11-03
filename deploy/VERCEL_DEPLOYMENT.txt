@@ -18,14 +18,21 @@
 ------------------------------------------------------------------------------
 
   A. Website on Vercel, API on Railway  (what runs today)
-     Vercel project Root Directory = "frontend". frontend/vercel.json sends
-     every /api request to Railway. Nothing in this guide changes it.
+     Vercel project ksf-x86j, Root Directory = "frontend".
+     frontend/vercel.json sends every /api request to Railway. Nothing in
+     this guide changes it.
 
   B. Everything on Vercel  (this guide)
-     Vercel project Root Directory = the repository itself (empty / "./").
-     The root vercel.json builds the website, runs the whole API as one
-     Vercel Function (api/index.js), in Mumbai (bom1), and runs the daily
-     housekeeping with Vercel Cron.
+     A Vercel project with Root Directory = "deploy/vercel".
+     deploy/vercel/vercel.json builds the whole repository (website and
+     API), runs the API as one Vercel Function (deploy/vercel/api/index.mjs)
+     in Mumbai (bom1), and runs the daily housekeeping with Vercel Cron.
+     Everything for it lives in that one folder, so no other Vercel project
+     is affected by it.
+
+  (Your Vercel account also has a project called "ksf" whose Root Directory
+  is "backend". It only builds the API folder and is not used by the live
+  site; 3B below turns it into the full system.)
 
   What is different on B, and why it is fine for testing:
    - Housekeeping (a trial or plan ending, grace periods, reminders, the
@@ -94,17 +101,23 @@
       1. https://vercel.com/new > Import the GitHub repository
          saadkhan01999/KSF.
       2. Project name: for example ksf-test.
-      3. Root Directory: leave it as the repository root ("./").
+      3. Root Directory: click Edit and choose  deploy/vercel
+         Leave "Include files outside the Root Directory in the Build Step"
+         switched ON (it is by default) - the build needs the whole
+         repository.
       4. Framework Preset: Other. Leave Build, Output and Install empty -
-         vercel.json sets them (npm ci --include=dev, npm run build,
-         frontend/dist).
+         deploy/vercel/vercel.json sets them (it installs and builds at the
+         repository root, then copies the website into deploy/vercel/public).
       5. Open "Environment Variables" and add everything in Part 4.
       6. Deploy.
 
  3B. Turn the EXISTING project into the full system
-      (this stops using Railway for that site)
-      1. Vercel > the project (ksf-x86j) > Settings > Build and Deployment.
-      2. Root Directory: clear "frontend" so it is empty. Save.
+      The natural one is the project called "ksf" (Root Directory "backend"
+      today, not used by the live site). Doing this to ksf-x86j instead
+      would stop that site using Railway.
+      1. Vercel > the project > Settings > Build and Deployment.
+      2. Root Directory: deploy/vercel. Keep "Include files outside the Root
+         Directory" ON. Save.
       3. Framework Preset: Other. Clear any Build/Output/Install overrides.
       4. Settings > Environment Variables: add everything in Part 4.
       5. Deployments > the latest > Redeploy.

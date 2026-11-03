@@ -63,15 +63,21 @@ Pakistan Standard Time.
   it.
 
 ### The whole system on Vercel, for testing
-- **A root `vercel.json` runs everything on one Vercel project:**
+- **`deploy/vercel/` runs everything on one Vercel project** (Root
+  Directory `deploy/vercel`):
   - the website;
-  - the API as one Vercel Function (`api/index.js`), in Mumbai;
+  - the API as one Vercel Function (`deploy/vercel/api/index.mjs`), in
+    Mumbai;
   - MongoDB Atlas as the database;
   - a daily Vercel Cron for the housekeeping, at
     `/api/v1/cron/maintenance`, protected by `CRON_SECRET`.
 - **`deploy/VERCEL_DEPLOYMENT.txt`** gives every step and setting.
-- A Vercel project whose Root Directory is `frontend` is unchanged: the
-  website on Vercel, the API on Railway.
+- Vercel projects with Root Directory `frontend` (the live site, with the
+  API on Railway) or `backend` are unchanged. Everything for the new set-up
+  is in its own folder; a first version at the repository root broke the
+  `backend` project's build.
+- The server reads its version from `package.json` relative to its own
+  file, so a bundler takes the file along.
 - The housekeeping a server runs hourly now lives in one place
   (`services/maintenance.ts`), shared by the server and the cron.
 

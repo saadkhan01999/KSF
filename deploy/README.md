@@ -258,13 +258,19 @@ the forwarding. Redeploy after changing either side.
 
 ## Everything on Vercel (testing)
 
-The root `vercel.json` runs the whole system on one Vercel project: the
-website from `frontend/dist`, the API as one Vercel Function
-(`api/index.js`, built from `backend/src`) in Mumbai, MongoDB Atlas for
-the database, and Vercel Cron calling `/api/v1/cron/maintenance` once a day
-with `CRON_SECRET`. It is used when the project's Root Directory is the
-repository itself; a project whose Root Directory is `frontend` is not
-affected. Step by step, with every setting: `VERCEL_DEPLOYMENT.txt`.
+`vercel/` here runs the whole system on one Vercel project whose Root
+Directory is `deploy/vercel`:
+- the website, copied from `frontend/dist` into `deploy/vercel/public`;
+- the API as one Vercel Function (`deploy/vercel/api/index.mjs`, built
+  from `backend/src`) in Mumbai;
+- MongoDB Atlas for the database;
+- Vercel Cron calling `/api/v1/cron/maintenance` once a day with
+  `CRON_SECRET`.
+
+`deploy/vercel/vercel.json` installs and builds at the repository root.
+Everything for it is in that folder, so projects with Root Directory
+`frontend` or `backend` are not affected. Step by step, with every setting:
+`VERCEL_DEPLOYMENT.txt`.
 
 ## Files here
 
@@ -276,3 +282,4 @@ affected. Step by step, with every setting: `VERCEL_DEPLOYMENT.txt`.
 | `nginx/ksf.conf` | The site: HTTP → HTTPS, TLS, security headers, proxy to `app` |
 | `HOSTINGER_DEPLOYMENT.txt` | Step by step on a Hostinger VPS, from buying it to backups and updates |
 | `VERCEL_DEPLOYMENT.txt` | Step by step with the whole system on Vercel and MongoDB Atlas, for testing |
+| `vercel/vercel.json`, `vercel/api/index.mjs` | That Vercel project: the build, the routes, the API function, the daily cron |

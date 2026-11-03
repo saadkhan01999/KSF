@@ -3,7 +3,8 @@
    --------------------------------------------------------------------------
    On a serverless host (Vercel) nothing runs between requests, so the
    hourly housekeeping a normal server does by itself is started from
-   outside: Vercel Cron calls this address on the schedule in vercel.json,
+   outside: Vercel Cron calls this address on the schedule in
+   deploy/vercel/vercel.json,
    with "Authorization: Bearer <CRON_SECRET>". Without CRON_SECRET set the
    address does not exist; with it, anybody else is turned away.
    ========================================================================== */
