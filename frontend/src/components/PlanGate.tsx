@@ -50,12 +50,12 @@ export function PlanGate() {
                 key={plan.key}
                 plan={plan}
                 plans={all}
-                note={offer && !offer.available ? <span className="is-warn">{offer.unavailableReason}</span> : undefined}
+                note={offer?.available === false ? <span className="is-warn">{offer.unavailableReason}</span> : undefined}
                 action={canPay ? (
                   <Button
                     variant="primary"
                     icon={<CreditCard size={16} />}
-                    disabled={!!offer && !offer.available}
+                    disabled={offer?.available === false}
                     onClick={() => navigate(`/settings?tab=billing&choose=${encodeURIComponent(plan.key)}`)}
                   >
                     Choose {plan.name}
