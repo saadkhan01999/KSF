@@ -21,7 +21,7 @@ import { nowIso, rateLimit } from '../core/util.js';
 import { isElevated } from '../security/sessions.js';
 import { platformAllows } from '../domain/platform.js';
 import { sendAvatar } from '../services/avatars.js';
-import { requireFeature } from '../services/subscriptions.js';
+import { planRequired, requireFeature, workingState } from '../services/subscriptions.js';
 import { authenticate } from './authenticate.js';
 import type { Ctx, HandlerResult } from './context.js';
 import { routes, type RouteDef } from './router.js';
@@ -81,6 +81,10 @@ function noteRefusedOrigin(origin: string | undefined): void {
   console.warn(`[KSF] Refused a sign-in or sign-up from ${origin.slice(0, 200)}: add it to PUBLIC_ALLOWED_ORIGINS (or PUBLIC_APP_URL) if it is yours.`);
 }
 
+/* What a pharmacy with no plan can still change: its plan, its notices, and
+   a support request if it needs help choosing. */
+const OPEN_WITHOUT_PLAN = ['/api/v1/billing', '/api/v1/notifications', '/api/v1/support', '/api/v1/setup/plan'];
+
 async function handle(def: RouteDef, req: Request, res: Response): Promise<void> {
   const ctx = baseContext(req);
 
@@ -115,6 +119,13 @@ async function handle(def: RouteDef, req: Request, res: Response): Promise<void>
       /* The platform team in support mode sees what the pharmacy has, locked
          or not: they are there to help, and the plan is not theirs. */
       if (def.options.feature && !ctx.supportMode) await requireFeature(ctx.pharmacyId, def.options.feature);
+      /* The trial or the plan has ended: every record can still be read and
+         exported, and the way to a plan stays open, but nothing is changed
+         until one is paid for. */
+      if (WRITE_METHODS.has(req.method) && !ctx.supportMode && !OPEN_WITHOUT_PLAN.some((prefix) => def.path.startsWith(prefix))) {
+        const working = await workingState(ctx.pharmacyId);
+        if (!working.ok) throw planRequired(working.afterTrial);
+      }
     }
 
     /* A person at a counter cannot make 240 changes a minute; a stuck tab or

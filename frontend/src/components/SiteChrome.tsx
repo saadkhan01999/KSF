@@ -95,7 +95,7 @@ export function SiteHeader() {
  */
 export function SiteCta({
   title = 'Bring your pharmacy onto KSF',
-  body = 'Fifteen days of the full system on a referral, or start free on Basic and stay there as long as you like. Your data is yours either way.',
+  body = 'Fifteen days of the full system, free — then Monthly or Yearly, with full access on both. Your data is yours either way.',
   primary = 'Start free trial',
   secondary = 'Sign in'
 }: {
@@ -114,7 +114,7 @@ export function SiteCta({
           <Link to="/login" className="btn btn-secondary btn-lg btn-pill">{secondary}</Link>
         </div>
         <p className="site-cta-note">
-          No card needed to start. Basic is free for as long as you want it.
+          No card needed to start. The first fifteen days are free.
         </p>
       </div>
     </section>

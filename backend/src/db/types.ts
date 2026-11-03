@@ -326,6 +326,12 @@ export interface Plan extends Base {
   max_desktop_devices: number; max_mobile_devices: number; max_users: number; max_branches: number;
   max_medicines: number; features: string[]; auto_renew: Flag; is_default: Flag; is_public: Flag; is_free: Flag;
   sort_order: number; status: string; created_at: When; updated_at: When;
+  /** The price for a pharmacy that registered through a referral (Monthly: Rs 1,300). */
+  referral_price_paisa?: number | null;
+  /** How many periods one pharmacy may buy on this plan; 0 or missing for no limit. */
+  max_cycles?: number;
+  /** The free trial (Starter): started once at registration, never bought. */
+  is_trial?: Flag;
 }
 
 export interface Subscription extends Base {
@@ -336,6 +342,8 @@ export interface Subscription extends Base {
   /** A provider that renews on its own schedule (Stripe): its subscription and customer. */
   provider_subscription_id?: string | null; provider_customer_id?: string | null;
   failed_payments: number; reminder_sent_for?: string | null; dunning_sent_for?: string | null;
+  /** The plan the pharmacy has chosen and not yet paid for. It changes nothing until the payment clears. */
+  pending_plan_key?: string | null;
   created_at: When; updated_at: When;
 }
 

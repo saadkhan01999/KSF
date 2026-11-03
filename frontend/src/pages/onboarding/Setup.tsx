@@ -303,7 +303,7 @@ export default function Setup() {
           <Link to="/settings?tab=billing" className="setup-next-card">
             <span aria-hidden="true"><CreditCard size={20} /></span>
             <strong>Choose a plan</strong>
-            <span>Basic is free and permanent. Nothing is charged until a payment is confirmed.</span>
+            <span>You are on the 15-day free trial. Choose Monthly or Yearly before it ends — nothing is charged until a payment is confirmed.</span>
           </Link>
         </div>
       </Card>

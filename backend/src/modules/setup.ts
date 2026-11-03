@@ -18,6 +18,7 @@ import { auditLog, getSetting, logActivity, setSetting } from '../core/trails.js
 import { isPkPhone, nowIso, sanitiseText, toStr } from '../core/util.js';
 import { route } from '../http/router.js';
 import { listPlans } from '../services/subscriptions.js';
+import { TRIAL_PLAN_KEY } from '../domain/plans.js';
 
 const PHARMACY_TYPES = ['retail', 'chain', 'hospital', 'clinic', 'wholesale', 'online', 'compounding'];
 const PROVINCES = ['Sindh', 'Punjab', 'Khyber Pakhtunkhwa', 'Balochistan', 'Islamabad Capital Territory', 'Gilgit-Baltistan', 'Azad Jammu and Kashmir'];
@@ -38,7 +39,7 @@ async function checklist(pharmacyId: string) {
     { key: 'pharmacy', label: 'Name your pharmacy', note: 'The name and type that appear on every receipt and report.', to: '/setup', done: !!pharmacy?.name && !isPlaceholderName(pharmacy.name) },
     { key: 'address', label: 'Where you are', note: 'Street, city and phone number — printed on receipts, and used on returns to suppliers.', to: '/setup', done: !!(pharmacy?.address && pharmacy?.city && pharmacy?.phone) },
     { key: 'licence', label: 'Licence and tax details', note: 'DRAP licence, NTN and business registration. Required on receipts in some cities.', to: '/setup', optional: true, done: !!(pharmacy?.drap_licence || pharmacy?.ntn || pharmacy?.registration_no) },
-    { key: 'plan', label: 'Choose a plan', note: 'Basic is free and permanent. Nothing is charged until a payment is confirmed.', to: '/settings?tab=billing', optional: true, done: planChosen === 'yes' },
+    { key: 'plan', label: 'Choose a plan', note: 'The 15-day free trial has every feature. Choose Monthly or Yearly before it ends — nothing is charged until a payment is confirmed.', to: '/settings?tab=billing', optional: true, done: planChosen === 'yes' },
     { key: 'staff', label: 'Add your staff', note: 'Each person needs their own account — that is how KSF can tell you who served a sale.', to: '/staff', optional: true, done: staff > 1 },
     { key: 'medicines', label: 'Bring your medicines across', note: 'Import a CSV or Excel file from your old system, or add them by hand.', to: '/settings?tab=migration', done: medicines > 0 }
   ];
@@ -115,14 +116,14 @@ route('POST', '/api/v1/setup/licence', 'settings.write', async (ctx) => {
 
 /* Records which plan the Admin is interested in, and nothing else. */
 route('POST', '/api/v1/setup/plan', 'settings.write', async (ctx) => {
-  const planKey = toStr(ctx.body.planKey, 30) || 'basic';
+  const planKey = toStr(ctx.body.planKey, 30) || TRIAL_PLAN_KEY;
   const plan = (await listPlans()).find((entry) => entry.key === planKey);
   if (!plan) return bad('Choose one of the available plans.', 'planKey');
   await setSetting(ctx.pharmacyId, 'setup.planChosen', 'yes');
   await setSetting(ctx.pharmacyId, 'setup.planInterest', planKey);
   return {
     data: await checklist(ctx.pharmacyId),
-    message: plan.isFree ? 'You are on the free Basic plan.' : `Noted. Nothing has been charged — finish ${plan.name} from Billing when you are ready.`
+    message: plan.isTrial ? 'You are on the free trial, with every feature. Choose Monthly or Yearly under Billing before it ends.' : `Noted. Nothing has been charged — finish ${plan.name} from Billing when you are ready.`
   };
 });
 

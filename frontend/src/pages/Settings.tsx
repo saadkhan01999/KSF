@@ -72,8 +72,15 @@ export default function SettingsPage() {
     setDirty(false);
   }, [data]);
 
+  /* The address follows the tab. Anything else on it — a payment coming back
+     (?payment=paid), a plan picked elsewhere (?choose=yearly) — is left for
+     the tab to read, which removes it once it has. */
   useEffect(() => {
-    setParams(tab === 'pharmacy' ? new URLSearchParams() : new URLSearchParams({ tab }), { replace: true });
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (tab === 'pharmacy') next.delete('tab'); else next.set('tab', tab);
+      return next;
+    }, { replace: true });
   }, [tab, setParams]);
 
   const set = (key: string, value: string) => { setSettings((s) => ({ ...s, [key]: value })); setDirty(true); };

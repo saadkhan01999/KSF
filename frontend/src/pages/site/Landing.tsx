@@ -35,7 +35,11 @@ import { SiteHeader, SiteFooter, SiteCta } from '../../components/SiteChrome';
 import { DashboardPreview, TillPreview, ExpiryPreview } from '../../components/AppPreview';
 import { BRAND } from '../../brand';
 import { useParallax, useReveal, useViewMode } from '../../hooks/useParallax';
-import { PLAN_SUMMARY, FAQ } from './content';
+import { usePublicPlans } from '../../hooks/usePublicPlans';
+import { FullAccessStrip, SheetPlanCard } from '../../components/price-sheet';
+import { CardSkeleton } from '../../components/ui';
+import { rupees } from '../../utils/format';
+import { FAQ } from './content';
 
 const PARTNERS = [
   'Getz Pharma', 'Searle', 'Abbott', 'GSK Pakistan', 'Highnoon',
@@ -78,6 +82,9 @@ const PILLARS = [
 export default function Landing() {
   useViewMode('site');
   useReveal([]);
+  /* The live plans and prices, so the front page never quotes an old price. */
+  const { plans, trialDays } = usePublicPlans();
+  const referral = plans?.find((plan) => plan.referralPricePaisa !== null && plan.referralPricePaisa < plan.pricePaisa);
 
   /* Each layer moves at its own rate; that difference is the whole effect. */
   const blobOne = useParallax<HTMLDivElement>({ speed: 0.35, max: 180 });
@@ -130,7 +137,7 @@ export default function Landing() {
                 <span className="avatar sm">BA</span>
               </span>
               <span>
-                Free on Basic for as long as you like. No card to begin,
+                Free for {trialDays} days, with every feature. No card to begin,
                 and nothing is ever deleted if you stop paying.
               </span>
             </div>
@@ -331,27 +338,35 @@ export default function Landing() {
         <section className="band" id="plans" data-reveal>
           <div className="band-head">
             <span className="eyebrow">Subscription</span>
-            <h2>Four levels. Basic is free, permanently.</h2>
+            <h2>Three plans. Full access on every one.</h2>
             <p>
-              Every plan includes batch tracking and expiry control, because a pharmacy that
-              cannot see an expired batch is a pharmacy that sells one. That is never behind a
-              paywall.
+              Start with {trialDays} days free, then pay month by month while you settle in, or once
+              a year for the best price. Every plan opens the whole system, with no limit on what
+              you record.
             </p>
           </div>
 
-          <div className="plan-strip">
-            {PLAN_SUMMARY.map((plan) => (
-              <article key={plan.key} className={`plan-strip-card ${plan.featured ? 'is-featured' : ''}`}>
-                <h3>{plan.name}</h3>
-                <p className="plan-strip-price">{plan.price}</p>
-                <p className="plan-strip-note">{plan.note}</p>
-                <ul>{plan.points.map((point) => <li key={point}><Check size={13} /> {point}</li>)}</ul>
-              </article>
-            ))}
-          </div>
+          {!plans && <CardSkeleton count={3} />}
+          {plans && (
+            <div className="sheet-grid plan-grid">
+              {plans.map((plan) => (
+                <SheetPlanCard
+                  key={plan.key}
+                  plan={plan}
+                  plans={plans}
+                  action={(
+                    <Link to="/register" className={`btn btn-block ${plan.isTrial ? 'btn-primary' : 'btn-secondary'}`}>
+                      {plan.isTrial ? 'Start free trial' : `Start free, then choose ${plan.name}`}
+                    </Link>
+                  )}
+                />
+              ))}
+            </div>
+          )}
+          <FullAccessStrip />
 
           <div className="band-actions">
-            <Link to="/pricing" className="btn btn-secondary btn-pill">Compare the plans in full</Link>
+            <Link to="/pricing" className="btn btn-secondary btn-pill">Everything about the plans</Link>
           </div>
         </section>
 
@@ -360,16 +375,16 @@ export default function Landing() {
           <div className="referral-panel">
             <span className="referral-icon" aria-hidden="true"><Gift size={22} /></span>
             <div>
-              <h2>Fifteen days of everything, on a referral</h2>
+              <h2>Came through a referral? Pay less every month.</h2>
               <p>
-                Every KSF pharmacy has a referral code. A pharmacy that signs up through it gets
-                fifteen days of the full premium feature set, starting when they confirm their
-                e-mail address — not when they click the link.
+                Every KSF pharmacy has a referral code. A pharmacy that signs up through it pays
+                the referral price{referral ? <> — <strong>{rupees(referral.referralPricePaisa)} a month on {referral.name}</strong> instead of {rupees(referral.pricePaisa)}</> : null},
+                from its first payment, once it confirms its e-mail address.
               </p>
               <p className="referral-fineprint">
-                One trial per account. When it ends the pharmacy moves to the free Basic plan
-                with every medicine, batch, sale and prescription exactly where it was. Nothing
-                is deleted when a trial expires — not then, and not later.
+                Everybody starts with the {trialDays}-day free trial. When it ends you choose Monthly
+                or Yearly, and every medicine, batch, sale and prescription is exactly where it
+                was. Nothing is deleted when a trial or a plan ends — not then, and not later.
               </p>
             </div>
           </div>

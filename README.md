@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.5.2** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.6.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -211,10 +211,18 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
   Regional Manager, Branch Manager, Pharmacist, Cashier. The Admin can create
   any other role by ticking permissions, and can never grant more than they
   hold. Seniority decides who may act on whom.
-- **Plans** — Basic (free) has the till, stock with batches and expiry, the
-  daily summaries and messaging. Paid plans add advanced reports, CSV export,
-  custom roles, data import and more. The Super Admin decides what each plan
-  includes; a pharmacy's screens unlock or lock the moment its plan changes.
+- **Plans** — from the owner's price sheet, every one with every feature and
+  unlimited records:
+  - **Starter**: free for 15 days. Every new pharmacy starts on it.
+  - **Monthly**: Rs 1,500 a month, or Rs 1,300 for a pharmacy that came through
+    a referral. It's a starter plan for up to three months.
+  - **Yearly**: Rs 12,000, about Rs 1,000 a month.
+
+  When the trial or a plan ends, nothing is deleted. Every screen shows the
+  choice of Monthly or Yearly, records can still be read and exported, and
+  changes wait until a plan is paid for. The Super Admin can change any price,
+  the referral price, the three-month limit and the trial length under
+  **Platform › Plans**.
 - **Themes** — five colour themes (KSF Green, Ocean Blue, Royal Purple, Sunset
   Amber, Graphite), each with light and dark mode. The pharmacy Admin sets the
   pharmacy's theme in **Settings › Appearance** and chooses which roles may
@@ -326,6 +334,7 @@ added without a line here.
 | Endpoint | Who may call | What it does |
 |---|---|---|
 | `GET /api/v1/health` | Anyone | The service is up: version, time, whether transactions are available |
+| `GET /api/v1/cron/maintenance` | The scheduler (`Authorization: Bearer <CRON_SECRET>`) | On Vercel: runs the housekeeping a normal server does hourly — trials and plans ending, grace periods, reminders, the mail queue. Does not exist unless `CRON_SECRET` is set |
 | `GET /api/v1/avatars/:id` | Anyone | A profile photo (the id is random and changes with every new photo) |
 
 #### Sign-in and sessions
@@ -579,12 +588,13 @@ added without a line here.
 
 | Endpoint | Who may call | What it does |
 |---|---|---|
-| `GET /api/v1/billing` | `settings.read` | The subscription, plans, payment history, referrals, payment methods and the card on file |
+| `GET /api/v1/billing` | `settings.read` | The subscription, the plans at this pharmacy's own price (with the referral price, and whether each can still be chosen), payment history, referrals, payment methods and the card on file |
 | `GET /api/v1/billing/payments` | `settings.read` | Every subscription payment |
-| `POST /api/v1/billing/plan` | `settings.write` | Choose a plan (a paid plan waits for payment; Basic applies at once) |
+| `POST /api/v1/billing/plan` | `settings.write` | Choose Monthly or Yearly. Nothing changes until it is paid for: the trial or the current plan carries on, and the new one starts where it ends |
 | `POST /api/v1/billing/auto-renew` | `settings.write` | Turn automatic renewal on or off (told to Stripe first) |
 | `POST /api/v1/billing/cancel` | `settings.write` | Cancel: renewal stops, the paid period runs to its end |
-| `POST /api/v1/billing/checkout` | `settings.write` | Start paying for a plan with a provider: answers the redirect (Stripe Checkout, JazzCash…) or bank-transfer instructions; the amount comes from the plan |
+| `POST /api/v1/billing/checkout` | `settings.write` | Start paying for a plan with a provider: answers the redirect (Stripe Checkout, JazzCash…) or bank-transfer instructions; the amount is the pharmacy's price for the plan (Rs 1,300 on Monthly with a referral), never the browser's |
+| `POST /api/v1/billing/referral` | `settings.write` | Enter a referral code after registering without one: the referral price applies from the next payment |
 | `POST /api/v1/billing/portal` | `settings.write` | A link to Stripe's page for changing the card |
 | `GET /api/v1/billing/providers` | `settings.read` | The payment providers and whether each is configured |
 | `GET /api/v1/billing/attempts` | `settings.read` | Payment attempts and refunds |
@@ -794,6 +804,15 @@ stock, sales, purchases, accounts and a prescription — and the copy's
 from buying the VPS (KVM 2 recommended, Ubuntu 24.04 with Docker, Mumbai) to
 HTTPS, backups, updates and moving over from Railway and Vercel.
 
+**Everything on Vercel, for testing:** `deploy/VERCEL_DEPLOYMENT.txt`.
+- A Vercel project with Root Directory `deploy/vercel` builds the website.
+- It runs the whole API as one Vercel Function, in Mumbai, with MongoDB
+  Atlas.
+- A daily Vercel Cron does the housekeeping.
+
+The project whose Root Directory is `frontend` keeps working as before: the
+website on Vercel, the API on Railway.
+
 `deploy/README.md` covers a production server with Docker (the app, Nginx
 with HTTPS, and MongoDB Atlas or a bundled replica set), Railway (API) with
 Vercel (website), and the settings that must change for production:
@@ -807,7 +826,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.5.2 · Server 2.5.2 — up to date", or
+System) compares the two: "Website 2.6.0 · Server 2.6.0 — up to date", or
 which one still has to redeploy from `main` (Railway › the service ›
 Deployments, or Vercel › Deployments).
 

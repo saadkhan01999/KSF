@@ -1,23 +1,28 @@
 /* ==========================================================================
    Subscriptions
    --------------------------------------------------------------------------
-   Four plans, all documents in subscription_plans: Basic (free, permanent),
-   Weekly, Monthly and Annual. Two principles run through everything here.
+   Three plans, all documents in subscription_plans (domain/plans.ts):
+   Starter (the free 15-day trial every pharmacy starts on), Monthly (Rs 1,500,
+   or Rs 1,300 through a referral, for up to three months) and Yearly
+   (Rs 12,000). Every plan includes every feature. Two principles run through
+   everything here.
 
    1. The pharmacy's data is never the hostage. A trial ending, a card
       failing, a plan being cancelled — none of them delete a medicine, a
-      batch, a sale or a prescription. The account moves to Basic or into a
-      grace period; only which features are reachable changes.
+      batch, a sale or a prescription. When there is no plan the pharmacy is
+      asked to choose one, and its records can still be read and exported;
+      only changing them waits for the payment.
 
    2. The browser is never believed about money. A payment is real when the
       provider says so, over a signed webhook or a server-to-server check.
       Every provider event is recorded under a unique (provider, event_id), so
-      a retried delivery extends the period exactly once.
+      a retried delivery extends the period exactly once. Choosing a plan
+      changes nothing by itself: the plan starts when its payment clears.
    ========================================================================== */
 
 import { env } from '../config/env.js';
 import { col, tx, s } from '../db/mongo.js';
-import type { Plan, Subscription, SubscriptionPayment } from '../db/types.js';
+import type { Plan, Subscription, SubscriptionPayment, Trial } from '../db/types.js';
 import { FEATURES, TRIAL_PLAN_KEY } from '../domain/plans.js';
 import { HttpError } from '../core/errors.js';
 import { nextNumber, notify } from '../core/trails.js';
@@ -30,15 +35,31 @@ export const STATUSES = Object.freeze({
   GRACE: 'grace', CANCELLED: 'cancelled', EXPIRED: 'expired', SUSPENDED: 'suspended'
 });
 
-/* Statuses in which the paid feature set is available. Cancelled still works
-   until the period it was paid for runs out — the pharmacy paid for it. */
+/* Statuses in which the pharmacy can work. Cancelled still works until the
+   period it was paid for runs out — the pharmacy paid for it. */
 const ENTITLED = new Set<string>([STATUSES.TRIAL, STATUSES.ACTIVE, STATUSES.PAST_DUE, STATUSES.GRACE, STATUSES.CANCELLED]);
+/* These two end on their date to the second, without waiting for the hourly
+   maintenance: a trial that ran out at 10:00 is over at 10:00. */
+const UNTIL_PERIOD_END = new Set<string>([STATUSES.TRIAL, STATUSES.CANCELLED]);
+
+/** Can this subscription be worked on right now? */
+export function isEntitled(subscription: Pick<Subscription, 'status' | 'current_period_end'>, now = Date.now()): boolean {
+  if (!ENTITLED.has(subscription.status)) return false;
+  if (UNTIL_PERIOD_END.has(subscription.status)) return new Date(subscription.current_period_end).getTime() > now;
+  return true;
+}
 
 export interface PlanView {
   id: string; key: string; name: string; tagline: string | null; description: string | null; period: string;
   periodDays: number; pricePaisa: number; currency: string; annualDiscountPercent: number; graceDays: number;
   limits: { desktopDevices: number; mobileDevices: number; users: number; branches: number; medicines: number };
   features: string[]; autoRenew: boolean; isDefault: boolean; isFree: boolean; sortOrder: number; status?: string; isPublic?: boolean;
+  /** The free trial: started once, at registration, and never bought. */
+  isTrial: boolean; trialDays: number;
+  /** What a pharmacy that came through a referral pays instead, or null. */
+  referralPricePaisa: number | null;
+  /** How many periods one pharmacy may buy; 0 for no limit. */
+  maxCycles: number;
 }
 
 export const planView = (row: Plan): PlanView => ({
@@ -50,7 +71,9 @@ export const planView = (row: Plan): PlanView => ({
     branches: row.max_branches, medicines: row.max_medicines
   },
   features: row.features ?? [], autoRenew: !!row.auto_renew, isDefault: !!row.is_default, isFree: !!row.is_free,
-  sortOrder: row.sort_order, status: row.status, isPublic: !!row.is_public
+  sortOrder: row.sort_order, status: row.status, isPublic: !!row.is_public,
+  isTrial: !!row.is_trial, trialDays: row.trial_days ?? 0,
+  referralPricePaisa: row.referral_price_paisa ?? null, maxCycles: row.max_cycles ?? 0
 });
 
 export const listPlans = async (): Promise<PlanView[]> =>
@@ -66,10 +89,86 @@ export const defaultPlan = async (): Promise<PlanView | null> => {
   return row ? planView(row) : null;
 };
 
+/** The free trial plan (Starter). */
+export const trialPlan = async (): Promise<PlanView | null> => {
+  const row = await col.plans().findOne({ is_trial: 1, status: 'active' }, { sort: { sort_order: 1 } })
+    ?? await col.plans().findOne({ key: TRIAL_PLAN_KEY });
+  return row ? planView(row) : null;
+};
+
+/** How many days the free trial runs, as the Super Admin has set it. */
+export const trialLength = (plan: Pick<PlanView, 'trialDays' | 'periodDays'> | null): number =>
+  plan?.trialDays || plan?.periodDays || 15;
+
+/* ------------------------------------------------------------ the price */
+
+/** Did this pharmacy register through a referral that was honoured? */
+export async function hasReferralPricing(pharmacyId: string): Promise<boolean> {
+  return !!(await col.referrals().findOne({ referred_pharmacy_id: pharmacyId, status: 'converted' }, { projection: { _id: 1 } }));
+}
+
+/** What a pharmacy pays for a period of this plan: the referral price when it came through one. */
+export function priceFor(plan: Pick<PlanView, 'pricePaisa' | 'referralPricePaisa'>, referred: boolean): number {
+  const special = plan.referralPricePaisa;
+  return referred && special !== null && special >= 0 && special < plan.pricePaisa ? special : plan.pricePaisa;
+}
+
+/** Periods of this plan the pharmacy has paid for. */
+export const cyclesUsed = (pharmacyId: string, planKey: string): Promise<number> =>
+  col.subscriptionPayments().countDocuments({ pharmacy_id: pharmacyId, plan_key: planKey, status: 'succeeded' });
+
+const PERIOD_WORD: Record<string, string> = { week: 'week', month: 'month', year: 'year', trial: 'day' };
+const periods = (plan: Pick<PlanView, 'period'>, n: number): string => `${n} ${PERIOD_WORD[plan.period] ?? 'period'}${n === 1 ? '' : 's'}`;
+
+/** A plan as one pharmacy sees it: its own price, and whether it can still have it. */
+export interface PlanOffer extends PlanView {
+  yourPricePaisa: number; referralApplied: boolean;
+  cyclesUsed: number; cyclesLeft: number | null;
+  available: boolean; unavailableReason: string | null;
+}
+
+/** Can this pharmacy choose this plan, and if not, why not — in words it can act on. */
+function availability(plan: PlanView, used: number, others: PlanView[]): string | null {
+  if (plan.status !== 'active' || !plan.isPublic) return 'That plan is not offered any more.';
+  if (plan.isTrial) return 'The free trial is started once, when the pharmacy registers. Choose a paid plan to carry on.';
+  if (plan.maxCycles > 0 && used >= plan.maxCycles) {
+    const next = others.filter((other) => other.key !== plan.key && !other.isTrial && other.status === 'active').map((other) => other.name);
+    return `${plan.name} is a starter plan for the first ${periods(plan, plan.maxCycles)}, and this pharmacy has had them.${next.length ? ` Choose ${next.join(' or ')} to carry on.` : ''}`;
+  }
+  return null;
+}
+
+/** Every public plan, priced and checked for this pharmacy. */
+export async function offersFor(pharmacyId: string): Promise<PlanOffer[]> {
+  const [plans, referred] = await Promise.all([listPlans(), hasReferralPricing(pharmacyId)]);
+  const used = await Promise.all(plans.map((plan) => (plan.maxCycles > 0 ? cyclesUsed(pharmacyId, plan.key) : Promise.resolve(0))));
+  return plans.map((plan, index) => {
+    const reason = availability(plan, used[index], plans);
+    const yourPricePaisa = priceFor(plan, referred);
+    return {
+      ...plan, yourPricePaisa, referralApplied: yourPricePaisa < plan.pricePaisa,
+      cyclesUsed: used[index], cyclesLeft: plan.maxCycles > 0 ? Math.max(0, plan.maxCycles - used[index]) : null,
+      available: !reason, unavailableReason: reason
+    };
+  });
+}
+
+/** One plan for one pharmacy, or the reason it cannot have it. */
+export async function offerFor(pharmacyId: string, planKey: string): Promise<{ ok: true; offer: PlanOffer } | { ok: false; reason: string }> {
+  const plan = await getPlan(planKey);
+  if (!plan) return { ok: false, reason: 'Choose one of the available plans.' };
+  const offers = await offersFor(pharmacyId);
+  const offer = offers.find((row) => row.key === plan.key);
+  if (!offer) return { ok: false, reason: plan.status === 'active' ? 'That plan is not offered any more.' : 'Choose one of the available plans.' };
+  if (!offer.available) return { ok: false, reason: offer.unavailableReason ?? 'That plan cannot be chosen.' };
+  return { ok: true, offer };
+}
+
 /** The end of a period that starts now, for a plan of this shape. */
 export function periodEnd(plan: Pick<PlanView, 'period' | 'periodDays'>, from = new Date()): string {
   const date = new Date(from);
   if (plan.period === 'perpetual') return new Date(date.getTime() + 100 * 365 * 86_400_000).toISOString();
+  if (plan.period === 'trial') return new Date(date.getTime() + (plan.periodDays || 15) * 86_400_000).toISOString();
   if (plan.period === 'week') date.setUTCDate(date.getUTCDate() + 7);
   else if (plan.period === 'month') date.setUTCMonth(date.getUTCMonth() + 1);
   else if (plan.period === 'year') date.setUTCFullYear(date.getUTCFullYear() + 1);
@@ -80,7 +179,7 @@ export function periodEnd(plan: Pick<PlanView, 'period' | 'periodDays'>, from = 
 export type CurrentSubscription = Subscription & {
   plan_name: string; plan_period: string; plan_features: string[]; max_desktop_devices: number;
   max_mobile_devices: number; max_users: number; max_branches: number; max_medicines: number;
-  grace_days: number; is_free: 0 | 1;
+  grace_days: number; is_free: 0 | 1; is_trial: 0 | 1; max_cycles: number;
 };
 
 /** The pharmacy's current subscription, with its plan's details alongside. */
@@ -94,50 +193,72 @@ export async function currentSubscription(pharmacyId: string): Promise<CurrentSu
     plan_features: plan?.features ?? [], max_desktop_devices: plan?.max_desktop_devices ?? 1,
     max_mobile_devices: plan?.max_mobile_devices ?? 1, max_users: plan?.max_users ?? 3,
     max_branches: plan?.max_branches ?? 1, max_medicines: plan?.max_medicines ?? 500,
-    grace_days: plan?.grace_days ?? 7, is_free: plan?.is_free ?? 0
+    grace_days: plan?.grace_days ?? 7, is_free: plan?.is_free ?? 0, is_trial: plan?.is_trial ?? 0, max_cycles: plan?.max_cycles ?? 0
   };
 }
+
+/** Everything the web app needs when a pharmacy has no plan at all. */
+const NO_PLAN = {
+  subscriptionId: null, plan: 'none', planName: 'No plan', status: STATUSES.EXPIRED, entitled: false, locked: true,
+  features: [] as string[], planFeatures: [] as string[], limits: {}, isFree: false, isTrial: false, autoRenew: false,
+  pricePaisa: 0, startedAt: null, periodStart: null, periodEnd: null, renewalAt: null, graceUntil: null, cancelledAt: null,
+  endedAt: null, failedPayments: 0, daysLeft: null, trial: null, pendingPlan: null, cycles: null, referralPricing: false
+};
 
 /**
  * Everything the web app needs to decide what to show. Computed, never
  * cached, so a trial that expired overnight is right on the first load.
+ * `locked` is the one the screens care most about: true when the trial or
+ * the plan has ended and the pharmacy needs to choose one to carry on.
  */
 export async function subscriptionState(pharmacyId: string | null) {
   if (!pharmacyId) return null;
   const subscription = await currentSubscription(pharmacyId);
-  if (!subscription) {
-    const plan = await defaultPlan();
-    return {
-      subscriptionId: null, plan: plan?.key ?? 'basic', planName: plan?.name ?? 'Basic', status: STATUSES.ACTIVE,
-      entitled: true, features: plan?.features ?? [], planFeatures: plan?.features ?? [], limits: plan?.limits ?? {},
-      isFree: true, autoRenew: false, daysLeft: null, trial: null
-    };
-  }
-  const trial = await col.trials().findOne({ pharmacy_id: pharmacyId, status: 'active' }, { sort: { created_at: -1 } });
+  if (!subscription) return NO_PLAN;
+  const [trial, referralPricing, used] = await Promise.all([
+    col.trials().findOne({ pharmacy_id: pharmacyId, status: 'active' }, { sort: { created_at: -1 } }),
+    hasReferralPricing(pharmacyId),
+    subscription.max_cycles > 0 ? cyclesUsed(pharmacyId, subscription.plan_key) : Promise.resolve(0)
+  ]);
   const endsAt = subscription.status === STATUSES.GRACE && subscription.grace_until ? subscription.grace_until : subscription.current_period_end;
   const daysLeft = endsAt ? Math.max(0, Math.ceil((new Date(endsAt).getTime() - Date.now()) / 86_400_000)) : null;
   /* `features` is what can be used now; `planFeatures` what the plan
-     includes. They differ while a plan waits for payment. */
-  const entitled = ENTITLED.has(subscription.status);
-  const basic = entitled ? null : await defaultPlan();
+     includes. They differ once the trial or the plan has ended. */
+  const entitled = isEntitled(subscription);
+  const status = !entitled && subscription.status === STATUSES.TRIAL ? STATUSES.EXPIRED : subscription.status;
+  const pending = subscription.pending_plan_key ? await getPlan(subscription.pending_plan_key) : null;
   return {
     subscriptionId: subscription.id, plan: subscription.plan_key, planName: subscription.plan_name,
-    status: subscription.status, entitled,
-    features: entitled ? subscription.plan_features : (basic?.features ?? []),
+    status, entitled, locked: !entitled,
+    features: entitled ? subscription.plan_features : [],
     planFeatures: subscription.plan_features,
     limits: {
       desktopDevices: subscription.max_desktop_devices, mobileDevices: subscription.max_mobile_devices,
       users: subscription.max_users, branches: subscription.max_branches, medicines: subscription.max_medicines
     },
-    isFree: !!subscription.is_free, autoRenew: !!subscription.auto_renew, startedAt: subscription.started_at,
+    isFree: !!subscription.is_free, isTrial: !!subscription.is_trial, autoRenew: !!subscription.auto_renew,
+    pricePaisa: subscription.price_paisa, startedAt: subscription.started_at,
     periodStart: subscription.current_period_start, periodEnd: subscription.current_period_end,
     renewalAt: subscription.renewal_at, graceUntil: subscription.grace_until, cancelledAt: subscription.cancelled_at,
-    failedPayments: subscription.failed_payments, daysLeft,
+    endedAt: subscription.ended_at, failedPayments: subscription.failed_payments, daysLeft: entitled ? daysLeft : 0,
+    pendingPlan: pending ? { key: pending.key, name: pending.name } : null,
+    /* "Month 2 of 3" on a plan that runs for a set number of periods. */
+    cycles: subscription.max_cycles > 0 ? { used, max: subscription.max_cycles, period: subscription.plan_period } : null,
+    referralPricing,
     trial: trial ? {
       id: trial.id, source: trial.source, days: trial.days, startedAt: trial.started_at, expiresAt: trial.expires_at,
       daysLeft: Math.max(0, Math.ceil((new Date(trial.expires_at).getTime() - Date.now()) / 86_400_000))
     } : null
   };
+}
+
+/** Can the pharmacy change its records — is it on its trial, or a plan that has not ended? */
+export async function workingState(pharmacyId: string): Promise<{ ok: boolean; afterTrial: boolean }> {
+  const subscription = await col.subscriptions().findOne({ pharmacy_id: pharmacyId }, { sort: { created_at: -1 }, projection: { status: 1, current_period_end: 1, plan_key: 1 } });
+  if (!subscription) return { ok: false, afterTrial: true };
+  if (isEntitled(subscription)) return { ok: true, afterTrial: false };
+  const plan = await col.plans().findOne({ key: subscription.plan_key }, { projection: { is_trial: 1 } });
+  return { ok: false, afterTrial: subscription.status === STATUSES.TRIAL || !!plan?.is_trial };
 }
 
 export async function hasFeature(pharmacyId: string, featureKey: string): Promise<boolean> {
@@ -151,9 +272,11 @@ export async function hasFeature(pharmacyId: string, featureKey: string): Promis
  * cannot be reached until the plan includes it again.
  */
 export async function requireFeature(pharmacyId: string, featureKey: string): Promise<void> {
-  if (await hasFeature(pharmacyId, featureKey)) return;
+  const state = await subscriptionState(pharmacyId);
+  if (state?.features.includes(featureKey)) return;
+  if (state?.locked) throw planRequired(state.isTrial || state.plan === 'none');
   const name = FEATURES.find(([key]) => key === featureKey)?.[1] ?? featureKey;
-  const plans = (await listPlans()).filter((plan) => plan.features.includes(featureKey)).map((plan) => ({ key: plan.key, name: plan.name }));
+  const plans = (await listPlans()).filter((plan) => !plan.isTrial && plan.features.includes(featureKey)).map((plan) => ({ key: plan.key, name: plan.name }));
   const error = new HttpError(
     402,
     `${name} is not part of your current plan.${plans.length ? ` It comes with ${plans.map((plan) => plan.name).join(', ')}.` : ''} Upgrade under Settings › Billing.`,
@@ -164,13 +287,25 @@ export async function requireFeature(pharmacyId: string, featureKey: string): Pr
   throw error;
 }
 
+/** The refusal for a change made with no plan: what happened, that nothing is lost, and what to do. */
+export function planRequired(afterTrial = false): HttpError {
+  const error = new HttpError(
+    402,
+    `${afterTrial ? 'Your free trial has ended.' : 'Your plan has ended.'} Choose the Monthly or Yearly plan under Settings › Billing to carry on — every record is safe and can still be viewed.`,
+    undefined,
+    'plan_required'
+  );
+  error.details = { billing: '/settings?tab=billing' };
+  return error;
+}
+
 /* --------------------------------------------------------------- lifecycle */
 
 /**
- * Put a pharmacy on a plan. Choosing a paid plan does not grant it: the
- * account starts on payment_pending with the free features, and only a
- * verified provider event moves it to active. `activateWithoutPayment` is
- * for the Super Admin and is never reachable from a pharmacy's browser.
+ * Put a pharmacy on a plan straight away. The free trial and a free plan
+ * start at once; a paid plan only with `activateWithoutPayment`, which is for
+ * the Super Admin and never reachable from a pharmacy's browser. Without it a
+ * paid plan waits for its first payment and the pharmacy has no plan yet.
  */
 export async function startSubscription(input: {
   pharmacyId: string; planKey: string; source?: string; autoRenew?: boolean | null;
@@ -180,62 +315,88 @@ export async function startSubscription(input: {
   if (!plan) throw new Error('No subscription plans are configured.');
   const at = nowIso();
   const id = secureReference('SUB');
-  const ends = periodEnd(plan);
-  const status = plan.isFree || input.activateWithoutPayment ? STATUSES.ACTIVE : STATUSES.PAYMENT_PENDING;
+  const ends = plan.isTrial ? periodEnd({ period: 'trial', periodDays: trialLength(plan) }) : periodEnd(plan);
+  const status = plan.isTrial ? STATUSES.TRIAL : plan.isFree || input.activateWithoutPayment ? STATUSES.ACTIVE : STATUSES.PAYMENT_PENDING;
   const doc: Subscription = {
     _id: id, id, pharmacy_id: input.pharmacyId, plan_id: plan.id, plan_key: plan.key, status,
-    price_paisa: plan.pricePaisa, currency: plan.currency,
-    auto_renew: input.autoRenew === null || input.autoRenew === undefined ? (plan.autoRenew ? 1 : 0) : (input.autoRenew ? 1 : 0),
-    started_at: at, current_period_start: at, current_period_end: ends, renewal_at: plan.isFree ? null : ends,
+    price_paisa: plan.isTrial ? 0 : priceFor(plan, await hasReferralPricing(input.pharmacyId)), currency: plan.currency,
+    auto_renew: plan.isFree ? 0 : input.autoRenew === null || input.autoRenew === undefined ? (plan.autoRenew ? 1 : 0) : (input.autoRenew ? 1 : 0),
+    started_at: at, current_period_start: at, current_period_end: status === STATUSES.PAYMENT_PENDING ? at : ends,
+    renewal_at: plan.isFree || status === STATUSES.PAYMENT_PENDING ? null : ends,
     grace_until: null, cancelled_at: null, cancel_reason: null, ended_at: null, source: input.source ?? 'signup',
     provider: input.provider ?? null, provider_reference: input.providerReference ?? null, failed_payments: 0,
-    created_at: at, updated_at: at
+    pending_plan_key: null, created_at: at, updated_at: at
   };
   await col.subscriptions().insertOne(doc, s());
   await col.pharmacies().updateOne({ _id: input.pharmacyId }, { $set: { subscription_id: id, plan_key: plan.key } }, s());
   return doc;
 }
 
-/** Start a premium trial. One per account, ever. */
+/**
+ * Start the free trial: every feature, for the Starter plan's days. One per
+ * account, ever — `again` is for the Super Admin, and for an installation
+ * moving from the old free plan, never for a pharmacy's browser.
+ */
 export async function startTrial(input: {
-  pharmacyId: string; days?: number; source?: string; referralId?: string | null; planKey?: string;
-}): Promise<{ ok: boolean; reason?: string; trial?: unknown }> {
-  if (await col.trials().findOne({ pharmacy_id: input.pharmacyId })) return { ok: false, reason: 'A trial has already been used on this account.' };
-  const plan = await getPlan(input.planKey ?? TRIAL_PLAN_KEY);
+  pharmacyId: string; days?: number; source?: string; referralId?: string | null; planKey?: string; again?: boolean;
+}): Promise<{ ok: boolean; reason?: string; trial?: Trial; subscription?: Subscription }> {
+  if (!input.again && await col.trials().findOne({ pharmacy_id: input.pharmacyId })) return { ok: false, reason: 'A trial has already been used on this account.' };
+  const plan = input.planKey ? await getPlan(input.planKey) : await trialPlan();
   if (!plan) return { ok: false, reason: 'The trial plan is not configured.' };
-  const days = input.days ?? env.REFERRAL_TRIAL_DAYS;
+  const days = input.days ?? trialLength(plan);
   const at = nowIso();
   const expires = plusDays(days);
   const id = secureReference('TRL');
+  const source = input.source ?? 'signup';
 
   return tx(async () => {
-    const subscription = await currentSubscription(input.pharmacyId);
+    let subscription: Subscription | null = await currentSubscription(input.pharmacyId);
     if (subscription) {
       await col.subscriptions().updateOne({ _id: subscription.id }, {
         $set: {
-          plan_id: plan.id, plan_key: plan.key, status: STATUSES.TRIAL, price_paisa: 0, current_period_start: at,
-          current_period_end: expires, renewal_at: null, source: input.source ?? 'referral', updated_at: at
+          plan_id: plan.id, plan_key: plan.key, status: STATUSES.TRIAL, price_paisa: 0, auto_renew: 0, current_period_start: at,
+          current_period_end: expires, renewal_at: null, grace_until: null, ended_at: null, source, pending_plan_key: null, updated_at: at
         }
       }, s());
       await col.pharmacies().updateOne({ _id: input.pharmacyId }, { $set: { plan_key: plan.key } }, s());
+    } else {
+      subscription = await startSubscription({ pharmacyId: input.pharmacyId, planKey: plan.key, source });
+      await col.subscriptions().updateOne({ _id: subscription.id }, { $set: { current_period_end: expires } }, s());
     }
-    const trial = {
-      _id: id, id, pharmacy_id: input.pharmacyId, subscription_id: subscription?.id ?? null, plan_key: plan.key,
-      source: input.source ?? 'referral', referral_id: input.referralId ?? null, days, started_at: at,
+    /* One running trial at a time: a fresh one closes the last. */
+    await col.trials().updateMany({ pharmacy_id: input.pharmacyId, status: 'active' }, { $set: { status: 'replaced', ended_at: at, updated_at: at } }, s());
+    const trial: Trial = {
+      _id: id, id, pharmacy_id: input.pharmacyId, subscription_id: subscription.id, plan_key: plan.key,
+      source, referral_id: input.referralId ?? null, days, started_at: at,
       expires_at: expires, ended_at: null, status: 'active', created_at: at, updated_at: at
     };
     await col.trials().insertOne(trial, s());
-    return { ok: true, trial };
+    return { ok: true, trial, subscription };
   });
 }
 
-/** Move to another plan. A paid plan takes effect when payment is confirmed. */
-export async function changePlan(input: { pharmacyId: string; planKey: string; activate?: boolean }): Promise<{ ok: boolean; reason?: string; subscription?: Subscription | null }> {
+/**
+ * Choose a plan. For the pharmacy (no `activate`) this only writes the
+ * choice down: the trial or the current plan carries on untouched, and the
+ * new plan starts when its payment clears. The Super Admin's `activate`
+ * starts it at once, without a payment (a complimentary or negotiated plan).
+ */
+export async function changePlan(input: { pharmacyId: string; planKey: string; activate?: boolean }): Promise<{ ok: boolean; reason?: string; subscription?: Subscription | null; pending?: boolean }> {
   const plan = await getPlan(input.planKey);
   if (!plan) return { ok: false, reason: 'That plan does not exist.' };
+  if (plan.isTrial) {
+    if (!input.activate) return { ok: false, reason: 'The free trial is started once, when the pharmacy registers.' };
+    const restarted = await startTrial({ pharmacyId: input.pharmacyId, planKey: plan.key, source: 'platform', again: true });
+    return restarted.ok ? { ok: true, subscription: await col.subscriptions().findOne({ _id: restarted.subscription!.id }) } : { ok: false, reason: restarted.reason };
+  }
   const subscription = await currentSubscription(input.pharmacyId);
   if (!subscription) {
     return { ok: true, subscription: await startSubscription({ pharmacyId: input.pharmacyId, planKey: input.planKey, source: 'upgrade', activateWithoutPayment: input.activate }) };
+  }
+  const at = nowIso();
+  if (!plan.isFree && !input.activate) {
+    await col.subscriptions().updateOne({ _id: subscription.id }, { $set: { pending_plan_key: plan.key, updated_at: at } });
+    return { ok: true, pending: true, subscription: await col.subscriptions().findOne({ _id: subscription.id }) };
   }
   /* A different plan replaces what the provider was renewing (Stripe): stop
      it now, or the card would be charged for the old plan as well. */
@@ -247,20 +408,15 @@ export async function changePlan(input: { pharmacyId: string; planKey: string; a
       return { ok: false, reason: `${(error as Error).message}. Nothing was changed — try again in a moment.` };
     }
   }
-  const at = nowIso();
-  if (plan.isFree || input.activate) {
-    await col.subscriptions().updateOne({ _id: subscription.id }, {
-      $set: {
-        plan_id: plan.id, plan_key: plan.key, status: STATUSES.ACTIVE, price_paisa: plan.pricePaisa,
-        auto_renew: plan.isFree ? 0 : 1, current_period_start: at, current_period_end: periodEnd(plan),
-        renewal_at: plan.isFree ? null : periodEnd(plan), grace_until: null, updated_at: at
-      }
-    });
-  } else {
-    await col.subscriptions().updateOne({ _id: subscription.id }, {
-      $set: { plan_id: plan.id, plan_key: plan.key, status: STATUSES.PAYMENT_PENDING, price_paisa: plan.pricePaisa, auto_renew: 1, updated_at: at }
-    });
-  }
+  const ends = periodEnd(plan);
+  await col.subscriptions().updateOne({ _id: subscription.id }, {
+    $set: {
+      plan_id: plan.id, plan_key: plan.key, status: STATUSES.ACTIVE, price_paisa: priceFor(plan, await hasReferralPricing(input.pharmacyId)),
+      auto_renew: plan.isFree ? 0 : 1, current_period_start: at, current_period_end: ends,
+      renewal_at: plan.isFree ? null : ends, grace_until: null, ended_at: null, pending_plan_key: null, updated_at: at
+    }
+  });
+  await col.trials().updateMany({ pharmacy_id: input.pharmacyId, status: 'active' }, { $set: { status: 'converted', ended_at: at, updated_at: at } });
   await col.pharmacies().updateOne({ _id: input.pharmacyId }, { $set: { plan_key: plan.key } });
   return { ok: true, subscription: await col.subscriptions().findOne({ _id: subscription.id }) };
 }
@@ -271,7 +427,7 @@ export async function cancelSubscription(input: { pharmacyId: string; reason?: s
   if (!subscription) return { ok: false, reason: 'There is no subscription to cancel.' };
   const at = nowIso();
   await col.subscriptions().updateOne({ _id: subscription.id }, {
-    $set: { status: STATUSES.CANCELLED, auto_renew: 0, cancelled_at: at, cancel_reason: toStr(input.reason, 300), renewal_at: null, updated_at: at }
+    $set: { status: STATUSES.CANCELLED, auto_renew: 0, cancelled_at: at, cancel_reason: toStr(input.reason, 300), renewal_at: null, pending_plan_key: null, updated_at: at }
   });
   return { ok: true, endsAt: subscription.current_period_end };
 }
@@ -279,15 +435,20 @@ export async function cancelSubscription(input: { pharmacyId: string; reason?: s
 /* ---------------------------------------------------------------- payments */
 
 /**
- * Record a payment and, if it succeeded, extend the period. A provider's
- * reference is unique per provider, so the same charge is applied once; a
- * slip number recorded by hand is unique within its pharmacy.
+ * Record a payment and, if it succeeded, start or extend the period. A
+ * provider's reference is unique per provider, so the same charge is applied
+ * once; a slip number recorded by hand is unique within its pharmacy.
+ *
+ * `planKey` is the plan the payment was for, when the pharmacy chose one at
+ * checkout: the subscription moves to it as the money arrives. Days already
+ * paid for, or left on the trial, are never lost — the new period starts
+ * where the current one ends.
  */
 export async function recordPayment(input: {
   pharmacyId: string; subscriptionId: string; amountPaisa: number; currency?: string; status?: string;
   kind?: string; provider?: string; providerReference?: string | null; providerEventId?: string | null;
   method?: string | null; failureCode?: string | null; failureMessage?: string | null; attemptId?: string | null;
-  verifiedBy?: string | null;
+  verifiedBy?: string | null; planKey?: string | null;
 }): Promise<{ ok: boolean; duplicate?: boolean; reason?: string; payment?: SubscriptionPayment | null }> {
   const provider = input.provider ?? 'manual';
   const status = input.status ?? 'succeeded';
@@ -299,38 +460,60 @@ export async function recordPayment(input: {
 
   const subscription = await col.subscriptions().findOne({ _id: input.subscriptionId, pharmacy_id: input.pharmacyId });
   if (!subscription) return { ok: false, reason: 'That subscription could not be found.' };
-  const plan = await getPlan(subscription.plan_key);
+  const switching = !!input.planKey && input.planKey !== subscription.plan_key;
+  const plan = await getPlan(input.planKey || subscription.plan_key);
   const at = nowIso();
 
   const recorded = await tx(async () => {
-    const periodStart = status === 'succeeded' ? at : subscription.current_period_start;
-    const nextEnd = status === 'succeeded' && plan ? periodEnd(plan, new Date()) : subscription.current_period_end;
+    const succeeded = status === 'succeeded';
+    /* Paid days and trial days run on; a period that has ended starts again from now. */
+    const from = succeeded && isEntitled(subscription) && new Date(subscription.current_period_end).getTime() > Date.now()
+      ? new Date(subscription.current_period_end) : new Date();
+    const periodStart = succeeded ? at : subscription.current_period_start;
+    const nextEnd = succeeded && plan ? periodEnd(plan, from) : subscription.current_period_end;
     const id = randomUUID();
     const payment: SubscriptionPayment = {
       _id: id, id, subscription_id: subscription.id, pharmacy_id: input.pharmacyId, amount_paisa: input.amountPaisa,
       currency: input.currency ?? 'PKR', status, kind: input.kind ?? 'renewal', provider, provider_reference: reference,
       provider_event_id: input.providerEventId ?? null, method: input.method ?? null, failure_code: input.failureCode ?? null,
       failure_message: input.failureMessage ?? null, period_start: periodStart, period_end: nextEnd,
-      paid_at: status === 'succeeded' ? at : null, provider_status: null, fee_paisa: null, settled_at: null,
+      paid_at: succeeded ? at : null, provider_status: null, fee_paisa: null, settled_at: null,
       refunded_paisa: null, cancelled_at: null, expires_at: null, verified_by: input.verifiedBy ?? null,
       verified_at: input.verifiedBy ? at : null, statement_reference: null, attempt_id: input.attemptId ?? null,
       created_at: at, updated_at: at,
       /* Every successful payment is an invoice, numbered once, across the platform. */
-      invoice_no: status === 'succeeded' ? await invoiceNumber(at) : null,
-      plan_key: subscription.plan_key, plan_name: plan?.name ?? subscription.plan_key
+      invoice_no: succeeded ? await invoiceNumber(at) : null,
+      plan_key: plan?.key ?? subscription.plan_key, plan_name: plan?.name ?? subscription.plan_key
     };
     await col.subscriptionPayments().insertOne(payment, s());
 
-    if (status === 'succeeded') {
+    if (succeeded) {
       await col.subscriptions().updateOne({ _id: subscription.id }, {
         $set: {
           status: STATUSES.ACTIVE, current_period_start: periodStart, current_period_end: nextEnd, renewal_at: nextEnd,
-          grace_until: null, failed_payments: 0, provider, provider_reference: reference, updated_at: at
+          grace_until: null, ended_at: null, failed_payments: 0, provider, provider_reference: reference, pending_plan_key: null, updated_at: at,
+          /* A plan chosen at checkout: the subscription becomes that plan, at the price that was charged for it. */
+          ...(input.planKey && plan ? {
+            plan_id: plan.id, plan_key: plan.key, price_paisa: input.amountPaisa,
+            ...(switching ? { auto_renew: plan.autoRenew ? 1 : 0, cancelled_at: null, cancel_reason: null } : {})
+          } : {})
         }
       }, s());
+      if (input.planKey && plan) await col.pharmacies().updateOne({ _id: input.pharmacyId }, { $set: { plan_key: plan.key } }, s());
+      /* The trial has done its job. */
+      await col.trials().updateMany({ pharmacy_id: input.pharmacyId, status: 'active' }, { $set: { status: 'converted', ended_at: at, updated_at: at } }, s());
+    } else if (input.kind === 'checkout' || ![STATUSES.ACTIVE, STATUSES.PAST_DUE, STATUSES.GRACE].includes(subscription.status as 'active')) {
+      /* A payment that did not go through for a plan not yet started — on the
+         trial, or after a plan has ended — changes nothing: no grace period
+         is earned by a failed card. */
+      await notify(input.pharmacyId, {
+        type: 'billing', severity: 'warn', title: 'The payment did not go through',
+        body: 'Nothing was charged and nothing has changed. You can try again, or choose another way to pay, under Settings › Billing.',
+        link: '/settings?tab=billing'
+      });
     } else {
-      /* A failure switches nothing off: a grace period starts and the
-         pharmacy Admin is told. */
+      /* A renewal that failed switches nothing off: a grace period starts and
+         the pharmacy Admin is told. */
       const graceUntil = subscription.grace_until ?? plusDays(plan?.graceDays ?? 7);
       await col.subscriptions().updateOne({ _id: subscription.id }, {
         $set: { status: STATUSES.GRACE, grace_until: graceUntil, updated_at: at }, $inc: { failed_payments: 1 }
@@ -343,8 +526,35 @@ export async function recordPayment(input: {
     }
     return { ok: true, duplicate: false, payment };
   });
-  if (recorded.payment?.status === 'succeeded') await sendReceipt(recorded.payment);
+  if (recorded.payment?.status === 'succeeded') {
+    await sendReceipt(recorded.payment);
+    if (plan) await closeFinalCycle(input.pharmacyId, subscription.id, plan);
+  }
   return recorded;
+}
+
+/**
+ * A plan sold for a set number of periods (Monthly, three months): once the
+ * last one is paid for, it stops renewing — at the provider too — and the
+ * pharmacy is told, in good time, to choose the plan that comes next.
+ */
+async function closeFinalCycle(pharmacyId: string, subscriptionId: string, plan: PlanView): Promise<void> {
+  if (plan.maxCycles <= 0) return;
+  const used = await cyclesUsed(pharmacyId, plan.key);
+  if (used < plan.maxCycles) return;
+  const subscription = await col.subscriptions().findOne({ _id: subscriptionId });
+  if (!subscription || subscription.plan_key !== plan.key) return;
+  if (subscription.provider_subscription_id) {
+    const { setProviderRenewal } = await import('./payments/index.js');
+    await setProviderRenewal(subscription, false).catch((error: Error) => console.error(`[KSF] ${error.message} (${subscriptionId})`));
+  }
+  await col.subscriptions().updateOne({ _id: subscriptionId }, { $set: { auto_renew: 0, renewal_at: null, updated_at: nowIso() } });
+  const others = (await listPlans()).filter((other) => other.key !== plan.key && !other.isTrial).map((other) => other.name);
+  await notify(pharmacyId, {
+    type: 'billing', severity: 'info', title: `This is the last ${PERIOD_WORD[plan.period] ?? 'period'} of your ${plan.name} plan`,
+    body: `${plan.name} runs for ${periods(plan, plan.maxCycles)}, and yours ends on ${subscription.current_period_end.slice(0, 10)}. ${others.length ? `Choose ${others.join(' or ')} before then to carry on without a break.` : ''}`.trim(),
+    link: '/settings?tab=billing'
+  });
 }
 
 /** KSF-INV-2026-000123: numbered per calendar year, never reused. */
@@ -481,7 +691,20 @@ async function noticeOnce(input: {
   return true;
 }
 
-async function sendRenewalNotices(summary: { remindersSent: number; dunningSent: number }): Promise<void> {
+const rs = (paisa: number): string => `Rs ${(paisa / 100).toLocaleString('en-PK')}`;
+
+/** "Monthly — Rs 1,500 a month (Rs 1,300 with a referral), for up to 3 months", for each plan this pharmacy can still choose. */
+async function choiceLines(pharmacyId: string): Promise<string[]> {
+  return (await offersFor(pharmacyId)).filter((offer) => offer.available).map((offer) => {
+    const per = PERIOD_WORD[offer.period] ?? 'period';
+    const special = offer.referralPricePaisa !== null && offer.referralPricePaisa < offer.pricePaisa
+      ? (offer.referralApplied ? ' (your referral price)' : ` (${rs(offer.referralPricePaisa)} with a referral)`) : '';
+    const limit = offer.cyclesLeft !== null ? `, for up to ${periods(offer, offer.cyclesLeft)}` : '';
+    return `${offer.name} — ${rs(offer.yourPricePaisa)} a ${per}${special}${limit}`;
+  });
+}
+
+async function sendRenewalNotices(summary: { remindersSent: number; dunningSent: number; endingSent: number }): Promise<void> {
   const now = Date.now();
   const day = 86_400_000;
   const renewing = await col.subscriptions().find({
@@ -496,13 +719,38 @@ async function sendRenewalNotices(summary: { remindersSent: number; dunningSent:
     if (!contact) continue;
     const amount = `Rs ${(subscription.price_paisa / 100).toLocaleString('en-PK')}`;
     const on = subscription.current_period_end.slice(0, 10);
+    const planName = (await getPlan(subscription.plan_key))?.name ?? subscription.plan_key;
     const sent = await noticeOnce({
       key: `renewal-${stage}:${subscription.id}:${on}`, pharmacyId: subscription.pharmacy_id, template: 'renewalReminder',
       severity: 'info', title: stage === 1 ? 'Your subscription renews tomorrow' : 'Your subscription renews in a week',
-      body: `${subscription.plan_key} · ${amount} on ${on}. Nothing to do if your payment method is up to date.`,
-      ...templates.renewalReminder({ name: contact.full_name, pharmacy: contact.pharmacy_name, plan: subscription.plan_key, amount, on, days: stage })
+      body: `${planName} · ${amount} on ${on}. Nothing to do if your payment method is up to date.`,
+      ...templates.renewalReminder({ name: contact.full_name, pharmacy: contact.pharmacy_name, plan: planName, amount, on, days: stage })
     });
     if (sent) summary.remindersSent += 1;
+  }
+
+  /* The trial, and a plan that will not renew (its last month, or renewal
+     switched off): a word three days and one day before, so the choice of
+     what comes next is never a surprise at the counter. */
+  const ending = await col.subscriptions().find({
+    $or: [{ status: STATUSES.TRIAL }, { status: { $in: [STATUSES.ACTIVE, STATUSES.CANCELLED] }, auto_renew: 0, price_paisa: { $gt: 0 } }],
+    current_period_end: { $gt: new Date(now).toISOString(), $lte: new Date(now + 3 * day).toISOString() }
+  }).toArray();
+  for (const subscription of ending) {
+    const daysLeft = Math.ceil((new Date(subscription.current_period_end).getTime() - now) / day);
+    const stage = daysLeft <= 1 ? 1 : 3;
+    const contact = await billingContact(subscription.pharmacy_id);
+    if (!contact) continue;
+    const on = subscription.current_period_end.slice(0, 10);
+    const trial = subscription.status === STATUSES.TRIAL;
+    const planName = (await getPlan(subscription.plan_key))?.name ?? subscription.plan_key;
+    const sent = await noticeOnce({
+      key: `ending-${stage}:${subscription.id}:${on}`, pharmacyId: subscription.pharmacy_id, template: 'planEnding',
+      severity: 'info', title: trial ? `Your free trial ends ${stage === 1 ? 'tomorrow' : `in ${daysLeft} days`}` : `Your ${planName} plan ends ${stage === 1 ? 'tomorrow' : `on ${on}`}`,
+      body: 'Choose Monthly or Yearly under Settings › Billing to carry on without a break. Nothing you have entered is lost either way.',
+      ...templates.planEnding({ name: contact.full_name, pharmacy: contact.pharmacy_name, what: trial ? 'free trial' : `${planName} plan`, on, days: daysLeft, choices: await choiceLines(subscription.pharmacy_id) })
+    });
+    if (sent) summary.endingSent += 1;
   }
 
   const inGrace = await col.subscriptions().find({ status: STATUSES.GRACE, grace_until: { $ne: null, $gt: new Date(now).toISOString() } }).toArray();
@@ -515,8 +763,8 @@ async function sendRenewalNotices(summary: { remindersSent: number; dunningSent:
     const amount = `Rs ${(subscription.price_paisa / 100).toLocaleString('en-PK')}`;
     const sent = await noticeOnce({
       key: `dunning-${stage}:${subscription.id}:${until}`, pharmacyId: subscription.pharmacy_id, template: 'paymentMissed',
-      severity: 'warn', title: stage === 'final' ? 'Your subscription is about to move to Basic' : 'We could not take your subscription payment',
-      body: `The pharmacy keeps working until ${until}. After that it moves to the free Basic plan — nothing is deleted.`,
+      severity: 'warn', title: stage === 'final' ? 'Your plan ends in a few days' : 'We could not take your subscription payment',
+      body: `The pharmacy keeps working until ${until}. After that you will be asked to choose a plan — nothing is deleted.`,
       ...templates.paymentMissed({
         name: contact.full_name, pharmacy: contact.pharmacy_name, amount, until, daysLeft: Math.max(0, daysLeft),
         attempts: subscription.failed_payments ?? 0, final: stage === 'final'
@@ -528,63 +776,77 @@ async function sendRenewalNotices(summary: { remindersSent: number; dunningSent:
 
 /**
  * Move subscriptions and trials on when their dates pass. Runs at start-up
- * and hourly; safe to run as often as you like. Nothing here deletes data.
+ * and hourly (or once a day from a scheduler, on a serverless host); safe to
+ * run as often as you like. Nothing here deletes data.
+ *
+ *   trial ends                    -> expired: the pharmacy chooses a plan
+ *   paid period ends, renewing    -> grace, while the renewal is collected
+ *   paid period ends, not renewing (its last month, cancelled, renewal off)
+ *                                 -> expired
+ *   grace ends                    -> expired
  */
 export async function runSubscriptionMaintenance() {
   const at = nowIso();
-  const summary = { trialsEnded: 0, graceStarted: 0, expired: 0, remindersSent: 0, dunningSent: 0 };
-  const basic = await defaultPlan();
+  const summary = { trialsEnded: 0, graceStarted: 0, expired: 0, remindersSent: 0, dunningSent: 0, endingSent: 0 };
 
-  const toBasic = async (subscriptionId: string, pharmacyId: string) => {
-    if (!basic) return;
-    /* A card the provider would go on charging is stopped before the move. */
+  const expire = async (subscriptionId: string) => {
+    /* A card the provider would go on charging is stopped first. */
     const current = await col.subscriptions().findOne({ _id: subscriptionId });
     if (current?.provider_subscription_id) {
       const { setProviderRenewal } = await import('./payments/index.js');
       await setProviderRenewal(current, false, true).catch((error: Error) => console.error(`[KSF] ${error.message} (${subscriptionId})`));
     }
     await col.subscriptions().updateOne({ _id: subscriptionId }, {
-      $set: {
-        plan_id: basic.id, plan_key: basic.key, status: STATUSES.ACTIVE, price_paisa: 0, auto_renew: 0,
-        current_period_start: at, current_period_end: periodEnd(basic), grace_until: null, renewal_at: null, updated_at: at
-      }
+      $set: { status: STATUSES.EXPIRED, auto_renew: 0, grace_until: null, renewal_at: null, ended_at: at, updated_at: at }
     });
-    await col.pharmacies().updateOne({ _id: pharmacyId }, { $set: { plan_key: basic.key } });
   };
 
   for (const trial of await col.trials().find({ status: 'active', expires_at: { $lte: at } }).toArray()) {
     await col.trials().updateOne({ _id: trial.id }, { $set: { status: 'expired', ended_at: at, updated_at: at } });
-    const subscription = await currentSubscription(trial.pharmacy_id);
-    if (subscription && subscription.status === STATUSES.TRIAL) await toBasic(subscription.id, trial.pharmacy_id);
-    await notify(trial.pharmacy_id, {
-      type: 'billing', severity: 'info', title: 'Your premium trial has ended',
-      body: 'Your pharmacy has moved to the free Basic plan. Every medicine, batch, sale and prescription is exactly where you left it — only the premium features are now locked.',
+  }
+  for (const subscription of await col.subscriptions().find({ status: STATUSES.TRIAL, current_period_end: { $lte: at } }).toArray()) {
+    await expire(subscription.id);
+    await notify(subscription.pharmacy_id, {
+      type: 'billing', severity: 'warn', title: 'Your free trial has ended',
+      body: 'Choose the Monthly or Yearly plan to carry on. Every medicine, batch, sale and prescription is exactly where you left it, and can still be viewed.',
       link: '/settings?tab=billing'
     });
     summary.trialsEnded += 1;
   }
 
   const lapsed = await col.subscriptions().find({
-    status: { $in: [STATUSES.ACTIVE, STATUSES.PAYMENT_PENDING] }, current_period_end: { $lte: at }, grace_until: null
+    status: { $in: [STATUSES.ACTIVE, STATUSES.PAYMENT_PENDING, STATUSES.CANCELLED] }, current_period_end: { $lte: at }, grace_until: null
   }).toArray();
   for (const subscription of lapsed) {
     const plan = await getPlan(subscription.plan_key);
-    if (plan?.isFree) continue;
-    const graceUntil = plusDays(plan?.graceDays ?? 7);
-    await col.subscriptions().updateOne({ _id: subscription.id }, { $set: { status: STATUSES.GRACE, grace_until: graceUntil, updated_at: at } });
-    await notify(subscription.pharmacy_id, {
-      type: 'billing', severity: 'warn', title: 'Your subscription is due for renewal',
-      body: `The pharmacy carries on working normally until ${graceUntil.slice(0, 10)}. Nothing will be deleted after that either — the account moves to the free Basic plan.`,
-      link: '/settings?tab=billing'
-    });
-    summary.graceStarted += 1;
+    if (plan?.isFree && !plan.isTrial) continue;
+    if (subscription.status === STATUSES.ACTIVE && subscription.auto_renew && subscription.price_paisa > 0) {
+      const graceUntil = plusDays(plan?.graceDays ?? 7);
+      await col.subscriptions().updateOne({ _id: subscription.id }, { $set: { status: STATUSES.GRACE, grace_until: graceUntil, updated_at: at } });
+      await notify(subscription.pharmacy_id, {
+        type: 'billing', severity: 'warn', title: 'Your subscription is due for renewal',
+        body: `The pharmacy carries on working normally until ${graceUntil.slice(0, 10)}. Nothing will be deleted after that either — you will simply be asked to choose a plan.`,
+        link: '/settings?tab=billing'
+      });
+      summary.graceStarted += 1;
+      continue;
+    }
+    await expire(subscription.id);
+    if (subscription.status !== STATUSES.PAYMENT_PENDING) {
+      await notify(subscription.pharmacy_id, {
+        type: 'billing', severity: 'warn', title: `Your ${plan?.name ?? ''} plan has ended`.replace('  ', ' '),
+        body: 'Choose the Monthly or Yearly plan to carry on. Your data has not been touched — every record is still here and can still be viewed.',
+        link: '/settings?tab=billing'
+      });
+    }
+    summary.expired += 1;
   }
 
   for (const subscription of await col.subscriptions().find({ status: STATUSES.GRACE, grace_until: { $ne: null, $lte: at } }).toArray()) {
-    await toBasic(subscription.id, subscription.pharmacy_id);
+    await expire(subscription.id);
     await notify(subscription.pharmacy_id, {
-      type: 'billing', severity: 'warn', title: 'Your pharmacy has moved to the Basic plan',
-      body: 'The subscription was not renewed. Your data has not been touched — every record is still here. Upgrade whenever you are ready.',
+      type: 'billing', severity: 'warn', title: 'Your subscription has ended',
+      body: 'The renewal was not paid. Your data has not been touched — every record is still here. Choose a plan whenever you are ready and everything carries on.',
       link: '/settings?tab=billing'
     });
     summary.expired += 1;

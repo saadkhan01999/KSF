@@ -109,7 +109,8 @@ const schema = z.object({
   /* Testing only: the sign-up code is also sent back to the browser and shown
      on screen, so anyone can sign up with an address they do not own. */
   SHOW_SIGNUP_CODE: bool(false),
-  REFERRAL_TRIAL_DAYS: int(15, 0),
+  /* The free trial's length is the Starter plan's, set by the Super Admin
+     under Plans; REFERRAL_TRIAL_DAYS from earlier releases is not read. */
   REFERRAL_MAX_USES: int(100, 1),
   REFERRAL_MAX_PER_DAY: int(10, 1),
   REFERRAL_MAX_PER_IP_PER_DAY: int(3, 1),
@@ -119,6 +120,12 @@ const schema = z.object({
   /* "university" is the isolated copy made by scripts/university-copy.mjs:
      online payments are off, and the app says which edition it is. */
   KSF_EDITION: z.enum(['commercial', 'university']).default('commercial'),
+
+  /* ------------------------------------------------------------ scheduler */
+  /* On Vercel: the secret Vercel Cron sends to /api/v1/cron/maintenance.
+     Empty (the default) switches that address off — a normal server runs
+     its housekeeping by itself, hourly. */
+  CRON_SECRET: z.string().default(''),
 
   /* ------------------------------------------------------------- payments */
   PAYMENT_PROVIDER: z.string().default('manual'),
@@ -167,8 +174,18 @@ if (IS_PROD && env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
   process.exit(1);
 }
 
-/** The release number, typed once — in the root package.json. */
-export const VERSION: string = JSON.parse(readFileSync(fromRoot('package.json'), 'utf8')).version;
+/** The release number, typed once — in the root package.json. Read relative
+    to this file (backend/src/config or backend/dist/config, three levels
+    down), so a bundler that packs the server into one function (Vercel)
+    sees the file and takes it along. */
+export const VERSION: string = (() => {
+  try {
+    return String(JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).version);
+  } catch {
+    console.warn('[KSF] The root package.json could not be read, so the version is unknown.');
+    return '0.0.0';
+  }
+})();
 
 export const STATIC_FOLDER = (): string => fromRoot(env.STATIC_DIR);
 export const OUTBOX_FOLDER = (): string => fromRoot(env.MAIL_OUTBOX);

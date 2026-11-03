@@ -116,7 +116,7 @@ export default function Pharmacies() {
                             {(row.owner?.phone ?? row.phone) && <a className="cell-sub row-tight" href={`tel:${row.owner?.phone ?? row.phone}`}><Phone size={12} /> {fmtPhone(row.owner?.phone ?? row.phone)}</a>}
                           </td>
                           <td data-label="Plan">
-                            <div className="t-sm t-semi" style={{ textTransform: 'capitalize' }}>{row.plan_key ?? 'basic'}</div>
+                            <div className="t-sm t-semi" style={{ textTransform: 'capitalize' }}>{row.plan_key ?? '—'}</div>
                             {row.subscription_status && <StatusBadge status={row.subscription_status} />}
                           </td>
                           <td data-label="Sales, 30 days" className="t-right">

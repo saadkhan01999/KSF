@@ -77,6 +77,13 @@ export function setSessionLostHandler(handler: (reason: 'expired' | 'suspended',
   onSessionLost = handler;
 }
 
+let onPlanRequired: (() => void) | null = null;
+
+/** Called when the server refuses a change because the trial or the plan has ended. */
+export function setPlanRequiredHandler(handler: () => void): void {
+  onPlanRequired = handler;
+}
+
 /** Called when the server wants the password confirmed; resolves true when it was. */
 export function setStepUpHandler(handler: () => Promise<boolean>): void {
   onStepUp = handler;
@@ -166,6 +173,10 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, attemp
     }
     if (response.status === 401 && !isAuthPath) onSessionLost?.('expired');
     if (response.status === 403 && code === 'pharmacy_suspended') onSessionLost?.('suspended', String(body.message ?? ''));
+
+    /* The trial or the plan ran out while this screen was open: the app
+       fetches the subscription again and shows the plan choice. */
+    if (response.status === 402 && code === 'plan_required') onPlanRequired?.();
 
     /* The server wants the password confirmed first. */
     if (response.status === 403 && code === 'step_up_required' && attempt < 2 && onStepUp) {

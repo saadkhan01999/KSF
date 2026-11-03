@@ -1,6 +1,6 @@
 ==============================================================================
  KSF PHARMACY MANAGEMENT SYSTEM - DEPLOYING ON HOSTINGER, FROM A TO Z
- Version 2.5.2 - October 2026
+ Version 2.6.0 - November 2026
 ==============================================================================
 
  Who this is for: the person putting KSF on the internet for real pharmacies.
@@ -385,7 +385,7 @@ exec docker compose --env-file /srv/ksf/deploy/.env -f /srv/ksf/deploy/docker-co
 
         curl -k https://localhost/api/v1/health
 
-      Expected: {"ok":true,"service":"KSF","version":"2.5.2",...,
+      Expected: {"ok":true,"service":"KSF","version":"2.6.0",...,
                  "transactions":true}
 
 
@@ -465,7 +465,7 @@ cp /etc/letsencrypt/live/<YOUR-DOMAIN>/privkey.pem /srv/ksf/deploy/nginx/certs/k
         https://<YOUR-DOMAIN>/api/v1/payments/webhook/<provider>
       and their return pages, as listed in docs/PAYMENTS.md.
 
- 9.5  The platform console > Overview shows "Website 2.5.2 - Server 2.5.2 -
+ 9.5  The platform console > Overview shows "Website 2.6.0 - Server 2.6.0 -
       up to date".
 
 

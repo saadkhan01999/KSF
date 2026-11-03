@@ -122,9 +122,9 @@ export default function Product() {
           <article>
             <h3>A single neighbourhood pharmacy</h3>
             <p>
-              One counter, two or three staff, a shelf that needs watching. Basic covers it
-              free — including batch tracking and expiry control, which are the two things
-              that actually cost money when they go wrong.
+              One counter, two or three staff, a shelf that needs watching. Fifteen days free,
+              then Rs 1,500 a month — with batch tracking and expiry control, the two things
+              that actually cost money when they go wrong, on every plan.
             </p>
           </article>
           <article>

@@ -7,7 +7,7 @@
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { Client, SUPER_ADMIN, addStaff, registerPharmacy, startServer } from './support/server.mjs';
+import { addStaff, registerPharmacy, startServer } from './support/server.mjs';
 
 const skip = process.env.KSF_TEST_DATABASE !== 'yes' ? 'no MongoDB: set TEST_MONGODB_URI to run the API suites' : false;
 const today = new Date().toISOString().slice(0, 10);
@@ -117,15 +117,7 @@ describe('accounts', { skip }, () => {
     assert.equal(out.total, 1);
   });
 
-  it('keeps the downloads to plans that include exports', async () => {
-    const locked = await owner.call('GET', '/api/v1/accounting/export?kind=profit-and-loss');
-    assert.equal(locked.status, 402);
-    assert.equal(locked.body.code, 'feature_locked');
-    assert.ok(locked.body.plans.some((plan) => plan.key === 'monthly'));
-
-    const admin = new Client(server.base);
-    await admin.signIn(SUPER_ADMIN.email, SUPER_ADMIN.password);
-    await admin.post(`/api/v1/platform/pharmacies/${pharmacyId}/subscription`, { planKey: 'monthly' });
+  it('downloads every statement on the free trial — every plan includes exports', async () => {
     const pnl = await owner.get('/api/v1/accounting/export?kind=profit-and-loss');
     assert.equal(pnl.data.find((row) => row.Section === 'Net profit')['Amount (Rs)'], -1730);
     const salaries = await owner.get('/api/v1/accounting/export?kind=salaries');

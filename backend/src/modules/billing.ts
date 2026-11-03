@@ -20,13 +20,15 @@ import { nowIso, rateLimit, toStr } from '../core/util.js';
 import { publicRoute, route } from '../http/router.js';
 import type { Ctx } from '../http/context.js';
 import {
-  cancelSubscription, changePlan, currentSubscription, getPlan, handleWebhook, listPlans, STATUSES, subscriptionState
+  cancelSubscription, changePlan, currentSubscription, cyclesUsed, handleWebhook, listPlans, offerFor, offersFor, STATUSES, subscriptionState
 } from '../services/subscriptions.js';
 import {
   adapterFor, attemptsFor, availableProviders, confirmReturn, createAttempt, defaultProviderKey, listProviders, providerPortal, receiveEvent,
   refundsFor, setProviderRenewal, settleFromProvider
 } from '../services/payments/index.js';
-import { referralSummary } from '../services/referrals.js';
+import { applyReferralCode, referralSummary } from '../services/referrals.js';
+
+const rupees = (paisa: number): string => `Rs ${(paisa / 100).toLocaleString('en-PK')}`;
 
 const PAYMENT_FIELDS = {
   _id: 0, id: 1, amount_paisa: 1, currency: 1, status: 1, kind: 1, provider: 1, provider_reference: 1, method: 1,
@@ -36,10 +38,12 @@ const PAYMENT_FIELDS = {
 
 /* ------------------------------------------------------------ what we have */
 route('GET', '/api/v1/billing', 'settings.read', async (ctx) => {
+  /* The plans as this pharmacy sees them: its own price (the referral price
+     when it came through one) and whether it can still choose each. */
   const [subscription, current, plans, payments, referrals] = await Promise.all([
     subscriptionState(ctx.pharmacyId),
     currentSubscription(ctx.pharmacyId),
-    listPlans(),
+    offersFor(ctx.pharmacyId),
     col.subscriptionPayments().find({ pharmacy_id: ctx.pharmacyId }, { projection: PAYMENT_FIELDS }).sort({ created_at: -1 }).limit(50).toArray(),
     referralSummary(ctx.pharmacyId, ctx.user.id)
   ]);
@@ -60,8 +64,9 @@ route('GET', '/api/v1/billing/payments', 'settings.read', async (ctx) => ({
 /* ------------------------------------------------------------ changing it */
 route('POST', '/api/v1/billing/plan', 'settings.write', async (ctx) => {
   const planKey = toStr(ctx.body.planKey, 30);
-  const plan = await getPlan(planKey);
-  if (!plan || plan.status !== 'active' || !plan.isPublic) return bad('Choose one of the available plans.', 'planKey');
+  const chosen = await offerFor(ctx.pharmacyId, planKey);
+  if (!chosen.ok) return bad(chosen.reason, 'planKey');
+  const plan = chosen.offer;
 
   const before = await subscriptionState(ctx.pharmacyId);
   const result = await changePlan({ pharmacyId: ctx.pharmacyId, planKey });
@@ -76,16 +81,19 @@ route('POST', '/api/v1/billing/plan', 'settings.write', async (ctx) => {
   return {
     subscription: after,
     message: plan.isFree
-      ? `Your pharmacy is now on the ${plan.name} plan. Nothing has been deleted — premium features are simply locked.`
-      : `The ${plan.name} plan is ready. It becomes active as soon as the payment clears; nothing changes until then.`
+      ? `Your pharmacy is now on the ${plan.name} plan.`
+      : `${plan.name} is ready to pay for — ${rupees(plan.yourPricePaisa)}. It starts as soon as the payment clears${after?.locked ? '' : ', and the days you have now carry on until then'}.`
   };
 });
 
 route('POST', '/api/v1/billing/auto-renew', 'settings.write', async (ctx) => {
   const subscription = await currentSubscription(ctx.pharmacyId);
   if (!subscription) return missing('There is no subscription on this pharmacy.');
-  if (subscription.is_free) bad('The Basic plan is free and has nothing to renew.');
+  if (subscription.is_free) bad(subscription.is_trial ? 'The free trial does not renew — choose a plan to carry on after it.' : 'This plan is free and has nothing to renew.');
   const enabled = !!ctx.body.enabled;
+  if (enabled && subscription.max_cycles > 0 && await cyclesUsed(ctx.pharmacyId, subscription.plan_key) >= subscription.max_cycles) {
+    bad(`${subscription.plan_name} runs for ${subscription.max_cycles} ${subscription.plan_period}s and this is the last one, so it cannot renew. Choose another plan to carry on.`);
+  }
   /* A card the provider renews (Stripe) is told first; if it cannot be, nothing changes here either. */
   await setProviderRenewal(subscription, enabled).catch((error: Error) => bad(`${error.message} Nothing was changed.`));
   await col.subscriptions().updateOne({ _id: subscription.id }, { $set: { auto_renew: enabled ? 1 : 0, updated_at: nowIso() } });
@@ -93,13 +101,13 @@ route('POST', '/api/v1/billing/auto-renew', 'settings.write', async (ctx) => {
   return {
     subscription: await subscriptionState(ctx.pharmacyId),
     message: enabled ? 'Automatic renewal is on.'
-      : `Automatic renewal is off. The plan runs until ${subscription.current_period_end.slice(0, 10)} and then moves to Basic. Nothing is deleted.`
+      : `Automatic renewal is off. The plan runs until ${subscription.current_period_end.slice(0, 10)}; after that you choose a plan again. Nothing is deleted.`
   };
 });
 
 route('POST', '/api/v1/billing/cancel', 'settings.write', async (ctx) => {
   const current = await currentSubscription(ctx.pharmacyId);
-  if (current?.is_free) bad('The Basic plan is free — there is nothing to cancel.');
+  if (current?.is_free) bad(current.is_trial ? 'The free trial costs nothing and simply ends — there is nothing to cancel.' : 'This plan is free — there is nothing to cancel.');
   if (current?.status === STATUSES.CANCELLED) bad('This subscription is already cancelled.');
   /* Stop the card renewing at the end of the paid period before saying it is cancelled. */
   if (current) await setProviderRenewal(current, false).catch((error: Error) => bad(`${error.message} Nothing was cancelled.`));
@@ -111,7 +119,7 @@ route('POST', '/api/v1/billing/cancel', 'settings.write', async (ctx) => {
   await auditLog(ctx, { action: 'billing.cancelled', entity: 'subscription', entityId: state?.subscriptionId, summary: `Cancelled, paid period runs to ${endsOn}` });
   await notify(ctx.pharmacyId, {
     type: 'billing', severity: 'info', title: 'Your subscription has been cancelled',
-    body: `You keep everything you have paid for until ${endsOn}, then the pharmacy moves to the free Basic plan. No record is deleted at any point.`,
+    body: `You keep everything you have paid for until ${endsOn}. After that you can choose a plan again whenever you are ready — no record is deleted at any point.`,
     link: '/settings?tab=billing'
   });
   return { subscription: state, endsAt: result.endsAt, message: `Cancelled. Your plan keeps working until ${endsOn}, and none of your data is affected.` };
@@ -126,9 +134,9 @@ route('POST', '/api/v1/billing/checkout', 'settings.write', async (ctx) => {
   if (!subscription) return missing('There is no subscription on this pharmacy.');
   const providerKey = toStr(ctx.body.provider, 40).toLowerCase() || defaultProviderKey();
   if (!providerKey) bad('No payment method is configured on this installation yet. The platform administrator can set one up — see docs/PAYMENTS.md.');
-  const result = await createAttempt({
-    pharmacyId: ctx.pharmacyId, subscriptionId: subscription.id, planKey: toStr(ctx.body.planKey, 30) || subscription.plan_key, providerKey, actorId: ctx.user.id
-  });
+  /* The plan asked for, else the one chosen earlier, else the current one renewed. */
+  const planKey = toStr(ctx.body.planKey, 30) || subscription.pending_plan_key || subscription.plan_key;
+  const result = await createAttempt({ pharmacyId: ctx.pharmacyId, subscriptionId: subscription.id, planKey, providerKey, actorId: ctx.user.id });
   if (!result.ok) return bad(result.reason);
   await logActivity(ctx, { action: 'billing.checkout-started', entity: 'subscription', entityId: subscription.id, summary: `Payment ${result.reference} started through ${providerKey}` });
   return {
@@ -136,6 +144,19 @@ route('POST', '/api/v1/billing/checkout', 'settings.write', async (ctx) => {
     redirect: result.redirect, instructions: result.instructions,
     note: 'Your plan becomes active when the payment is confirmed to this server — not from this browser.'
   };
+});
+
+/* A pharmacy that registered without a referral code, entering one now: the
+   referral price applies from its next payment. */
+route('POST', '/api/v1/billing/referral', 'settings.write', async (ctx) => {
+  const limit = rateLimit(`refcode:${ctx.pharmacyId}`, 10, 3_600_000);
+  if (!limit.ok) tooMany('Too many codes tried. Please wait a while before trying another.', limit.retryAfter);
+  const code = toStr(ctx.body.code, 32).toUpperCase();
+  if (!code) bad('Enter the referral code.', 'code');
+  const result = await applyReferralCode({ code, pharmacyId: ctx.pharmacyId, userId: ctx.user.id, email: ctx.user.email, ip: ctx.ip });
+  if (!result.ok) bad(result.reason ?? 'That code could not be used.', 'code');
+  await auditLog(ctx, { action: 'billing.referral-applied', entity: 'pharmacy', entityId: ctx.pharmacyId, summary: `Referral code ${code} applied` });
+  return { plans: await offersFor(ctx.pharmacyId), message: 'Referral code applied. The referral price is used from your next payment.' };
 });
 
 /* The provider's own page for changing the card (Stripe's billing portal). */
@@ -255,6 +276,6 @@ route('GET', '/api/v1/billing/entitlements', null, async (ctx) => {
   const state = await subscriptionState(ctx.pharmacyId);
   return {
     ...state,
-    needsAttention: ([STATUSES.PAST_DUE, STATUSES.GRACE, STATUSES.PAYMENT_PENDING] as string[]).includes(String(state?.status))
+    needsAttention: !!state?.locked || ([STATUSES.PAST_DUE, STATUSES.GRACE, STATUSES.PAYMENT_PENDING] as string[]).includes(String(state?.status))
   };
 });

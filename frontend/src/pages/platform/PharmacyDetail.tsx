@@ -430,7 +430,7 @@ function PlanModal({ open, detail, onClose, onSaved }: { open: boolean; detail: 
       <div className="col" style={{ gap: 16 }}>
         <SelectInput
           label="Move to plan" value={planKey} onChange={(event) => setPlanKey(event.target.value)} placeholder="Keep the current plan"
-          options={(plans?.data ?? []).filter((plan) => plan.status !== 'retired').map((plan) => ({ value: plan.key, label: `${plan.name} — ${plan.isFree ? 'free' : `${rupees(plan.pricePaisa)} / ${plan.period}`}` }))}
+          options={(plans?.data ?? []).filter((plan) => plan.status !== 'retired').map((plan) => ({ value: plan.key, label: plan.isTrial ? `${plan.name} — a fresh free trial (${plan.trialDays || plan.periodDays} days)` : `${plan.name} — ${plan.isFree ? 'free' : `${rupees(plan.pricePaisa)} / ${plan.period}`}, without payment` }))}
           hint={detail.subscription ? `Now: ${detail.subscription.planName}, ${detail.subscription.status}` : undefined}
         />
         <TextInput label="Extend the current period by" type="number" min={1} max={3660} suffix="days" value={extendDays} onChange={(event) => setExtendDays(event.target.value)} />
@@ -446,10 +446,15 @@ function PaymentModal({ open, detail, onClose, onSaved }: { open: boolean; detai
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('cash');
   const [reference, setReference] = useState('');
-  useEffect(() => { if (open) { setAmount(''); setMethod('cash'); setReference(''); } }, [open]);
+  /* Which plan the money is for; empty keeps the plan the pharmacy is on (or the one it chose). */
+  const [planKey, setPlanKey] = useState('');
+  const { data: plans } = useApiData<{ data: PlanRow[] }>(open ? '/platform/plans' : null, [open]);
+  const choices = (plans?.data ?? []).filter((plan) => plan.status !== 'retired' && !plan.isTrial && !plan.isFree);
+  useEffect(() => { if (open) { setAmount(''); setMethod('cash'); setReference(''); setPlanKey(''); } }, [open]);
+  const chosen = choices.find((plan) => plan.key === planKey);
 
   const save = () => run(
-    () => api.post<{ message: string }>(`/platform/pharmacies/${detail.data.id}/payments`, { amountPaisa: toPaisa(amount), method, reference }),
+    () => api.post<{ message: string }>(`/platform/pharmacies/${detail.data.id}/payments`, { amountPaisa: toPaisa(amount), method, reference, planKey: planKey || undefined }),
     (reply) => { ok('Payment recorded', reply.message); onSaved(); }
   );
 
@@ -458,7 +463,12 @@ function PaymentModal({ open, detail, onClose, onSaved }: { open: boolean; detai
       subtitle="Money paid outside the online checkout — cash at the office, a cheque, a direct transfer. It extends the subscription by one period."
       footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button variant="primary" loading={busy} onClick={save} disabled={!(Number(amount) > 0) || !reference.trim()}>Record payment</Button></>}>
       <div className="form-grid">
-        <TextInput label="Amount" prefix="Rs" type="number" min={1} required value={amount} onChange={(event) => setAmount(event.target.value)} />
+        <SelectInput
+          label="For the plan" wrapClass="span-2" value={planKey} onChange={(event) => setPlanKey(event.target.value)} placeholder="The plan the pharmacy is on, or has chosen"
+          options={choices.map((plan) => ({ value: plan.key, label: `${plan.name} — ${rupees(plan.pricePaisa)}${plan.referralPricePaisa !== null && plan.referralPricePaisa < plan.pricePaisa ? ` (${rupees(plan.referralPricePaisa)} with a referral)` : ''} / ${plan.period}` }))}
+          hint="A pharmacy on its free trial has to be given one."
+        />
+        <TextInput label="Amount" prefix="Rs" type="number" min={1} required value={amount} onChange={(event) => setAmount(event.target.value)} hint={chosen ? `${chosen.name} costs ${rupees(chosen.pricePaisa)}.` : undefined} />
         <SelectInput label="Paid by" value={method} onChange={(event) => setMethod(event.target.value)}
           options={[{ value: 'cash', label: 'Cash' }, { value: 'cheque', label: 'Cheque' }, { value: 'transfer', label: 'Bank transfer' }, { value: 'wallet', label: 'Easypaisa / JazzCash' }]} />
         <TextInput label="Receipt, cheque or slip number" required wrapClass="span-2" value={reference} onChange={(event) => setReference(event.target.value)} hint="A reference is recorded once for each pharmacy, so the same payment is never counted twice." />

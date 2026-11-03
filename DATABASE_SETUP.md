@@ -253,12 +253,13 @@ npm run dev
 
 On Windows you can double-click **`windows\START_KSF.bat`** instead.
 
-On its first start the server creates, in this order: the indexes, the four
-subscription plans (Basic, Weekly, Monthly, Annual) and **the Super
-Admin** from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. The console says:
+On its first start the server creates, in this order: the indexes, the three
+subscription plans (Starter — the 15-day free trial — Monthly and Yearly) and
+**the Super Admin** from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. The
+console says:
 
 ```
-[KSF] added 4 subscription plan(s)
+[KSF] added 3 subscription plan(s)
 [KSF] created the platform Super Admin account for superadmin@ksfpharmacy.pk
 ```
 

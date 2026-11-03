@@ -9,7 +9,7 @@
    trusted — each endpoint checks the draft is really at that point.
 
    The account exists the moment the code is accepted: a pharmacy with its
-   own Admin, its built-in roles, a main branch and the free Basic plan. The
+   own Admin, its built-in roles, a main branch and the 15-day free trial. The
    name, address and licences are asked for afterwards by the setup
    checklist, where they can be skipped and returned to.
    ========================================================================== */
@@ -33,8 +33,8 @@ import { generateRecoveryCodes, generateSecret, normaliseRecoveryCode, otpauthUr
 import { createSession, listSessions, revokeAllSessions, revokeDeviceSessions, revokeSession, signAccessToken } from '../security/sessions.js';
 import { approximate, deviceLimits, listDevices, publicDevice, registerDevice, renameDevice, revokeDevice } from '../security/devices.js';
 import { isDevMailbox, mailHealth, readDevOutbox, sendMail, templates } from '../services/mailer.js';
-import { listPlans, startSubscription, subscriptionState } from '../services/subscriptions.js';
-import { claimReferral, completeReferral, referralSummary, validateCode } from '../services/referrals.js';
+import { listPlans, startTrial, subscriptionState, trialLength, trialPlan } from '../services/subscriptions.js';
+import { claimReferral, completeReferral, referralPrices, referralSummary, validateCode } from '../services/referrals.js';
 import { installRoles } from './people.js';
 import { publicUser } from './auth.js';
 import { PHARMACY_ADMIN_ROLE } from '../domain/permissions.js';
@@ -66,7 +66,7 @@ async function draftView(draft: Registration | null) {
     started: true, step: draft.step, email: maskEmail(draft.email ?? ''), emailVerified: !!draft.email_verified,
     firstName: payload.firstName ?? '', lastName: payload.lastName ?? '', mobile: payload.mobile ?? '',
     hasPassword: !!payload.passwordHash,
-    referral: draft.referral_code ? { code: draft.referral_code, trialDays: env.REFERRAL_TRIAL_DAYS } : null,
+    referral: draft.referral_code ? { code: draft.referral_code, trialDays: trialLength(await trialPlan()), prices: await referralPrices() } : null,
     expiresAt: draft.expires_at,
     pending: draft.email_verified ? null : await pendingCode(PURPOSES.EMAIL_VERIFY, draft.email ?? '')
   };
@@ -76,7 +76,7 @@ async function draftView(draft: Registration | null) {
 publicRoute('GET', '/api/v1/public/brand', async () => ({ business: BUSINESS, edition: env.KSF_EDITION }));
 
 publicRoute('GET', '/api/v1/public/plans', async () => ({
-  data: await listPlans(), trialDays: env.REFERRAL_TRIAL_DAYS, passwordMinLength: PASSWORD_MIN_LENGTH, pharmacyTypes: PHARMACY_TYPES
+  data: await listPlans(), trialDays: trialLength(await trialPlan()), passwordMinLength: PASSWORD_MIN_LENGTH, pharmacyTypes: PHARMACY_TYPES
 }));
 
 publicRoute('GET', '/api/v1/public/referral/:code', async (ctx) => {
@@ -136,12 +136,10 @@ async function createPharmacyAccount(ctx: Ctx, draft: Registration) {
     await col.users().insertOne(user, s());
   });
 
-  await startSubscription({ pharmacyId, planKey: 'basic', source: 'signup' });
-  let trialEnds: string | null = null;
-  if (payload.referralId) {
-    const honoured = await completeReferral({ referralId: payload.referralId, pharmacyId, userId });
-    if (honoured.ok && honoured.trial) trialEnds = honoured.trial.expires_at.slice(0, 10);
-  }
+  /* Every pharmacy starts on the free trial; a referral adds its price on top. */
+  const started = await startTrial({ pharmacyId, source: payload.referralId ? 'referral' : 'signup' });
+  const trialEnds = started.trial ? started.trial.expires_at.slice(0, 10) : null;
+  if (payload.referralId) await completeReferral({ referralId: payload.referralId, pharmacyId, userId });
   const state = await subscriptionState(pharmacyId);
   await col.registrations().updateOne({ _id: draft.id }, { $set: { status: 'completed', pharmacy_id: pharmacyId, step: 3, updated_at: at } });
 

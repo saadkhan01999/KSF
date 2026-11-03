@@ -31,7 +31,8 @@ Only **three** settings are required: `MONGODB_URI`, the two JWT secrets, and
 | `PUBLIC_APP_URL` | `http://localhost:5180` | The address people type. Used in e-mails, referral links and payment returns |
 | `PUBLIC_ALLOWED_ORIGINS` | `http://localhost:5180,http://localhost:4180` | Comma-separated origins allowed to call the API from another origin. A page calling the API on its own address (Vercel forwarding `/api`, or the API's own site) needs no entry: current browsers mark those requests `Sec-Fetch-Site: same-origin`. The origin of `PUBLIC_APP_URL` is always allowed. `*` stands for one run of letters and digits, so `https://ksf-x86j-*-ssam1.vercel.app` covers every Vercel deployment address of that project. In development any localhost port is accepted as well |
 | `STATIC_DIR` | `frontend/dist` | The built website the API serves in production |
-| `TRUST_PROXY` | `loopback` | Which proxies to believe for the visitor's IP (Express `trust proxy`): `loopback`, `uniquelocal`, an IP, `false`, or a number of proxy hops. Behind Nginx on Docker: `uniquelocal`. On Railway: `1`, or `2` with Vercel forwarding `/api` to it |
+| `TRUST_PROXY` | `loopback` | Which proxies to believe for the visitor's IP (Express `trust proxy`): `loopback`, `uniquelocal`, an IP, `false`, or a number of proxy hops. Behind Nginx on Docker: `uniquelocal`. On Railway: `1`, or `2` with Vercel forwarding `/api` to it. With the whole system on Vercel: `1` |
+| `CRON_SECRET` | — | With the whole system on Vercel (`deploy/VERCEL_DEPLOYMENT.txt`): the secret Vercel Cron sends to `/api/v1/cron/maintenance` to run the daily housekeeping (trials and plans ending, grace, reminders, the mail queue). Empty switches that address off; a normal server does its housekeeping by itself, hourly |
 
 ## Database — required
 
@@ -117,11 +118,14 @@ the new parameters.
 | `OTP_MAX_ATTEMPTS` | `5` | Wrong guesses before a code is used up |
 | `OTP_MAX_SENDS` | `5` | Codes per address per hour |
 | `SHOW_SIGNUP_CODE` | `false` | **Testing only.** `true` shows the sign-up code on the confirm screen as well as e-mailing it, so sign-up works without SMTP. E-mail addresses are then not really checked; the server logs a warning at every start. Password-reset codes are never shown |
-| `REFERRAL_TRIAL_DAYS` | `15` | Extra trial days for a pharmacy that signs up with a referral code |
 | `REFERRAL_MAX_USES` | `100` | Lifetime uses of one code |
 | `REFERRAL_MAX_PER_DAY` | `10` | Uses of one code per day |
 | `REFERRAL_MAX_PER_IP_PER_DAY` | `3` | Referral sign-ups from one IP per day |
 | `REGISTER_MAX_PER_IP` | `20` | Sign-up attempts per IP per hour |
+
+The free trial's length (15 days) and the referral price (Rs 1,300 a month on
+Monthly) are not settings here: they are on the plans, and the Super Admin
+changes them under **Platform › Plans**.
 
 ## Subscription payments
 

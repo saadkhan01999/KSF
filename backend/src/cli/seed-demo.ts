@@ -93,7 +93,7 @@ async function main(): Promise<number> {
     /* Every feature on, so every screen can be seen. */
     const platform = client(base);
     platform.useToken((await platform.post('/auth/login', { email: env.SUPER_ADMIN_EMAIL, password: env.SUPER_ADMIN_PASSWORD })).accessToken);
-    await platform.post(`/platform/pharmacies/${pharmacyId}/subscription`, { planKey: 'annual', note: 'University demonstration' });
+    await platform.post(`/platform/pharmacies/${pharmacyId}/subscription`, { planKey: 'yearly', note: 'University demonstration' });
 
     const roles = (await admin.get('/roles')).data as Array<{ id: string; key: string }>;
     for (const [key, name, email] of ROLES) {

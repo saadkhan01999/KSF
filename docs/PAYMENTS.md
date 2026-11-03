@@ -151,8 +151,10 @@ How it works:
   (`KSF-INV-2026-000001`), a receipt by e-mail and a notification; the
   pharmacy sees and prints its invoices on Billing, the platform on Income.
 - **Changing the card, stopping renewal.** Billing › Change card opens
-  Stripe's customer portal. Turning auto-renew off, cancelling, moving to
-  Basic or to another plan tells Stripe first, and only then says it is done.
+  Stripe's customer portal. Turning auto-renew off, cancelling, a plan
+  ending, or moving to another plan tells Stripe first, and only then says it
+  is done. Monthly stops renewing at Stripe by itself once its third month is
+  paid for.
 - **Refunds** go back through Stripe, on the payment behind the invoice.
 
 ### Bank transfer — works with no merchant account

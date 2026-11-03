@@ -22,6 +22,7 @@ import { PasswordField, OtpInput, StatusNote, Stepper } from '../../components/a
 import { Button, TextInput, Alert, PageLoader } from '../../components/ui';
 import { useApp } from '../../context/AppContext';
 import { api, ApiError } from '../../services/api';
+import { rupees } from '../../utils/format';
 import { useViewMode } from '../../hooks/useParallax';
 import { BRAND } from '../../brand';
 import type { RegistrationState, ReferralCheck } from '../../types';
@@ -39,8 +40,8 @@ const POINTS: AuthPoint[] = [
   },
   {
     icon: <Gift />,
-    title: 'Nothing to pay, ever, on Basic',
-    body: 'No card is asked for. Basic is a permanent free plan, not a trial with a clock on it.'
+    title: 'Fifteen days free, everything included',
+    body: 'No card is asked for. Complete access, every feature, unlimited data — then choose Monthly or Yearly.'
   }
 ];
 
@@ -198,15 +199,17 @@ export default function Register() {
 
       {referral?.valid && step !== 'done' && (
         <StatusNote tone="ok" icon={<Gift size={17} />} title={`${referral.pharmacyName} referred you`}>
-          You will get {referral.trialDays} days of the full premium feature set, free, starting
-          the moment you confirm your e-mail address. No card is needed and nothing is charged
-          when it ends.
+          You start with {referral.trialDays} days of the full system, free, like everyone
+          {referral.prices?.[0]
+            ? <> — and then pay the referral price: <strong>{rupees(referral.prices[0].pricePaisa)} a month on {referral.prices[0].name}</strong> instead of {rupees(referral.prices[0].listPricePaisa)}</>
+            : null}.
+          No card is needed, and nothing is charged when the trial ends.
         </StatusNote>
       )}
       {referral && !referral.valid && step === 'details' && (
         <StatusNote tone="warn" title="That referral code did not work">
-          {referral.reason} You can still create your account — it will start on the free Basic
-          plan.
+          {referral.reason} You can still create your account — it starts on the 15-day free
+          trial, and a code can be entered later under Settings › Billing.
         </StatusNote>
       )}
 
@@ -329,11 +332,11 @@ export default function Register() {
           subtitle={<>You are signed in already. Your subscription reference is <code>{created.subscriptionId}</code> — quote it if you ever telephone about a payment.</>}
         >
           {created.trial && (
-            <StatusNote tone="ok" icon={<Gift size={17} />} title="Your premium trial is running">
-              {created.trial.daysLeft} days of the full feature set, until{' '}
+            <StatusNote tone="ok" icon={<Gift size={17} />} title="Your free trial is running">
+              {created.trial.daysLeft} days of the full system — every feature, unlimited data — until{' '}
               {new Date(created.trial.expiresAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' })}.
-              When it ends the pharmacy moves to the free Basic plan and every record stays
-              exactly where it is.
+              Choose Monthly or Yearly under Settings › Billing whenever you are ready; every
+              record stays exactly where it is.
             </StatusNote>
           )}
 
