@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.6.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.6.1** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -805,10 +805,15 @@ from buying the VPS (KVM 2 recommended, Ubuntu 24.04 with Docker, Mumbai) to
 HTTPS, backups, updates and moving over from Railway and Vercel.
 
 **Everything on Vercel, for testing:** `deploy/VERCEL_DEPLOYMENT.txt`.
-- A Vercel project with Root Directory `deploy/vercel` builds the website.
-- It runs the whole API as one Vercel Function, in Mumbai, with MongoDB
-  Atlas.
-- A daily Vercel Cron does the housekeeping.
+- The root `vercel.json` defines two Vercel services in one project.
+  - `backend`: the API as one function, `backend/src/vercel.ts`, at
+    `/api/…`.
+  - `frontend`: the Vite website, at every other address.
+- Import the repository with the Root Directory left empty.
+- MongoDB Atlas is the database, and a daily Vercel Cron does the
+  housekeeping.
+- `deploy/vercel/` (Root Directory `deploy/vercel`) is the same as one
+  folder.
 
 The project whose Root Directory is `frontend` keeps working as before: the
 website on Vercel, the API on Railway.
@@ -826,7 +831,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.6.0 · Server 2.6.0 — up to date", or
+System) compares the two: "Website 2.6.1 · Server 2.6.1 — up to date", or
 which one still has to redeploy from `main` (Railway › the service ›
 Deployments, or Vercel › Deployments).
 
