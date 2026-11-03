@@ -3,6 +3,78 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.6.0] — 2026-11-03
+
+### The three plans from the price sheet
+- **Starter — the free trial.** Every new pharmacy starts on it: 15 days with
+  complete account access, every feature and unlimited data. No card is
+  asked for.
+- **Monthly — a 3-month starter plan for beginners.**
+  - Rs 1,500 a month, or **Rs 1,300 a month** for a pharmacy that came
+    through another pharmacy's referral.
+  - It is paid month by month for up to three months. Once the third month
+    is paid, it stops renewing by itself (at Stripe too) and the pharmacy is
+    told to choose Yearly.
+- **Yearly — best value.** Rs 12,000 a year: about Rs 1,000 a month, which
+  saves Rs 6,000 (about 33%) against twelve months of Monthly.
+- **Every plan includes everything:** the dashboard, purchasing, stock,
+  sales and billing, customers and suppliers, reports, settings and
+  administration, with unlimited records, staff and branches.
+- **When the trial or a plan ends, nothing is deleted.**
+  - Every screen shows "Your free trial has ended" with Monthly and Yearly.
+  - Records can still be read and exported.
+  - The server refuses every change (`402 plan_required`) until a plan is
+    paid for. Paying opens everything again at once.
+  - A trial ends to the minute, without waiting for the hourly
+    housekeeping.
+- **No free day is lost.** Choosing a plan changes nothing until its payment
+  clears: the trial (or the current plan) carries on, and the paid period
+  starts where it ends.
+- **Referrals now give the referral price**, not extra trial days.
+  - A pharmacy that registered without a code can enter one later, under
+    Billing › Have a referral code?
+  - It can never enter its own code, and only one referral per pharmacy.
+- **The Super Admin can change everything under Platform › Plans:** each
+  price, the referral price, how many months Monthly runs, the trial length
+  and unlimited (-1) limits.
+  - Recording a payment by hand asks which plan it is for.
+  - Extra days given to a trial keep it a trial.
+- **Existing installations move over once, at start-up.**
+  - Monthly takes the new price; Starter and Yearly are added.
+  - Basic, Weekly and Annual are retired (old invoices still name them).
+  - Every pharmacy on the old free plan starts a fresh 15-day trial, so
+    nobody is locked out.
+  - A pharmacy that has paid keeps its plan to the end of its period.
+- **The website, Billing and the sign-up** are laid out like the price
+  sheet: Starter in green, Monthly in blue, Yearly in purple, the "All plans
+  include full access" strip and the plan summary. The prices always come
+  live from the plans.
+- **E-mails:** a notice three days and one day before the trial (or a plan
+  that will not renew) ends, with the plans that can be chosen.
+
+### Fixed
+- A failed first payment (on the trial, or after a plan had ended) no
+  longer starts a grace period; only a failed renewal of a running plan
+  does.
+- A cancelled plan now ends on its last paid day; before, it stayed usable.
+- A confirmed bank transfer now moves the pharmacy to the plan it paid for.
+- Coming back from a payment page now shows "Payment received". Settings
+  had been dropping `?payment=` from the address before Billing could read
+  it.
+
+### The whole system on Vercel, for testing
+- **A root `vercel.json` runs everything on one Vercel project:**
+  - the website;
+  - the API as one Vercel Function (`api/index.js`), in Mumbai;
+  - MongoDB Atlas as the database;
+  - a daily Vercel Cron for the housekeeping, at
+    `/api/v1/cron/maintenance`, protected by `CRON_SECRET`.
+- **`deploy/VERCEL_DEPLOYMENT.txt`** gives every step and setting.
+- A Vercel project whose Root Directory is `frontend` is unchanged: the
+  website on Vercel, the API on Railway.
+- The housekeeping a server runs hourly now lives in one place
+  (`services/maintenance.ts`), shared by the server and the cron.
+
 ## [2.5.2] — 2026-10-28
 
 ### A bigger logo

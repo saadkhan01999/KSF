@@ -1,0 +1,226 @@
+/* ==========================================================================
+   The price sheet: Starter (green), Monthly (blue) and Yearly (purple),
+   the "all plans include" strip and the plan summary. Used by the pricing
+   page, Billing and the screen shown when the free trial has ended.
+   ========================================================================== */
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: var(--s-5);
+  align-items: stretch;
+}
+
+.sheet-card {
+  --tone: var(--brand-600);
+  --tone-deep: var(--brand-800);
+  --tone-soft: var(--brand-050);
+  --tone-text: var(--brand-700);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1.5px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 10px 28px -18px color-mix(in srgb, var(--tone) 60%, transparent);
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+.sheet-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(16, 24, 40, .06), 0 18px 36px -18px color-mix(in srgb, var(--tone) 70%, transparent); }
+.sheet-card.tone-monthly { --tone: var(--info-600); --tone-deep: #0B3E8F; --tone-soft: var(--info-100); --tone-text: var(--info-text); }
+.sheet-card.tone-yearly { --tone: var(--purple-500); --tone-deep: #4A1FB8; --tone-soft: var(--purple-100); --tone-text: var(--purple-text); }
+.sheet-card.is-current { border-width: 2px; border-color: var(--tone); }
+
+.sheet-card-head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--s-5) var(--s-5) calc(var(--s-5) + 4px);
+  text-align: center;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, var(--tone) 0%, var(--tone-deep) 100%);
+}
+.sheet-card-head h3 { margin: 0; font-size: 1.45rem; font-weight: 750; letter-spacing: -.02em; color: inherit; }
+.sheet-card-sub { margin: 0; font-size: var(--fs-sm); opacity: .9; }
+.sheet-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 5px 16px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  background: #FFFFFF;
+  color: var(--tone-deep);
+}
+/* The trial's header is light, as on the sheet, with the pill solid green. */
+.sheet-card.tone-trial .sheet-card-head { color: var(--brand-800); background: linear-gradient(135deg, var(--brand-100) 0%, var(--brand-200) 100%); }
+.sheet-card.tone-trial .sheet-pill { background: var(--brand-600); color: #FFFFFF; }
+.sheet-current {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  background: rgba(255, 255, 255, .92);
+  color: var(--tone-deep);
+}
+
+.sheet-card-body { display: flex; flex-direction: column; flex: 1; gap: var(--s-4); padding: var(--s-5); }
+
+.sheet-price { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.sheet-price small { color: var(--text-dim); font-size: var(--fs-sm); }
+.sheet-amount { font-size: 1.7rem; font-weight: 800; letter-spacing: -.03em; color: var(--tone-text); font-variant-numeric: tabular-nums; }
+.sheet-amount.is-big { font-size: 2.35rem; }
+.sheet-figure { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.sheet-per { font-size: var(--fs-sm); font-weight: 600; color: var(--text-soft); }
+.sheet-free { font-size: 3.2rem; line-height: 1; font-weight: 850; letter-spacing: -.02em; color: var(--brand-700); }
+.sheet-chip {
+  display: inline-block;
+  padding: 7px 22px;
+  border-radius: var(--r-pill);
+  background: var(--brand-100);
+  color: var(--brand-800);
+  font-weight: 700;
+}
+.sheet-price.is-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: var(--s-3) 0;
+  border-radius: var(--r-lg);
+  background: var(--tone-soft);
+}
+.sheet-price.is-split > div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 var(--s-2); }
+.sheet-price.is-split > div + div { border-left: 1px solid color-mix(in srgb, var(--tone) 25%, transparent); }
+.sheet-price.is-split .sheet-amount { font-size: 1.45rem; }
+.sheet-price.is-split small { font-size: var(--fs-xs); }
+.sheet-price.is-split > .is-yours small { color: var(--tone-text); font-weight: 700; }
+.sheet-price.is-split:has(.is-yours) > div:not(.is-yours) { opacity: .62; }
+
+.sheet-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-lg);
+  background: var(--tone-soft);
+  color: var(--tone-text);
+  text-align: center;
+  font-size: var(--fs-sm);
+}
+.sheet-box strong { font-size: 1rem; }
+.sheet-box.is-saving { flex-direction: row; justify-content: center; gap: var(--s-3); background: var(--danger-100); color: var(--danger-text); }
+.sheet-box.is-saving svg { flex: none; }
+.sheet-saving { display: flex; flex-direction: column; align-items: center; }
+.sheet-saving > span { font-size: var(--fs-sm); }
+
+.sheet-points { list-style: none; display: grid; gap: 10px; margin: 0; padding: 0; }
+.sheet-points li { display: flex; align-items: flex-start; gap: 10px; font-size: .95rem; color: var(--text); }
+.sheet-points svg { flex: none; margin-top: 2px; color: var(--tone); stroke-width: 2.6; }
+
+.sheet-note { font-size: var(--fs-sm); color: var(--text-soft); text-align: center; }
+.sheet-note.is-warn, .sheet-note .is-warn { color: var(--warn-text); }
+.sheet-action { margin-top: auto; display: grid; }
+.sheet-action .btn { justify-content: center; }
+
+/* ----------------------------------------------------- all plans include */
+.sheet-access {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  margin-top: var(--s-6);
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--r-xl);
+  background: var(--info-100);
+  border: 1px solid color-mix(in srgb, var(--info-600) 18%, transparent);
+}
+.sheet-access-title {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 230px;
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-lg);
+  background: linear-gradient(135deg, var(--info-600), #0B3E8F);
+  color: #FFFFFF;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.sheet-access-title strong { text-transform: uppercase; letter-spacing: .02em; }
+.sheet-access ul {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: var(--s-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sheet-access li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.sheet-access li span { display: inline-flex; color: var(--info-600); }
+.sheet-access li svg { width: 28px; height: 28px; stroke-width: 1.8; }
+@media (max-width: 1180px) {
+  .sheet-access ul { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: var(--s-4); }
+}
+@media (max-width: 760px) {
+  .sheet-access { flex-direction: column; align-items: stretch; }
+  .sheet-access-title { max-width: none; justify-content: center; }
+  .sheet-access ul { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 420px) {
+  .sheet-access ul { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* --------------------------------------------------------- plan summary */
+.sheet-summary th { text-align: left; }
+.sheet-summary th[scope="row"] { font-weight: 700; }
+.sheet-summary tr.tone-trial th[scope="row"] { color: var(--brand-700); }
+.sheet-summary tr.tone-monthly th[scope="row"] { color: var(--info-text); }
+.sheet-summary tr.tone-yearly th[scope="row"] { color: var(--purple-text); }
+
+/* ------------------------------------------------- the end of the trial */
+.plan-gate { max-width: 1080px; margin: 0 auto; display: grid; gap: var(--s-5); }
+.plan-gate-head { text-align: center; display: grid; justify-items: center; gap: var(--s-2); padding-top: var(--s-4); }
+.plan-gate-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--brand-100);
+  color: var(--brand-700);
+}
+.plan-gate-head h1 { margin: 0; font-size: clamp(1.5rem, 3vw, 2rem); }
+.plan-gate-head p { margin: 0; max-width: 640px; color: var(--text-soft); line-height: 1.6; }
+.plan-gate-links { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-3); }
+
+/* A referral code typed in under Billing. */
+.referral-entry { display: flex; gap: var(--s-3); align-items: flex-end; flex-wrap: wrap; }
+.referral-entry > :first-child { flex: 1; min-width: 180px; }
+
+/* The plan summary on the pricing page. */
+.sheet-summary-band { max-width: 760px; margin: var(--s-7) auto 0; }
+.sheet-summary-title { text-align: center; font-size: 1.25rem; margin-bottom: var(--s-3); }

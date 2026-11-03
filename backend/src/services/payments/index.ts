@@ -26,7 +26,7 @@ import type { PaymentAttempt, Subscription } from '../../db/types.js';
 import { auditLog, securityEvent } from '../../core/trails.js';
 import { nowIso, plusDays, randomUUID, toInt, toStr } from '../../core/util.js';
 import { secureReference } from '../../security/crypto.js';
-import { cancelSubscription, getPlan, recordPayment } from '../subscriptions.js';
+import { cancelSubscription, offerFor, recordPayment } from '../subscriptions.js';
 import { bankTransfer, easypaisa, gateway, jazzcash } from './adapters.js';
 import { stripe } from './stripe.js';
 import { canMoveTo, PAYMENT_STATUS, setting, type Adapter, type CallbackInput, type ProviderEvent, type ProviderOutcome } from './provider.js';
@@ -77,14 +77,18 @@ export async function createAttempt(input: {
   const state = adapter.configured();
   if (!state.ok) return { ok: false as const, reason: `${adapter.label} is not configured on this installation.` };
 
-  const plan = await getPlan(input.planKey);
-  if (!plan || plan.status !== 'active') return { ok: false as const, reason: 'Choose one of the available plans.' };
-  if (plan.isFree) return { ok: false as const, reason: 'The Basic plan is free — there is nothing to pay.' };
+  /* The price is this pharmacy's own — the referral price when it came
+     through one — and a plan it can no longer have is refused here too. */
+  const chosen = await offerFor(input.pharmacyId, input.planKey);
+  if (!chosen.ok) return { ok: false as const, reason: chosen.reason };
+  const plan = chosen.offer;
+  if (plan.isFree) return { ok: false as const, reason: `${plan.name} is free — there is nothing to pay.` };
+  const amountPaisa = plan.yourPricePaisa;
 
   const reference = secureReference('KSFPAY');
   const pharmacy = await col.pharmacies().findOne({ _id: input.pharmacyId }, { projection: { email: 1, name: 1 } });
   const built = await adapter.createRequest({
-    reference, amountPaisa: plan.pricePaisa, currency: plan.currency || 'PKR', description: `KSF ${plan.name} plan`,
+    reference, amountPaisa, currency: plan.currency || 'PKR', description: `KSF ${plan.name} plan`,
     /* The reference rides on the return address so a provider that is
        confirmed by lookup (Stripe) knows which payment to look up. */
     returnUrl: `${APP_URL}/api/v1/payments/return/${adapter.key}?ref=${encodeURIComponent(reference)}`,
@@ -103,7 +107,7 @@ export async function createAttempt(input: {
   const id = randomUUID();
   const attempt: PaymentAttempt = {
     _id: id, id, reference, pharmacy_id: input.pharmacyId, subscription_id: input.subscriptionId, purpose: input.purpose ?? 'subscription',
-    plan_key: plan.key, provider: adapter.key, method: adapter.methods[0] ?? null, amount_paisa: plan.pricePaisa, currency: plan.currency || 'PKR',
+    plan_key: plan.key, provider: adapter.key, method: adapter.methods[0] ?? null, amount_paisa: amountPaisa, currency: plan.currency || 'PKR',
     status: PAYMENT_STATUS.CREATED, provider_reference: built.providerReference ?? null, provider_status: null, redirect_url: built.redirect?.url ?? null,
     request_payload: JSON.stringify({ redirect: built.redirect ?? null, instructions: built.instructions ?? null }).slice(0, 8000),
     last_checked_at: null, check_count: 0, failure_reason: null, created_by: input.actorId ?? null, created_at: at, updated_at: at,
@@ -112,7 +116,7 @@ export async function createAttempt(input: {
   await col.paymentAttempts().insertOne(attempt);
   return {
     ok: true as const, attempt, reference, redirect: built.redirect ?? null, instructions: built.instructions ?? null,
-    amountPaisa: plan.pricePaisa, currency: attempt.currency, plan: { key: plan.key, name: plan.name }
+    amountPaisa, currency: attempt.currency, plan: { key: plan.key, name: plan.name }
   };
 }
 
@@ -183,7 +187,9 @@ export async function settleFromProvider(input: { providerKey: string; outcome: 
   const result = await recordPayment({
     pharmacyId: attempt.pharmacy_id, subscriptionId: attempt.subscription_id, amountPaisa: attempt.amount_paisa, currency: attempt.currency,
     status: 'succeeded', kind: attempt.purpose === 'subscription' ? 'checkout' : attempt.purpose, provider: adapter.key,
-    providerReference: toStr(outcome.providerReference, 120) || reference, method: toStr(outcome.method, 40) || null, attemptId: attempt.id
+    providerReference: toStr(outcome.providerReference, 120) || reference, method: toStr(outcome.method, 40) || null, attemptId: attempt.id,
+    /* The plan this payment was for: the subscription becomes it as the money arrives. */
+    planKey: attempt.plan_key
   });
   if (result.ok && !result.duplicate && result.payment) {
     await col.subscriptionPayments().updateOne({ _id: result.payment.id }, {
@@ -406,7 +412,7 @@ export async function verifyManualPayment(input: { attemptId: string; statementR
   const result = await recordPayment({
     pharmacyId: attempt.pharmacy_id, subscriptionId: attempt.subscription_id, amountPaisa: attempt.amount_paisa, currency: attempt.currency,
     status: 'succeeded', kind: 'checkout', provider: 'bank-transfer', providerReference: attempt.reference, method: 'transfer',
-    attemptId: attempt.id, verifiedBy: input.actor.id
+    attemptId: attempt.id, verifiedBy: input.actor.id, planKey: attempt.plan_key
   });
   if (result.payment) {
     await col.subscriptionPayments().updateOne({ _id: result.payment.id }, { $set: { statement_reference: toStr(input.statementReference, 120), updated_at: nowIso() } });

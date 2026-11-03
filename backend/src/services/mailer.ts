@@ -340,12 +340,12 @@ export const templates = {
   }),
   welcome: ({ name, pharmacy, subscriptionId, trialEnds }: { name?: string; pharmacy: string; subscriptionId: string; trialEnds?: string | null }) => ({
     subject: `${pharmacy} is ready on KSF`,
-    text: `Assalam-o-alaikum ${name || ''},\n\n${pharmacy} is set up and ready to use.\n\nSubscription reference: ${subscriptionId}\n${trialEnds ? `Your premium trial runs until ${trialEnds}.\n` : ''}\nSign in at ${APP_URL}\n\nKSF`,
+    text: `Assalam-o-alaikum ${name || ''},\n\n${pharmacy} is set up and ready to use.\n\nSubscription reference: ${subscriptionId}\n${trialEnds ? `Your free trial — every feature, unlimited data — runs until ${trialEnds}. Then choose Monthly or Yearly; nothing you enter is lost.\n` : ''}\nSign in at ${APP_URL}\n\nKSF`,
     html: shell(`${pharmacy} is ready`, [
       `Assalam-o-alaikum ${name || ''},`,
       'Your pharmacy is set up. The first thing worth doing is adding your opening stock, or importing it from your old system under Settings &rsaquo; Data Migration.',
       `Subscription reference: <strong>${subscriptionId}</strong>`,
-      trialEnds ? `Your premium trial runs until <strong>${trialEnds}</strong>. Nothing is deleted when it ends — the account moves to the free Basic plan.` : '',
+      trialEnds ? `Your free trial — every feature, unlimited data — runs until <strong>${trialEnds}</strong>. Then choose the Monthly or Yearly plan; nothing you enter is lost.` : '',
       button(APP_URL, 'Open KSF')
     ].filter(Boolean))
   }),
@@ -359,7 +359,7 @@ export const templates = {
   }),
   renewalReminder: ({ name, pharmacy, plan, amount, on, days }: { name?: string; pharmacy: string; plan: string; amount: string; on: string; days: number }) => ({
     subject: days === 1 ? `${pharmacy}: your KSF subscription renews tomorrow` : `${pharmacy}: your KSF subscription renews on ${on}`,
-    text: `Assalam-o-alaikum ${name || ''},\n\nThe ${plan} subscription for ${pharmacy} renews on ${on} at ${amount}.\n\nIf your payment method is up to date there is nothing to do.\n\nTo change the plan or stop the renewal, open Settings > Billing and Subscription. Cancelling keeps the plan until ${on} and then moves the pharmacy to the free Basic plan — nothing is deleted either way.\n\n${APP_URL}\n\nKSF`,
+    text: `Assalam-o-alaikum ${name || ''},\n\nThe ${plan} subscription for ${pharmacy} renews on ${on} at ${amount}.\n\nIf your payment method is up to date there is nothing to do.\n\nTo change the plan or stop the renewal, open Settings > Billing and Subscription. Cancelling keeps the plan until ${on}; after that you choose a plan again whenever you are ready — nothing is deleted either way.\n\n${APP_URL}\n\nKSF`,
     html: shell(days === 1 ? 'Your subscription renews tomorrow' : 'Your subscription renews soon', [
       `Assalam-o-alaikum ${name || ''},`,
       `The <strong>${plan}</strong> subscription for <strong>${pharmacy}</strong> renews on <strong>${on}</strong> at <strong>${amount}</strong>.`,
@@ -370,13 +370,24 @@ export const templates = {
   }),
   paymentMissed: ({ name, pharmacy, amount, until, daysLeft, attempts, final }: { name?: string; pharmacy: string; amount: string; until: string; daysLeft: number; attempts: number; final: boolean }) => ({
     subject: final ? `${pharmacy}: last few days before your plan changes` : `${pharmacy}: your KSF payment did not go through`,
-    text: `Assalam-o-alaikum ${name || ''},\n\nThe subscription payment of ${amount} for ${pharmacy} has not been received${attempts > 1 ? ` after ${attempts} attempts` : ''}.\n\nYour pharmacy is working normally and will keep working until ${until}${daysLeft > 0 ? ` — that is ${daysLeft} more day(s)` : ''}.\n\nAfter that the account moves to the free Basic plan. Nothing is deleted, and picking the plan back up puts everything back.\n\nTo pay now: Settings > Billing and Subscription.\n\n${APP_URL}/settings?tab=billing\n\nKSF`,
+    text: `Assalam-o-alaikum ${name || ''},\n\nThe subscription payment of ${amount} for ${pharmacy} has not been received${attempts > 1 ? ` after ${attempts} attempts` : ''}.\n\nYour pharmacy is working normally and will keep working until ${until}${daysLeft > 0 ? ` — that is ${daysLeft} more day(s)` : ''}.\n\nAfter that you will be asked to choose a plan. Nothing is deleted, and paying puts everything back as it was.\n\nTo pay now: Settings > Billing and Subscription.\n\n${APP_URL}/settings?tab=billing\n\nKSF`,
     html: shell(final ? 'A few days left on your plan' : 'We could not take your payment', [
       `Assalam-o-alaikum ${name || ''},`,
       `The subscription payment of <strong>${amount}</strong> for <strong>${pharmacy}</strong> has not been received${attempts > 1 ? ` after ${attempts} attempts` : ''}.`,
       `Your pharmacy is working normally and keeps working until <strong>${until}</strong>${daysLeft > 0 ? ` — ${daysLeft} more day(s)` : ''}.`,
-      'After that the account moves to the free Basic plan. <strong>Nothing is deleted</strong>, and picking the plan back up puts everything back.',
+      'After that you will be asked to choose a plan. <strong>Nothing is deleted</strong>, and paying puts everything back as it was.',
       button(`${APP_URL}/settings?tab=billing`, 'Pay now')
+    ])
+  }),
+  planEnding: ({ name, pharmacy, what, on, days, choices }: { name?: string; pharmacy: string; what: string; on: string; days: number; choices: string[] }) => ({
+    subject: days <= 1 ? `${pharmacy}: your KSF ${what} ends tomorrow` : `${pharmacy}: your KSF ${what} ends on ${on}`,
+    text: `Assalam-o-alaikum ${name || ''},\n\nThe ${what} for ${pharmacy} ends on ${on}.\n\nTo carry on without a break, choose a plan under Settings > Billing and Subscription:\n\n${choices.map((line) => `  - ${line}`).join('\n')}\n\nNothing you have entered is lost either way.\n\n${APP_URL}/settings?tab=billing\n\nKSF`,
+    html: shell(days <= 1 ? `Your ${what} ends tomorrow` : `Your ${what} ends on ${on}`, [
+      `Assalam-o-alaikum ${name || ''},`,
+      `The <strong>${what}</strong> for <strong>${pharmacy}</strong> ends on <strong>${on}</strong>.`,
+      `To carry on without a break, choose a plan:<br>${choices.map((line) => `&bull; ${line}`).join('<br>')}`,
+      '<strong>Nothing you have entered is lost</strong> either way.',
+      button(`${APP_URL}/settings?tab=billing`, 'Choose a plan')
     ])
   }),
   paymentReceipt: ({ name, pharmacy, invoiceNo, amount, plan, period, paidOn }: { name?: string; pharmacy: string; invoiceNo: string; amount: string; plan: string; period: string; paidOn: string }) => ({

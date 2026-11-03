@@ -54,7 +54,7 @@ describe('access to every route', { skip }, () => {
     const { client: rival, pharmacyId: rivalId } = await registerPharmacy(server.base, 'Rival', 'rival@pharmacy.test');
     other = rival;
     /* Every feature on, so a plan never answers in place of a permission. */
-    for (const id of [pharmacyId, rivalId]) await admin.post(`/api/v1/platform/pharmacies/${id}/subscription`, { planKey: 'annual' });
+    for (const id of [pharmacyId, rivalId]) await admin.post(`/api/v1/platform/pharmacies/${id}/subscription`, { planKey: 'yearly' });
 
     for (const roleKey of ['regional-manager', 'manager', 'pharmacist', 'cashier']) {
       staff[roleKey] = await addStaff(server.base, owner, { name: `Staff ${roleKey}`, email: `${roleKey}@access.test`, roleKey });

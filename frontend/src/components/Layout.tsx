@@ -27,6 +27,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useHomeRoute } from '../hooks/useHomeRoute';
 import { PersonAvatar } from './people';
 import { SubscriptionBanner } from './SubscriptionBanner';
+import { PlanGate } from './PlanGate';
 import { useBusiness } from '../services/business';
 
 interface NavEntry {
@@ -171,6 +172,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   /* A phone has room in the top bar for the word, not the sentence: cut to
      "Sea", the sentence read as a broken field. */
   const narrow = useMediaQuery('(max-width: 479px)');
+  /* The trial or the plan has ended: every screen but Billing, the person's
+     own account, notifications and support shows the plan choice instead.
+     The platform team in support mode sees the pharmacy as it is. */
+  const tab = new URLSearchParams(location.search).get('tab');
+  const showGate = !isPlatform && !user?.supportMode && !!subscription?.locked && !(
+    (location.pathname === '/settings' && (tab === 'billing' || tab === 'appearance'))
+    || ['/account', '/notifications', '/support'].some((path) => location.pathname.startsWith(path))
+  );
   /* The isolated university copy says so, so it is never mistaken for the live service. */
   const { edition } = useBusiness();
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -452,7 +461,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Menu>
         </header>
 
-        <main className="page">{children}</main>
+        <main className="page">{showGate ? <PlanGate /> : children}</main>
       </div>
 
       <nav className="mobile-bar" aria-label="Quick navigation">

@@ -370,9 +370,18 @@ platformRoute('POST', '/api/v1/platform/pharmacies/:id/subscription', 'platform.
     if (!subscription) bad('This pharmacy has no subscription to extend.');
     const from = new Date(Math.max(Date.now(), new Date(subscription!.current_period_end).getTime()));
     const until = new Date(from.getTime() + extendDays * 86_400_000).toISOString();
+    /* A trial extended stays a trial — with every feature, and its own end date. */
+    const trial = !!subscription!.is_trial;
     await col.subscriptions().updateOne({ _id: subscription!.id }, {
-      $set: { current_period_end: until, renewal_at: subscription!.is_free ? null : until, status: 'active', grace_until: null, updated_at: nowIso() }
+      $set: { current_period_end: until, renewal_at: subscription!.is_free ? null : until, status: trial ? 'trial' : 'active', grace_until: null, ended_at: null, updated_at: nowIso() }
     });
+    if (trial) {
+      await col.trials().findOneAndUpdate(
+        { pharmacy_id: pharmacy.id, status: { $in: ['active', 'expired'] } },
+        { $set: { status: 'active', expires_at: until, ended_at: null, updated_at: nowIso() } },
+        { sort: { created_at: -1 } }
+      );
+    }
   }
   const after = await subscriptionState(pharmacy.id);
   const summary = [planKey ? `plan set to ${after?.planName}` : null, extendDays ? `extended by ${extendDays} day(s) to ${String(after?.periodEnd).slice(0, 10)}` : null].filter(Boolean).join(', ');
@@ -394,9 +403,16 @@ platformRoute('POST', '/api/v1/platform/pharmacies/:id/payments', 'platform.fina
   const reference = toStr(ctx.body.reference, 120);
   if (!reference) bad('Record a reference — a receipt, cheque or slip number — so the payment can be traced.', 'reference');
   const method = toStr(ctx.body.method, 30) || 'cash';
+  /* Which plan the money is for: the one named, else the one the pharmacy
+     chose, else the plan it is on — never the free trial. */
+  const planKey = toStr(ctx.body.planKey, 30) || subscription.pending_plan_key || (subscription.is_trial ? '' : subscription.plan_key);
+  if (!planKey) bad('Say which plan this payment is for — the pharmacy is on its free trial.', 'planKey');
+  const plan = await getPlan(planKey);
+  if (!plan || plan.isTrial || plan.status !== 'active') bad('That plan cannot be paid for.', 'planKey');
   const result = await recordPayment({
     pharmacyId: pharmacy.id, subscriptionId: subscription.id, amountPaisa: amount, currency: subscription.currency, status: 'succeeded',
-    kind: 'manual', provider: 'manual', providerReference: reference, method, verifiedBy: ctx.user.id
+    kind: 'manual', provider: 'manual', providerReference: reference, method, verifiedBy: ctx.user.id,
+    planKey: plan!.key === subscription.plan_key ? null : plan!.key
   });
   if (!result.ok) bad(result.reason ?? 'The payment could not be recorded.');
   if (result.duplicate) {
@@ -545,13 +561,25 @@ function planChanges(body: Record<string, any>, existing: Plan | null): Partial<
     if (set.price_paisa < 0) bad('The price cannot be negative.', 'pricePaisa');
     set.is_free = set.price_paisa === 0 ? 1 : 0;
   }
+  if (has('referralPricePaisa')) {
+    const value = body.referralPricePaisa === null || body.referralPricePaisa === '' ? null : toInt(body.referralPricePaisa, -1);
+    if (value !== null && value < 0) bad('The referral price cannot be negative.', 'referralPricePaisa');
+    const price = set.price_paisa ?? existing?.price_paisa ?? 0;
+    if (value !== null && value >= price) bad('The referral price has to be lower than the plan price, or empty for none.', 'referralPricePaisa');
+    set.referral_price_paisa = value;
+  }
+  if (has('maxCycles')) {
+    set.max_cycles = toInt(body.maxCycles, 0);
+    if (set.max_cycles < 0 || set.max_cycles > 120) bad('Choose between 0 (no limit) and 120 periods.', 'maxCycles');
+  }
   if (has('graceDays')) set.grace_days = Math.min(60, Math.max(0, toInt(body.graceDays, existing?.grace_days ?? 7)));
   if (has('trialDays')) set.trial_days = Math.min(90, Math.max(0, toInt(body.trialDays, existing?.trial_days ?? 0)));
   const limits = body.limits ?? {};
+  /* -1 is unlimited — what every plan on the price sheet has. */
   const limit = (key: string, field: keyof Plan, current: number | undefined) => {
     if (limits[key] === undefined) return;
-    const value = toInt(limits[key], -1);
-    if (value < 1 || value > 100_000) bad(`The ${key} limit must be between 1 and 100000.`, `limits.${key}`);
+    const value = toInt(limits[key], 0);
+    if (value !== -1 && (value < 1 || value > 100_000)) bad(`The ${key} limit must be between 1 and 100000, or -1 for unlimited.`, `limits.${key}`);
     (set as Record<string, unknown>)[field] = value ?? current;
   };
   limit('users', 'max_users', existing?.max_users);
@@ -581,7 +609,7 @@ platformRoute('POST', '/api/v1/platform/plans', 'platform.plans.manage', async (
   if (await col.plans().findOne({ key })) bad('A plan with that key already exists.', 'key');
   const period = toStr(ctx.body.period, 10) || 'month';
   if (!['week', 'month', 'year', 'perpetual'].includes(period)) bad('Choose week, month, year or perpetual.', 'period');
-  const changes = planChanges({ status: 'active', isPublic: true, autoRenew: true, features: ['pos.core', 'inventory.batches', 'reports.core'], ...ctx.body }, null);
+  const changes = planChanges({ status: 'active', isPublic: true, autoRenew: true, features: FEATURE_KEYS, ...ctx.body }, null);
   if (!changes.name) bad('A plan needs a name.', 'name');
   const at = nowIso();
   const id = `PLAN-${key.toUpperCase()}`;
@@ -592,7 +620,8 @@ platformRoute('POST', '/api/v1/platform/plans', 'platform.plans.manage', async (
     max_desktop_devices: changes.max_desktop_devices ?? 2, max_mobile_devices: changes.max_mobile_devices ?? 2, max_users: changes.max_users ?? 5,
     max_branches: changes.max_branches ?? 1, max_medicines: changes.max_medicines ?? 5000, features: changes.features ?? [], auto_renew: changes.auto_renew ?? 1,
     is_default: 0, is_public: changes.is_public ?? 1, is_free: (changes.price_paisa ?? 0) === 0 ? 1 : 0, sort_order: changes.sort_order ?? 50,
-    status: changes.status ?? 'active', created_at: at, updated_at: at
+    status: changes.status ?? 'active', referral_price_paisa: changes.referral_price_paisa ?? null, max_cycles: changes.max_cycles ?? 0, is_trial: 0,
+    created_at: at, updated_at: at
   };
   await col.plans().insertOne(plan);
   await logActivity({ pharmacyId: null, user: ctx.user, ip: ctx.ip, userAgent: ctx.userAgent }, { action: 'platform.plan-created', entity: 'plan', entityId: id, summary: `Plan ${plan.name} created at ${rupees(plan.price_paisa)}` });
@@ -604,7 +633,7 @@ platformRoute('PATCH', '/api/v1/platform/plans/:key', 'platform.plans.manage', a
   const existing = await col.plans().findOne({ key: toStr(ctx.params.key, 30) });
   if (!existing) return missing('That plan could not be found.');
   const set = planChanges(ctx.body, existing);
-  if (existing.is_default && (set.status === 'retired' || (set.price_paisa ?? 0) > 0)) bad('The default plan must stay free and active — it is where every pharmacy lands when a paid plan ends.');
+  if (existing.is_default && (set.status === 'retired' || (set.price_paisa ?? 0) > 0)) bad('The free trial must stay free and active — it is where every new pharmacy starts.');
   const updated = await col.plans().findOneAndUpdate({ _id: existing.id }, { $set: { ...set, updated_at: nowIso() } }, { returnDocument: 'after' });
   await logActivity({ pharmacyId: null, user: ctx.user, ip: ctx.ip, userAgent: ctx.userAgent }, { action: 'platform.plan-updated', entity: 'plan', entityId: existing.id, summary: `Plan ${existing.name} updated`, meta: set });
   return { data: planOut(updated!) };

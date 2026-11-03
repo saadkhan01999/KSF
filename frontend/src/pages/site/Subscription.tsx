@@ -5,17 +5,17 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Clock, CreditCard, RefreshCw, ShieldCheck, Database } from 'lucide-react';
 import { SitePage, SiteCta } from '../../components/SiteChrome';
-import { PlanCard, StatusNote } from '../../components/account-ui';
+import { StatusNote } from '../../components/account-ui';
+import { FullAccessStrip, SheetPlanCard } from '../../components/price-sheet';
 import { CardSkeleton, Alert } from '../../components/ui';
 import { useReveal, useViewMode } from '../../hooks/useParallax';
 import { usePublicPlans } from '../../hooks/usePublicPlans';
-import { FEATURE_NAMES } from './content';
 
 const LIFECYCLE = [
   {
     icon: <CreditCard size={16} />,
-    title: 'You choose a plan',
-    body: 'The subscription is created at once, marked as waiting for payment. Nothing about the pharmacy changes yet, and the free feature set stays available while it waits.'
+    title: 'You start free, then choose a plan',
+    body: 'Every pharmacy starts on the 15-day free trial with everything. Choosing Monthly or Yearly changes nothing yet: the trial carries on, and the plan starts where it ends — no free day is lost.'
   },
   {
     icon: <ShieldCheck size={16} />,
@@ -25,7 +25,7 @@ const LIFECYCLE = [
   {
     icon: <RefreshCw size={16} />,
     title: 'It renews on its own',
-    body: 'On the day the period ends, if auto-renewal is on. Each renewal is recorded with its own reference, and a delivery arriving twice extends the period exactly once.'
+    body: 'On the day the period ends, if auto-renewal is on. Monthly stops by itself after its third month, so you can move to Yearly. Each renewal is recorded with its own reference, and a delivery arriving twice extends the period exactly once.'
   },
   {
     icon: <Clock size={16} />,
@@ -35,7 +35,7 @@ const LIFECYCLE = [
   {
     icon: <Database size={16} />,
     title: 'If it is never paid',
-    body: 'The account moves to the free Basic plan. Every medicine, batch, sale, purchase and prescription stays exactly where it is. The premium features stop being reachable; your records are untouched.'
+    body: 'You are asked to choose a plan. Every medicine, batch, sale, purchase and prescription stays exactly where it is and can still be viewed and exported; changing records waits for the payment.'
   }
 ];
 
@@ -52,20 +52,21 @@ export default function Subscription() {
           <span className="eyebrow">Subscription</span>
           <h1>How paying for KSF works</h1>
           <p className="lede">
-            Four levels, a permanent free one, and one promise that runs through all of them:
-            your pharmacy&apos;s records are never used as leverage.
+            A free trial, two ways to pay, full access on all three — and one promise that runs
+            through them: your pharmacy&apos;s records are never deleted, whatever happens.
           </p>
         </div>
       </section>
 
       <section className="band" data-reveal>
         {problem && <Alert tone="warn" title="The live plans could not be loaded">{problem}</Alert>}
-        {!plans && !problem && <CardSkeleton count={4} />}
+        {!plans && !problem && <CardSkeleton count={3} />}
         {plans && (
-          <div className="plan-grid">
-            {plans.map((plan) => <PlanCard key={plan.key} plan={plan} featureNames={FEATURE_NAMES} />)}
+          <div className="sheet-grid plan-grid">
+            {plans.map((plan) => <SheetPlanCard key={plan.key} plan={plan} plans={plans} />)}
           </div>
         )}
+        <FullAccessStrip />
       </section>
 
       <section className="band band-tint" data-reveal>
@@ -113,12 +114,11 @@ export default function Subscription() {
 
         <div className="status-grid">
           {[
-            ['Trial', 'The full premium feature set, free, for fifteen days.', 'ok'],
-            ['Active', 'Paid and current. Everything on the plan is available.', 'ok'],
-            ['Waiting for payment', 'A plan has been chosen but not yet paid for. The free feature set applies meanwhile.', 'warn'],
-            ['Grace period', 'A payment did not go through. Everything still works, and you have days to sort it out.', 'warn'],
+            ['Free trial', 'Everything, free, for fifteen days from registration.', 'ok'],
+            ['Active', 'Paid and current. Everything is available.', 'ok'],
+            ['Grace period', 'A renewal did not go through. Everything still works, and you have days to sort it out.', 'warn'],
             ['Cancelled', 'Auto-renewal is off. The plan runs to the end of the period you already paid for.', 'neutral'],
-            ['Basic', 'The free plan. Reachable from any other state, and nothing is lost getting here.', 'ok']
+            ['Ended', 'The trial or the plan has run out. Records can be read and exported; choose a plan to change them again.', 'warn']
           ].map(([label, body, tone]) => (
             <article key={label} className={`status-card tone-${tone}`}>
               <h3>{label}</h3>
@@ -136,7 +136,7 @@ export default function Subscription() {
             <li><Check size={16} /> A failed payment does not delete anything, and does not lock you out on the day.</li>
             <li><Check size={16} /> Cancelling does not delete anything, and you keep what you paid for until it runs out.</li>
             <li><Check size={16} /> Nothing you can click in the browser can activate a paid plan without the provider confirming it.</li>
-            <li><Check size={16} /> You can export everything, at any time, on any plan including the free one.</li>
+            <li><Check size={16} /> You can export everything, at any time — on the trial, on a plan, and after one ends.</li>
           </ul>
         </div>
         <div className="band-actions">

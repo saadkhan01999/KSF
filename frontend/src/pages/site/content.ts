@@ -4,50 +4,6 @@
    appear on the landing page, the pricing page and the subscription page
    without being written three times and drifting apart. */
 
-export interface PlanSummary {
-  key: string;
-  name: string;
-  price: string;
-  note: string;
-  featured?: boolean;
-  points: string[];
-}
-
-/* Indicative figures for the marketing pages. The live prices, limits and
-   features come from the database via /api/v1/public/plans — the pricing page
-   reads those, so a price change never needs a rebuild. */
-export const PLAN_SUMMARY: PlanSummary[] = [
-  {
-    key: 'basic',
-    name: 'Basic',
-    price: 'Free',
-    note: 'For as long as you want it',
-    points: ['One counter', 'Batch and expiry control', 'Daily and monthly summaries', 'Up to 3 staff accounts']
-  },
-  {
-    key: 'weekly',
-    name: 'Weekly',
-    price: 'Rs 1,200',
-    note: 'Billed every seven days',
-    points: ['Everything in Basic', 'Full reporting and CSV export', 'Custom roles', 'Bring your old data across']
-  },
-  {
-    key: 'monthly',
-    name: 'Monthly',
-    price: 'Rs 3,900',
-    note: 'Billed monthly, cancel any time',
-    featured: true,
-    points: ['Everything in Weekly', 'Several branches', 'Scheduled backups', 'Extra registered devices', 'Priority support']
-  },
-  {
-    key: 'annual',
-    name: 'Annual',
-    price: 'Rs 39,000',
-    note: 'About two months on the house',
-    points: ['Everything in Monthly', 'Unlimited staff and branches', 'Unlimited medicines', 'The best price per month']
-  }
-];
-
 /* Feature keys are what the server enforces; these are what a person reads. */
 export const FEATURE_NAMES: Record<string, string> = {
   'pos.core': 'Point of sale and invoicing',
@@ -72,11 +28,11 @@ export interface Question {
 export const FAQ: Question[] = [
   {
     q: 'What happens to my data if I stop paying?',
-    a: 'Nothing is deleted. The pharmacy moves to the free Basic plan and every medicine, batch, sale, purchase and prescription stays exactly where it was. The premium features stop being reachable; your records do not go anywhere. If a card fails you also get a grace period first, and we tell you before anything changes.'
+    a: 'Nothing is deleted. Every medicine, batch, sale, purchase and prescription stays exactly where it was, and you can still look at it and export it. Changing records waits until a plan is paid for, and then everything carries on where it stopped. If a renewal fails you also get a grace period first, and we tell you before anything changes.'
   },
   {
     q: 'Do I have to pay to start?',
-    a: 'No. Basic is free and permanent — no card, no trial clock on it. If somebody refers you, you get fifteen days of the full premium feature set on top, starting when you confirm your e-mail address.'
+    a: 'No. Every pharmacy starts on the Starter plan: fifteen days free, with complete access, every feature and unlimited data. No card is asked for. When the fifteen days are up you choose Monthly or Yearly — and the days you had left are never lost when you pay early.'
   },
   {
     q: 'Can I move my existing records into KSF?',
@@ -84,7 +40,7 @@ export const FAQ: Question[] = [
   },
   {
     q: 'How many computers can use one account?',
-    a: 'By default one computer and one phone or tablet per person, which is what stops a password being passed around. The paid plans raise that, and the pharmacy Admin can remove an old device at any time — KSF asks for the password first.'
+    a: 'Three computers and three phones or tablets per person, on every plan — enough for the counter, the back office and home, and few enough that one password cannot be passed round a whole market. The pharmacy Admin can remove an old device at any time; KSF asks for the password first. Staff accounts are unlimited.'
   },
   {
     q: 'Does it work without the internet?',
@@ -96,11 +52,11 @@ export const FAQ: Question[] = [
   },
   {
     q: 'Can I change plan later?',
-    a: 'At any time, in either direction. Moving up takes effect when the payment clears; moving down to Basic takes effect immediately and keeps all your data. Cancelling stops the renewal and you keep the plan until the period you already paid for runs out.'
+    a: 'Yes. Monthly is a starter plan for your first three months; Yearly can be chosen at any time, and it starts where your current plan ends, so no paid day is lost. Cancelling stops the renewal and you keep the plan until the period you already paid for runs out.'
   },
   {
     q: 'What if two people need the till at once?',
-    a: 'Give each of them their own account. KSF records who served every sale, which is the point — a shared login tells you nothing when the cash is short at closing. Staff accounts are included on every plan.'
+    a: 'Give each of them their own account. KSF records who served every sale, which is the point — a shared login tells you nothing when the cash is short at closing. Staff accounts are unlimited on every plan.'
   },
   {
     q: 'Do you support Easypaisa and JazzCash?',
@@ -112,7 +68,7 @@ export const FAQ: Question[] = [
   },
   {
     q: 'Can I try it before deciding?',
-    a: 'Yes. Open an account — it takes two minutes — and the Basic plan is free for as long as you like. With a referral code from another pharmacy you get fifteen days of the full system. Nothing is charged until you choose a paid plan.'
+    a: 'Yes. Open an account — it takes two minutes — and you have fifteen days of the full system, free. With a referral code from another pharmacy, Monthly then costs Rs 1,300 instead of Rs 1,500. Nothing is charged until you choose a plan and pay for it.'
   },
   {
     q: 'Who can see the reports?',
@@ -207,10 +163,11 @@ export const FEATURE_SECTIONS = [
 
 /** What the free trial is, and — more usefully — what happens when it ends. */
 export const TRIAL_POINTS: string[] = [
-  'It starts when you confirm your e-mail address, not when you click the link.',
-  'No card is asked for, and none is charged when the trial ends.',
+  'It starts when you confirm your e-mail address, with complete access, every feature and unlimited data.',
+  'No card is asked for, and nothing is charged when the trial ends.',
+  'Choose Monthly or Yearly whenever you are ready: the plan starts where the trial ends, so no free day is lost.',
   'One trial per account, ever — it cannot be restarted by registering again.',
-  'When it ends the pharmacy moves to the free Basic plan. Every medicine, batch, sale and prescription stays exactly where it is.'
+  'When it ends, every medicine, batch, sale and prescription stays exactly where it is. Choose a plan and carry on.'
 ];
 
 /** How renewal actually works here. Written plainly because this is the part
@@ -220,15 +177,19 @@ export const RENEWAL_POINTS: string[] = [
   'You are told before it renews, and the renewal is only ever recorded after the payment provider confirms it on the server.',
   'Cancelling stops the next renewal. You keep the plan until the period you have already paid for runs out.',
   'If a payment fails there is a grace period first, and a warning, before anything changes.',
-  'A refused payment never deletes anything. The worst case is the free Basic plan with all of your records intact.'
+  'A refused payment never deletes anything. The worst case is a pause on changes until a plan is paid for, with all of your records intact.'
 ];
 
 /** The conditions in short sentences, so nobody has to read a contract to
     understand what they are agreeing to. */
 export const SUBSCRIPTION_TERMS: { title: string; body: string }[] = [
   {
-    title: 'Basic is a plan, not a trial',
-    body: 'It costs nothing, permanently, and a single counter can run on it indefinitely. Batch tracking and expiry control are included, because they are safety features rather than upsells.'
+    title: 'Every plan is the whole system',
+    body: 'Starter, Monthly and Yearly all include every feature and unlimited records. The plans differ in how long they run and what they cost — never in what your pharmacy can do.'
+  },
+  {
+    title: 'Monthly is a starter plan',
+    body: 'It is paid month by month for up to three months — Rs 1,300 a month through a referral, Rs 1,500 without one. After that, Yearly carries on at about Rs 1,000 a month.'
   },
   {
     title: 'Prices are in Pakistani rupees',
@@ -236,7 +197,7 @@ export const SUBSCRIPTION_TERMS: { title: string; body: string }[] = [
   },
   {
     title: 'Changing plan',
-    body: 'Moving up takes effect when the payment clears. Moving down to Basic takes effect immediately and keeps every record.'
+    body: 'A new plan starts when its payment clears, at the end of the days you already have. Nothing is charged twice and nothing is lost.'
   },
   {
     title: 'Your data is yours',

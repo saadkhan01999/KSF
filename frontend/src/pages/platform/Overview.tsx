@@ -119,7 +119,7 @@ export default function Overview() {
                     {data.recentSignups.map((row) => (
                       <tr key={row.id} onClick={() => navigate(`/platform/pharmacies/${row.id}`)} style={{ cursor: 'pointer' }}>
                         <td><div className="cell-main">{row.name}</div><div className="cell-sub">{row.city ?? '—'} · {ago(row.created_at)}</div></td>
-                        <td className="t-right"><StatusBadge status={row.status} /><div className="cell-sub">{row.plan_key ?? 'basic'}</div></td>
+                        <td className="t-right"><StatusBadge status={row.status} /><div className="cell-sub">{row.plan_key ?? '—'}</div></td>
                       </tr>
                     ))}
                   </tbody>

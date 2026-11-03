@@ -1,0 +1,264 @@
+==============================================================================
+ KSF PHARMACY MANAGEMENT SYSTEM - THE WHOLE SYSTEM ON VERCEL (FOR TESTING)
+ Version 2.6.0 - November 2026
+==============================================================================
+
+ What this is: the website AND the API on one Vercel project, with the
+ database on MongoDB Atlas. No Railway, no server to look after. It is meant
+ for testing; for real pharmacies use the Hostinger VPS guide
+ (deploy/HOSTINGER_DEPLOYMENT.txt), which is cheaper at scale and has no
+ serverless limits.
+
+ Anything in CAPITALS between < and > is something you replace with your
+ own value.
+
+
+------------------------------------------------------------------------------
+ PART 0 - THE TWO WAYS KSF RUNS ON VERCEL
+------------------------------------------------------------------------------
+
+  A. Website on Vercel, API on Railway  (what runs today)
+     Vercel project Root Directory = "frontend". frontend/vercel.json sends
+     every /api request to Railway. Nothing in this guide changes it.
+
+  B. Everything on Vercel  (this guide)
+     Vercel project Root Directory = the repository itself (empty / "./").
+     The root vercel.json builds the website, runs the whole API as one
+     Vercel Function (api/index.js), in Mumbai (bom1), and runs the daily
+     housekeeping with Vercel Cron.
+
+  What is different on B, and why it is fine for testing:
+   - Housekeeping (a trial or plan ending, grace periods, reminders, the
+     mail queue) runs once a day from Vercel Cron instead of every hour.
+     A trial still ends to the minute: the server checks the date on every
+     request, so a pharmacy cannot keep working after its 15 days.
+   - The first request after a quiet spell takes 1-3 seconds longer (a
+     "cold start": connecting to the database and checking it).
+   - Live updates (a price changed, a payment confirmed) reconnect about
+     every 50 seconds. That is normal and invisible.
+   - Vercel's free Hobby plan is for non-commercial use. Testing is fine;
+     real customers belong on Hostinger (or Vercel Pro).
+
+
+------------------------------------------------------------------------------
+ PART 1 - THE DATABASE: MONGODB ATLAS (FREE)
+------------------------------------------------------------------------------
+
+ 1.1  Go to https://cloud.mongodb.com and sign up (or sign in).
+
+ 1.2  Create a cluster:
+        - Free (M0) is enough for testing.
+        - Provider AWS, region Mumbai (ap-south-1) - the same city as the
+          Vercel function, so every request is quick.
+        - Name: ksf
+
+ 1.3  Database Access > Add New Database User:
+        - Username: ksf_app
+        - Password: Autogenerate, and copy it somewhere safe.
+        - Role: Read and write to any database.
+
+ 1.4  Network Access > Add IP Address > Allow access from anywhere
+      (0.0.0.0/0). Vercel functions do not have a fixed address, so this is
+      needed; the database is still protected by the user and password.
+
+ 1.5  Database > Connect > Drivers. Copy the connection string. It looks like:
+        mongodb+srv://ksf_app:<PASSWORD>@ksf.abcde.mongodb.net/?retryWrites=true&w=majority
+      Put the real password in place of <PASSWORD>. This is MONGODB_URI.
+
+      Atlas is always a replica set, so KSF's transactions are on.
+
+
+------------------------------------------------------------------------------
+ PART 2 - THE SECRETS
+------------------------------------------------------------------------------
+
+ On any computer with the project and Node.js:
+
+        npm run secrets
+
+ It prints JWT_ACCESS_SECRET and JWT_REFRESH_SECRET (and a webhook secret).
+ Make one more long random value for CRON_SECRET, for example:
+
+        node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+
+ Never reuse these between installations, and never put them in GitHub.
+
+
+------------------------------------------------------------------------------
+ PART 3 - THE VERCEL PROJECT
+------------------------------------------------------------------------------
+
+ Choose ONE of these:
+
+ 3A. A NEW project for testing (recommended - today's site keeps working)
+      1. https://vercel.com/new > Import the GitHub repository
+         saadkhan01999/KSF.
+      2. Project name: for example ksf-test.
+      3. Root Directory: leave it as the repository root ("./").
+      4. Framework Preset: Other. Leave Build, Output and Install empty -
+         vercel.json sets them (npm ci --include=dev, npm run build,
+         frontend/dist).
+      5. Open "Environment Variables" and add everything in Part 4.
+      6. Deploy.
+
+ 3B. Turn the EXISTING project into the full system
+      (this stops using Railway for that site)
+      1. Vercel > the project (ksf-x86j) > Settings > Build and Deployment.
+      2. Root Directory: clear "frontend" so it is empty. Save.
+      3. Framework Preset: Other. Clear any Build/Output/Install overrides.
+      4. Settings > Environment Variables: add everything in Part 4.
+      5. Deployments > the latest > Redeploy.
+
+
+------------------------------------------------------------------------------
+ PART 4 - ENVIRONMENT VARIABLES (Vercel > Settings > Environment Variables)
+------------------------------------------------------------------------------
+
+ Add each one for "Production" (and "Preview" too if you test preview links).
+ Replace <PROJECT> with your project's address name, e.g. ksf-test, and
+ <TEAM> with your Vercel team's name in preview links (e.g. ssam1).
+
+   Required
+   --------
+   NODE_ENV                 production
+   MONGODB_URI              <THE ATLAS CONNECTION STRING FROM 1.5>
+   MONGODB_DB               ksf_pharmacy
+   JWT_ACCESS_SECRET        <FROM npm run secrets>
+   JWT_REFRESH_SECRET       <FROM npm run secrets - a different value>
+   COOKIE_SECURE            true
+   TRUST_PROXY              1
+   PUBLIC_APP_URL           https://<PROJECT>.vercel.app
+   PUBLIC_ALLOWED_ORIGINS   https://<PROJECT>.vercel.app,https://<PROJECT>-*-<TEAM>.vercel.app
+   SUPER_ADMIN_NAME         <YOUR NAME>
+   SUPER_ADMIN_EMAIL        <YOUR E-MAIL>
+   SUPER_ADMIN_PASSWORD     <A STRONG PASSWORD, 12+ characters, mixed>
+   CRON_SECRET              <THE RANDOM VALUE FROM PART 2>
+   MIGRATION_BACKUP_DIR     /tmp/ksf-backups
+
+   E-mail - choose one
+   -------------------
+   Real e-mail (Hostinger mail, Gmail with an app password, ...):
+   MAIL_TRANSPORT           smtp
+   MAIL_HOST                <e.g. smtp.hostinger.com>
+   MAIL_PORT                465
+   MAIL_SECURE              true
+   MAIL_USER                <THE MAILBOX>
+   MAIL_PASSWORD            <ITS PASSWORD>
+   MAIL_FROM                <THE MAILBOX>
+
+   Or, for testing only, no e-mail at all (the sign-up code is shown on the
+   screen, so ANY address can sign up - never leave this on for customers):
+   MAIL_TRANSPORT           none
+   SHOW_SIGNUP_CODE         true
+
+   Payments - optional for testing
+   -------------------------------
+   Bank transfer (the Super Admin confirms it against the statement):
+   BANK_NAME, BANK_ACCOUNT_TITLE, BANK_ACCOUNT_NUMBER (optional: BANK_IBAN,
+   BANK_BRANCH, BANK_RAAST_ID)
+   Card payments with Stripe (test keys first): STRIPE_SECRET_KEY,
+   STRIPE_WEBHOOK_SECRET, with the webhook at
+   https://<PROJECT>.vercel.app/api/v1/payments/webhook/stripe
+   (see docs/PAYMENTS.md).
+
+ After changing a variable, redeploy: variables are read when the function
+ starts.
+
+
+------------------------------------------------------------------------------
+ PART 5 - CHECK IT WORKS
+------------------------------------------------------------------------------
+
+ 5.1  Open https://<PROJECT>.vercel.app/api/v1/health
+      It answers {"ok":true, ..., "transactions":true}.
+      If it answers 503, see Part 7.
+
+ 5.2  Open https://<PROJECT>.vercel.app/pricing
+      Three cards: Starter (Free, 15 days), Monthly (Rs 1,300 with referral
+      / Rs 1,500 direct, 3 months), Yearly (Rs 12,000, about Rs 1,000 a
+      month, save Rs 6,000).
+
+ 5.3  Sign in at /login with SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD.
+      Turn on two-step sign-in. Platform > Plans shows the three plans;
+      prices, the referral price, the 3-month limit and the trial length can
+      all be changed there, and every open screen updates at once.
+
+ 5.4  Vercel > the project > Settings > Cron Jobs shows
+      /api/v1/cron/maintenance once a day (02:17 Pakistan time). Press "Run"
+      once: the log shows {"ok":true, ...}.
+
+
+------------------------------------------------------------------------------
+ PART 6 - TEST THE PLANS FROM START TO FINISH
+------------------------------------------------------------------------------
+
+ 6.1  In a private window, /register: a new pharmacy. It starts on the
+      15-day free trial with everything. Settings > Billing shows the three
+      cards, "15 day(s) of your trial left", and Monthly at Rs 1,500.
+
+ 6.2  Copy that pharmacy's referral link (Billing > Refer another pharmacy)
+      and register a second pharmacy with it. Its Billing shows Monthly at
+      Rs 1,300 - "Your price - with referral". (A pharmacy without a code
+      can also type one in later, under "Have a referral code?".)
+
+ 6.3  Choose Monthly and pay (bank transfer: then, as the Super Admin,
+      Platform > Income (or the pharmacy's page > Plan & payments) >
+      Confirm, with the reference from the bank statement). The
+      pharmacy is now on Monthly, "Month 1 of 3", and its period starts
+      where the trial ends - no free day is lost.
+
+ 6.4  To see the end of a trial without waiting 15 days: Atlas > Browse
+      Collections > ksf_pharmacy > subscriptions > the pharmacy's row >
+      set current_period_end to a time in the past > Update. Reload the
+      app: every screen shows "Your free trial has ended" with Monthly and
+      Yearly. Nothing is deleted - the data can still be exported from My
+      account - but every change is refused until a plan is paid for.
+      Paying opens everything again at once.
+
+ 6.5  After three paid months, Monthly stops renewing by itself and cannot
+      be chosen again; the pharmacy is told to choose Yearly.
+
+
+------------------------------------------------------------------------------
+ PART 7 - IF SOMETHING IS WRONG
+------------------------------------------------------------------------------
+
+ /api/v1/health answers 503 "cannot reach its database"
+   Vercel > the project > Logs shows why. Almost always: Atlas Network
+   Access does not allow 0.0.0.0/0 (1.4), or the password in MONGODB_URI is
+   wrong or contains a character that needs encoding (@ : / ? # -> use an
+   autogenerated password).
+
+ Every /api request fails and the log says "The server cannot start: .env
+ needs attention"
+   A required variable is missing or too short (Part 4). The log names it.
+   Add it and redeploy.
+
+ Sign-in says the request did not come from this application
+   PUBLIC_APP_URL / PUBLIC_ALLOWED_ORIGINS do not match the address you
+   opened. Use https://<PROJECT>.vercel.app exactly, or add the preview
+   pattern with the * (Part 4).
+
+ The build fails at "npm ci"
+   package-lock.json and package.json disagree. Run "npm install" locally,
+   commit package-lock.json, push.
+
+ The pages load but say they cannot reach the KSF server
+   The Vercel Firewall (Attack Challenge Mode) is blocking /api. Vercel >
+   Firewall: switch it off, or allow /api.
+
+ The cron job answers 401
+   CRON_SECRET in Vercel does not match, or it was added after the last
+   deploy. Redeploy.
+
+
+------------------------------------------------------------------------------
+ PART 8 - MOVING TO HOSTINGER LATER
+------------------------------------------------------------------------------
+
+ Follow deploy/HOSTINGER_DEPLOYMENT.txt. Part 13 there moves the data from
+ Atlas to the VPS with a verified backup and restore, so every pharmacy,
+ plan and payment you tested with comes across. Then point the domain at
+ the VPS and remove the Vercel project (or keep it for testing).
+
+==============================================================================

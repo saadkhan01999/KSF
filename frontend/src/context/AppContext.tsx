@@ -11,7 +11,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
-  api, ApiError, refreshAccessToken, setAccessToken, setSessionLostHandler, setStepUpHandler, setSupportPharmacy, supportPharmacy
+  api, ApiError, refreshAccessToken, setAccessToken, setPlanRequiredHandler, setSessionLostHandler, setStepUpHandler, setSupportPharmacy, supportPharmacy
 } from '../services/api';
 import type { Bootstrap, SessionUser, SubscriptionState, LoginOutcome, Device } from '../types';
 import { subscribeLive } from '../services/live';
@@ -288,6 +288,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         : 'Your session has ended. Please sign in again.');
     });
   }, [clearSession]);
+
+  /* The trial or the plan ended while a screen was open: ask again, and the
+     plan choice appears. And when it is due to end within the day, ask again
+     the moment it does, so nobody types a sale into a till that has stopped. */
+  useEffect(() => {
+    setPlanRequiredHandler(() => { void refreshSubscription(); });
+  }, [refreshSubscription]);
+  useEffect(() => {
+    const ends = subscription?.entitled && subscription.status !== 'grace' ? Date.parse(subscription.periodEnd ?? '') : NaN;
+    const wait = ends - Date.now();
+    if (!Number.isFinite(wait) || wait <= 0 || wait > 86_400_000) return undefined;
+    const timer = window.setTimeout(() => { void refreshSubscription(); }, wait + 1500);
+    return () => window.clearTimeout(timer);
+  }, [subscription, refreshSubscription]);
 
   /* A request that needs the password confirmed waits here for the dialog. */
   useEffect(() => {

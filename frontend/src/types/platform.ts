@@ -124,6 +124,7 @@ export interface PlanRow {
   pricePaisa: number; currency: string; graceDays: number; trialDays: number; isFree: boolean; isDefault: boolean; isPublic?: boolean;
   autoRenew: boolean; status?: string; sortOrder: number; features: string[]; pharmacies?: number;
   limits: { desktopDevices: number; mobileDevices: number; users: number; branches: number; medicines: number };
+  isTrial: boolean; referralPricePaisa: number | null; maxCycles: number;
 }
 
 export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {

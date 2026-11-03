@@ -1,33 +1,32 @@
 /* ==========================================================================
    Settings › Billing and Subscription
    --------------------------------------------------------------------------
-   The plan, what it costs, when it renews, what has been paid, and the
-   referral code.
+   The plan, what it costs this pharmacy, until when, what has been paid, and
+   the referral code — laid out like the price sheet: Starter (the free
+   trial), Monthly and Yearly.
 
-   Nothing on this screen can make a subscription active. Choosing a paid
-   plan records the choice and hands back a payment reference; the plan
-   becomes active when the payment provider confirms it to the server. The
-   copy says so plainly, because a screen that implies otherwise is how
-   somebody ends up believing they have paid when they have not.
+   Nothing on this screen can make a subscription active. Choosing a plan
+   writes the choice down and hands back a payment reference; the plan starts
+   when the payment provider confirms it to the server, and the days left on
+   the trial or the current plan run on underneath it. The copy says so
+   plainly, because a screen that implies otherwise is how somebody ends up
+   believing they have paid when they have not.
    ========================================================================== */
 
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  CreditCard, Gift, ArrowUpRight, RefreshCw, Receipt, AlertTriangle, Check, FileText, Lock
-} from 'lucide-react';
+import { CreditCard, Gift, ArrowUpRight, RefreshCw, Receipt, FileText, Lock, Sparkles, Ticket } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useApiData, useAction, useLiveRefresh } from '../../hooks/useApi';
 import { api } from '../../services/api';
 import {
-  Button, Card, Modal, ConfirmDialog, Alert, CardSkeleton, EmptyState,
-  Switch, Badge
+  Button, Card, Modal, ConfirmDialog, Alert, CardSkeleton, EmptyState, Switch, Badge, TextInput
 } from '../../components/ui';
-import { PlanCard, StatusNote, DetailRow, SubscriptionBadge, CopyField } from '../../components/account-ui';
+import { StatusNote, DetailRow, SubscriptionBadge, CopyField } from '../../components/account-ui';
+import { FullAccessStrip, SheetPlanCard } from '../../components/price-sheet';
 import { InvoiceDialog } from '../../components/invoice';
 import { rupees, date, dateTime } from '../../utils/format';
-import { FEATURE_NAMES } from '../site/content';
-import type { BillingOverview, CheckoutReply } from '../../types';
+import type { BillingOverview, CheckoutReply, PlanOffer } from '../../types';
 
 /** Send the browser to the provider's own page: a link, or a signed form it posts. */
 function goToProvider(redirect: NonNullable<CheckoutReply['redirect']>): void {
@@ -59,41 +58,51 @@ export function Billing() {
   const { ok, refreshSubscription } = useApp();
   const { busy, run } = useAction();
   const navigate = useNavigate();
-  const { data, loading, reload } = useApiData<BillingOverview>('/billing');
+  const { data, loading, reload, setData } = useApiData<BillingOverview>('/billing');
   /* A payment confirmed by the provider, or a price changed by the platform, shows here at once. */
   useLiveRefresh(reload);
 
-  const [changing, setChanging] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
-  /* The paid plan being paid for, and how. */
+  /* The plan being paid for, and how. */
   const [paying, setPaying] = useState<string | null>(null);
   const [provider, setProvider] = useState('');
   const [checkout, setCheckout] = useState<CheckoutReply | null>(null);
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
+  const [code, setCode] = useState('');
 
   const [params, setParams] = useSearchParams();
   const [returned] = useState(() => RETURNED[params.get('payment') ?? ''] ?? null);
+  /* Arriving from the end-of-trial screen or the banner with a plan already picked. */
+  const [preselected] = useState(() => params.get('choose'));
   useEffect(() => {
-    if (!params.get('payment')) return;
+    if (!params.get('payment') && !params.get('choose')) return;
     const next = new URLSearchParams(params);
     next.delete('payment');
+    next.delete('choose');
     setParams(next, { replace: true });
   }, [params, setParams]);
 
-  if (loading) return <CardSkeleton count={3} />;
-  if (!data) return <EmptyState title="Billing could not be loaded" message="Try again in a moment." />;
-
-  const { subscription, plans, payments, referrals, canManage } = data;
-  const currentPlan = plans.find((plan) => plan.key === subscription.plan);
-
   const choosePlan = async (planKey: string) => {
     const reply = await run(() => api.post<{ message: string }>('/billing/plan', { planKey }));
-    if (!reply) return;
+    if (!reply) return false;
     ok(reply.message);
-    setChanging(null);
     await reload(true);
     await refreshSubscription();
+    return true;
   };
+
+  /* Choose a plan, then straight on to how to pay for it. */
+  const startPlan = async (offer: PlanOffer) => {
+    if (!(await choosePlan(offer.key))) return;
+    if (!offer.isFree) { setProvider(data?.defaultProvider ?? ''); setPaying(offer.key); }
+  };
+
+  useEffect(() => {
+    if (!preselected || !data?.canManage) return;
+    const offer = data.plans.find((plan) => plan.key === preselected);
+    if (offer?.available) void startPlan(offer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselected, !!data]);
 
   const startCheckout = async (planKey: string, providerKey: string) => {
     const reply = await run(() => api.post<CheckoutReply>('/billing/checkout', { planKey, provider: providerKey }));
@@ -118,9 +127,24 @@ export function Billing() {
     if (reply) { ok(reply.message); setCancelOpen(false); await reload(true); await refreshSubscription(); }
   };
 
-  const needsAttention = ['grace', 'past_due', 'payment_pending'].includes(subscription.status);
+  const applyCode = async () => {
+    const reply = await run(() => api.post<{ message: string; plans: PlanOffer[] }>('/billing/referral', { code }));
+    if (!reply) return;
+    ok(reply.message);
+    setCode('');
+    setData((current) => (current ? { ...current, plans: reply.plans } : current));
+    await reload(true);
+  };
 
+  if (loading) return <CardSkeleton count={3} />;
+  if (!data) return <EmptyState title="Billing could not be loaded" message="Try again in a moment." />;
+
+  const { subscription, plans, payments, referrals, canManage } = data;
+  const currentPlan = plans.find((plan) => plan.key === subscription.plan);
   const payingPlan = plans.find((plan) => plan.key === paying);
+  const onTrial = subscription.status === 'trial';
+  const paid = !!currentPlan && !currentPlan.isFree && !subscription.locked;
+  const referralPrice = referrals.prices[0];
 
   return (
     <div className="grid grid-2">
@@ -137,25 +161,23 @@ export function Billing() {
         icon={<CreditCard size={18} />}
         className="span-2"
       >
-        {needsAttention && (
-          <Alert
-            tone={subscription.status === 'payment_pending' ? 'info' : 'warn'}
-            title={
-              subscription.status === 'payment_pending'
-                ? 'Waiting for the first payment'
-                : 'A payment did not go through'
-            }
-          >
-            {subscription.status === 'payment_pending'
-              ? `The ${subscription.planName} plan is set up but not yet paid for. Your pharmacy is working normally on the free feature set until it is.`
-              : `Everything is still working${subscription.graceUntil ? ` until ${date(subscription.graceUntil)}` : ''}. Nothing has been deleted and nothing will be — after the grace period the account simply moves to the free Basic plan.`}
+        {subscription.locked && (
+          <Alert tone="warn" title={subscription.isTrial || subscription.plan === 'none' ? 'Your free trial has ended' : `Your ${subscription.planName} plan has ended`}>
+            Choose Monthly or Yearly below to carry on. Every record is safe and can still be viewed — nothing has been deleted,
+            and everything opens again the moment the payment clears.
+          </Alert>
+        )}
+        {(subscription.status === 'grace' || subscription.status === 'past_due') && (
+          <Alert tone="warn" title="A payment did not go through">
+            Everything is still working{subscription.graceUntil ? ` until ${date(subscription.graceUntil)}` : ''}. Nothing has been deleted and
+            nothing will be — pay before then to carry on without a break.
           </Alert>
         )}
 
         <div className="billing-summary">
           <div className="billing-plan">
             <span className="billing-plan-label">Current plan</span>
-            <strong>{subscription.planName}</strong>
+            <strong>{onTrial ? `${subscription.planName} — free trial` : subscription.planName}</strong>
             <SubscriptionBadge status={subscription.status} />
           </div>
 
@@ -165,18 +187,28 @@ export function Billing() {
                 <code>{subscription.subscriptionId}</code>
               </DetailRow>
             )}
-            {currentPlan && !currentPlan.isFree && (
+            {paid && subscription.pricePaisa ? (
               <DetailRow label="Price">
-                {rupees(currentPlan.pricePaisa)} per {currentPlan.period}
+                {rupees(subscription.pricePaisa)} per {currentPlan.period}
+                {subscription.referralPricing && currentPlan.referralPricePaisa !== null && <span className="muted"> · referral price</span>}
+              </DetailRow>
+            ) : null}
+            {subscription.cycles && !subscription.locked && (
+              <DetailRow label="Plan term">
+                {subscription.cycles.period === 'month' ? 'Month' : 'Period'} {Math.min(subscription.cycles.used, subscription.cycles.max)} of {subscription.cycles.max}
               </DetailRow>
             )}
-            {subscription.periodEnd && (
-              <DetailRow label={subscription.status === 'cancelled' ? 'Runs until' : 'Current period ends'}>
+            {subscription.periodEnd && !subscription.locked && (
+              <DetailRow label={onTrial ? 'Free trial ends' : subscription.status === 'cancelled' || !subscription.autoRenew ? 'Runs until' : 'Current period ends'}>
                 {date(subscription.periodEnd)}
                 {subscription.daysLeft !== null && <span className="muted"> · {subscription.daysLeft} day(s) left</span>}
               </DetailRow>
             )}
-            {subscription.renewalAt && subscription.autoRenew && (
+            {subscription.locked && subscription.endedAt && <DetailRow label="Ended">{date(subscription.endedAt)}</DetailRow>}
+            {subscription.pendingPlan && (
+              <DetailRow label="Chosen next">{subscription.pendingPlan.name} — starts when it is paid for</DetailRow>
+            )}
+            {subscription.renewalAt && subscription.autoRenew && paid && (
               <DetailRow label="Renews">{date(subscription.renewalAt)}</DetailRow>
             )}
             {subscription.graceUntil && (
@@ -188,15 +220,14 @@ export function Billing() {
           </dl>
         </div>
 
-        {subscription.trial && (
-          <StatusNote tone="ok" icon={<Gift size={17} />} title="Your premium trial is running">
-            {subscription.trial.daysLeft} day(s) left, until {date(subscription.trial.expiresAt)}. When it
-            ends the pharmacy moves to the free Basic plan — every medicine, batch, sale and
-            prescription stays exactly where it is.
+        {onTrial && (
+          <StatusNote tone="ok" icon={<Gift size={17} />} title="Your free trial is running — every feature, unlimited data">
+            {subscription.daysLeft ?? 0} day(s) left, until {date(subscription.periodEnd ?? null)}. Choose Monthly or Yearly whenever
+            you are ready: the plan starts where the trial ends, so no free day is lost, and nothing is charged until you pay.
           </StatusNote>
         )}
 
-        {canManage && currentPlan && !currentPlan.isFree && (
+        {canManage && paid && (
           <div className="billing-toggle">
             <Switch
               checked={subscription.autoRenew}
@@ -204,20 +235,18 @@ export function Billing() {
               label="Renew this plan automatically"
             />
             <p className="card-note">
-              With this off, the plan runs to the end of the period you have paid for and then
-              moves to Basic. Nothing is deleted either way.
+              {subscription.cycles && subscription.cycles.used >= subscription.cycles.max
+                ? `${subscription.planName} runs for ${subscription.cycles.max} months and this is the last one, so it does not renew. Choose Yearly to carry on.`
+                : 'With this off, the plan runs to the end of the period you have paid for; after that you choose a plan again. Nothing is deleted either way.'}
             </p>
           </div>
         )}
 
         {canManage && (
           <div className="card-actions">
-            <Button variant="primary" icon={<ArrowUpRight size={15} />} onClick={() => setChanging(subscription.plan)}>
-              Change plan
-            </Button>
-            {subscription.status === 'payment_pending' && currentPlan && !currentPlan.isFree && (
-              <Button variant="secondary" icon={<CreditCard size={15} />} onClick={() => { setProvider(data.defaultProvider); setPaying(currentPlan.key); }}>
-                Pay for {currentPlan.name}
+            {subscription.pendingPlan && (
+              <Button variant="primary" icon={<CreditCard size={15} />} onClick={() => { setProvider(data.defaultProvider); setPaying(subscription.pendingPlan!.key); }}>
+                Pay for {subscription.pendingPlan.name}
               </Button>
             )}
             {data.card?.canChange && (
@@ -225,52 +254,75 @@ export function Billing() {
                 Change card ({data.card.provider})
               </Button>
             )}
-            {currentPlan && !currentPlan.isFree && subscription.status !== 'cancelled' && (
+            {paid && subscription.status !== 'cancelled' && (
               <Button variant="ghost" onClick={() => setCancelOpen(true)}>Cancel the subscription</Button>
             )}
           </div>
         )}
       </Card>
 
-      {/* ----------------------------- what you get ------------------------ */}
-      <Card title="What your plan includes" subtitle="Checked by the server on every request">
-        <ul className="feature-check-list">
-          {(subscription.planFeatures ?? subscription.features).map((feature) => {
-            const active = subscription.features.includes(feature);
+      {/* ---------------------------- the plans ---------------------------- */}
+      <Card
+        title={subscription.locked ? 'Choose your plan' : 'The plans'}
+        subtitle={subscription.referralPricing ? 'Your pharmacy came through a referral, so Monthly is at the referral price' : 'Every plan has every feature and no limit on your records'}
+        icon={<Sparkles size={18} />}
+        className="span-2"
+      >
+        <div className="sheet-grid">
+          {plans.map((plan) => {
+            const current = plan.key === subscription.plan && !subscription.locked;
+            const note = plan.isTrial
+              ? (onTrial ? `${subscription.daysLeft ?? 0} day(s) of your trial left` : 'Used once, when the pharmacy registered')
+              : !plan.available
+                ? <span className="is-warn">{plan.unavailableReason}</span>
+                : plan.cyclesLeft !== null && plan.cyclesUsed > 0
+                  ? `${plan.cyclesLeft} of ${plan.maxCycles} month(s) left on this plan`
+                  : undefined;
             return (
-              <li key={feature} className={active ? 'is-on' : 'is-off'}>
-                {active ? <Check size={15} aria-hidden="true" /> : <AlertTriangle size={15} aria-hidden="true" />}
-                {FEATURE_NAMES[feature] ?? feature}
-                {!active && <span className="muted"> — not available until the plan is paid for</span>}
-              </li>
+              <SheetPlanCard
+                key={plan.key}
+                plan={plan}
+                plans={plans}
+                current={current}
+                note={note}
+                action={canManage && !plan.isTrial ? (
+                  <Button
+                    variant={plan.period === 'year' ? 'primary' : 'secondary'}
+                    icon={<CreditCard size={16} />}
+                    disabled={!plan.available || busy}
+                    onClick={() => { void startPlan(plan); }}
+                  >
+                    {current ? `Pay for another ${plan.period}` : subscription.pendingPlan?.key === plan.key ? `Pay ${rupees(plan.yourPricePaisa)}` : `Choose ${plan.name} — ${rupees(plan.yourPricePaisa)}`}
+                  </Button>
+                ) : undefined}
+              />
             );
           })}
-        </ul>
-
-        {subscription.limits && (
-          <dl className="detail-list">
-            <DetailRow label="Registered computers">{subscription.limits.desktopDevices}</DetailRow>
-            <DetailRow label="Phones and tablets">{subscription.limits.mobileDevices}</DetailRow>
-            <DetailRow label="Staff accounts">
-              {(subscription.limits.users ?? 0) < 0 ? 'Unlimited' : subscription.limits.users}
-            </DetailRow>
-          </dl>
-        )}
+        </div>
+        <FullAccessStrip />
+        <StatusNote tone="info" title="How paying works">
+          Choosing a plan gives you a payment reference; the plan starts when the payment provider confirms the payment to our
+          server — nothing this browser does can start it. The days left on your trial or your current plan are added on, never lost.
+        </StatusNote>
       </Card>
 
       {/* ------------------------------- referrals ------------------------- */}
-      <Card title="Refer another pharmacy" subtitle={`They get ${referrals.trialDays} days of the full system, free`} icon={<Gift size={18} />}>
+      <Card
+        title="Refer another pharmacy"
+        subtitle={referralPrice ? `They pay ${rupees(referralPrice.pricePaisa)} a ${referralPrice.period} on ${referralPrice.name}, not ${rupees(referralPrice.listPricePaisa)}` : 'Share KSF with a pharmacy you know'}
+        icon={<Gift size={18} />}
+      >
         <CopyField
           label="Your referral link"
           value={referrals.link}
-          hint="Send this to a pharmacy you know. Their trial starts when they confirm their e-mail."
+          hint={`Send this to a pharmacy you know. They start with the ${referrals.trialDays}-day free trial like everyone, and the referral price applies once they confirm their e-mail.`}
           monospace={false}
         />
         <CopyField label="Your code" value={referrals.code} hint="If they would rather type it in." />
 
         <div className="referral-stats">
           <div><strong>{referrals.uses}</strong><span>Used</span></div>
-          <div><strong>{referrals.successful}</strong><span>Converted</span></div>
+          <div><strong>{referrals.successful}</strong><span>Joined</span></div>
           <div><strong>{Math.max(0, referrals.maxUses - referrals.uses)}</strong><span>Left</span></div>
         </div>
 
@@ -283,7 +335,7 @@ export function Billing() {
                   <span>{item.email}</span>
                 </div>
                 <Badge tone={item.status === 'converted' ? 'ok' : item.status === 'rejected' ? 'danger' : 'neutral'}>
-                  {item.status === 'converted' ? 'Trial started' : item.status === 'pending' ? 'Not yet registered' : item.status}
+                  {item.status === 'converted' ? 'Joined' : item.status === 'pending' ? 'Not yet registered' : item.status}
                 </Badge>
               </li>
             ))}
@@ -296,12 +348,35 @@ export function Billing() {
         </p>
       </Card>
 
+      {/* --------------------------- a code of your own -------------------- */}
+      <Card title="Have a referral code?" subtitle="From the pharmacy that told you about KSF" icon={<Ticket size={18} />}>
+        {subscription.referralPricing ? (
+          <StatusNote tone="ok" title="Referral price applied">
+            Your pharmacy came through a referral{referralPrice ? `, so ${referralPrice.name} is ${rupees(referralPrice.pricePaisa)} a ${referralPrice.period} instead of ${rupees(referralPrice.listPricePaisa)}` : ''}.
+          </StatusNote>
+        ) : canManage ? (
+          <>
+            <p className="card-note">
+              {referralPrice
+                ? `Enter it here and ${referralPrice.name} costs ${rupees(referralPrice.pricePaisa)} a ${referralPrice.period} instead of ${rupees(referralPrice.listPricePaisa)}, from your next payment.`
+                : 'Enter it here and the referral price applies from your next payment.'}
+            </p>
+            <form className="referral-entry" onSubmit={(event) => { event.preventDefault(); void applyCode(); }}>
+              <TextInput label="Referral code" value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="REF-XXXXXX" maxLength={32} />
+              <Button type="submit" variant="secondary" loading={busy} disabled={!code.trim()}>Apply</Button>
+            </form>
+          </>
+        ) : (
+          <p className="card-note">Your pharmacy Admin can enter a referral code here.</p>
+        )}
+      </Card>
+
       {/* -------------------------------- payments ------------------------- */}
       <Card title="Payment history" subtitle="Every charge, successful or not" icon={<Receipt size={18} />} className="span-2">
         {payments.length === 0 ? (
           <EmptyState
             title="No payments yet"
-            message="Nothing has been charged to this pharmacy. The free Basic plan never will be."
+            message="Nothing has been charged to this pharmacy. The free trial never is."
           />
         ) : (
           <div className="table-scroll">
@@ -353,44 +428,11 @@ export function Billing() {
       {/* ================================ modals =========================== */}
 
       <Modal
-        open={!!changing}
-        onClose={() => setChanging(null)}
-        title="Choose a plan"
-        subtitle="You can move in either direction, and nothing is deleted when you do"
-        size="lg"
-        footer={<Button variant="ghost" onClick={() => setChanging(null)}>Close</Button>}
-      >
-        <div className="plan-grid is-compact">
-          {plans.map((plan) => (
-            <PlanCard
-              key={plan.key}
-              plan={plan}
-              current={plan.key === subscription.plan}
-              selected={plan.key === changing}
-              featureNames={FEATURE_NAMES}
-              busy={busy}
-              onChoose={(key) => {
-                setChanging(key);
-                if (plans.find((p) => p.key === key)?.isFree) { void choosePlan(key); return; }
-                void choosePlan(key).then(() => { setProvider(data.defaultProvider); setPaying(key); });
-              }}
-            />
-          ))}
-        </div>
-
-        <StatusNote tone="info" title="How paying works">
-          Choosing a paid plan sets it up and gives you a payment reference. It becomes active
-          when the payment provider confirms the payment to our server — nothing this browser
-          does can activate it, which is what stops anybody giving themselves a paid plan.
-        </StatusNote>
-      </Modal>
-
-      <Modal
         open={!!payingPlan}
         onClose={() => setPaying(null)}
         icon={<Lock />}
         title={payingPlan ? `Pay for ${payingPlan.name}` : 'Pay'}
-        subtitle={payingPlan ? `${rupees(payingPlan.pricePaisa)} per ${payingPlan.period}${payingPlan.autoRenew ? ', renewing automatically until you stop it' : ''}` : ''}
+        subtitle={payingPlan ? `${rupees(payingPlan.yourPricePaisa)} per ${payingPlan.period}${payingPlan.referralApplied ? ' (referral price)' : ''}${payingPlan.autoRenew ? ', renewing automatically until you stop it' : ''}${payingPlan.maxCycles > 0 ? `, for up to ${payingPlan.cyclesLeft ?? payingPlan.maxCycles} month(s)` : ''}` : ''}
         footer={(
           <>
             <Button variant="ghost" onClick={() => setPaying(null)}>Not now</Button>
@@ -460,7 +502,7 @@ export function Billing() {
         onConfirm={cancel}
         tone="warn"
         title="Cancel your subscription?"
-        message={`Automatic renewal stops. You keep the ${subscription.planName} plan until ${subscription.periodEnd ? date(subscription.periodEnd) : 'the end of the period you have paid for'}, then the pharmacy moves to the free Basic plan. No record is deleted at any point.`}
+        message={`Automatic renewal stops. You keep the ${subscription.planName} plan until ${subscription.periodEnd ? date(subscription.periodEnd) : 'the end of the period you have paid for'}; after that you choose a plan again whenever you are ready. No record is deleted at any point.`}
         confirmLabel="Cancel the subscription"
         loading={busy}
         reasonLabel="Why are you cancelling? (optional)"

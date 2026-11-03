@@ -1,6 +1,7 @@
-/* The subscription plans pharmacies choose from. A change to a price or a
-   limit applies to new subscriptions and renewals; a pharmacy part-way
-   through a paid period keeps what it paid for. */
+/* The subscription plans pharmacies choose from — Starter (the free trial),
+   Monthly and Yearly on the price sheet. A change to a price or a limit
+   applies to new subscriptions and renewals; a pharmacy part-way through a
+   paid period keeps what it paid for. */
 
 import { useEffect, useState } from 'react';
 import { CreditCard, Pencil, Plus, Users, Building2, Pill, Monitor, Smartphone } from 'lucide-react';
@@ -13,7 +14,9 @@ import type { PlanRow } from '../../types/platform';
 
 interface PlansReply { data: PlanRow[]; features: { key: string; name: string; group: string }[] }
 
-const PERIOD: Record<string, string> = { week: 'week', month: 'month', year: 'year', perpetual: 'for ever' };
+const PERIOD: Record<string, string> = { week: 'week', month: 'month', year: 'year', perpetual: 'for ever', trial: 'trial' };
+/* -1 is unlimited. */
+const limit = (value: number) => (value < 0 ? 'Unlimited' : number(value));
 
 export default function Plans() {
   const { data, loading, reload } = useApiData<PlansReply>('/platform/plans');
@@ -45,16 +48,21 @@ export default function Plans() {
               <Card key={plan.key} className="plan-card" title={plan.name} subtitle={plan.tagline ?? undefined} icon={<CreditCard size={18} />}
                 actions={<button className="icon-btn" onClick={() => setEditing(plan)} aria-label={`Edit ${plan.name}`}><Pencil size={16} /></button>}>
                 <div className="price">{plan.isFree ? 'Free' : rupees(plan.pricePaisa)} {!plan.isFree && <small>/ {PERIOD[plan.period] ?? plan.period}</small>}</div>
+                {plan.referralPricePaisa !== null && plan.referralPricePaisa < plan.pricePaisa && (
+                  <p className="t-sm t-dim">{rupees(plan.referralPricePaisa)} / {PERIOD[plan.period] ?? plan.period} with a referral</p>
+                )}
                 <div className="row-tight" style={{ flexWrap: 'wrap', gap: 6 }}>
-                  {plan.isDefault && <Badge tone="info" dot={false}>Default</Badge>}
+                  {plan.isTrial && <Badge tone="info" dot={false}>Free trial · {plan.trialDays || plan.periodDays} days</Badge>}
+                  {plan.isDefault && !plan.isTrial && <Badge tone="info" dot={false}>Default</Badge>}
+                  {plan.maxCycles > 0 && <Badge tone="info" dot={false}>Up to {plan.maxCycles} {PERIOD[plan.period] ?? 'period'}(s)</Badge>}
                   {plan.status === 'retired' ? <Badge tone="neutral" dot={false}>Retired</Badge> : <Badge tone="ok" dot={false}>On sale</Badge>}
                   {!plan.isPublic && <Badge tone="purple" dot={false}>Hidden from the website</Badge>}
                   <Badge tone="gold" dot={false}>{number(plan.pharmacies ?? 0)} pharmacies</Badge>
                 </div>
                 <dl className="kv mt-3">
-                  <dt><Users size={14} /> People</dt><dd>{number(plan.limits.users)}</dd>
-                  <dt><Building2 size={14} /> Branches</dt><dd>{number(plan.limits.branches)}</dd>
-                  <dt><Pill size={14} /> Medicines</dt><dd>{number(plan.limits.medicines)}</dd>
+                  <dt><Users size={14} /> People</dt><dd>{limit(plan.limits.users)}</dd>
+                  <dt><Building2 size={14} /> Branches</dt><dd>{limit(plan.limits.branches)}</dd>
+                  <dt><Pill size={14} /> Medicines</dt><dd>{limit(plan.limits.medicines)}</dd>
                   <dt><Monitor size={14} /> Computers each</dt><dd>{number(plan.limits.desktopDevices)}</dd>
                   <dt><Smartphone size={14} /> Phones each</dt><dd>{number(plan.limits.mobileDevices)}</dd>
                   <dt>Grace period</dt><dd>{plan.graceDays} day(s)</dd>
@@ -86,9 +94,11 @@ function PlanEditor({ open, plan, features, onClose, onSaved }: {
   const blank = () => ({
     key: plan?.key ?? '', name: plan?.name ?? '', tagline: plan?.tagline ?? '', description: plan?.description ?? '',
     period: plan?.period ?? 'month', price: plan ? String(plan.pricePaisa / 100) : '', graceDays: String(plan?.graceDays ?? 7),
-    users: String(plan?.limits.users ?? 5), branches: String(plan?.limits.branches ?? 1), medicines: String(plan?.limits.medicines ?? 5000),
-    desktopDevices: String(plan?.limits.desktopDevices ?? 2), mobileDevices: String(plan?.limits.mobileDevices ?? 2),
-    features: plan?.features ?? ['pos.core', 'inventory.batches', 'reports.core'], isPublic: plan?.isPublic ?? true,
+    referralPrice: plan?.referralPricePaisa !== null && plan?.referralPricePaisa !== undefined ? String(plan.referralPricePaisa / 100) : '',
+    maxCycles: String(plan?.maxCycles ?? 0), trialDays: String(plan?.trialDays ?? 15),
+    users: String(plan?.limits.users ?? -1), branches: String(plan?.limits.branches ?? -1), medicines: String(plan?.limits.medicines ?? -1),
+    desktopDevices: String(plan?.limits.desktopDevices ?? 3), mobileDevices: String(plan?.limits.mobileDevices ?? 3),
+    features: plan?.features ?? features.map((feature) => feature.key), isPublic: plan?.isPublic ?? true,
     status: plan?.status ?? 'active'
   });
   const [form, setForm] = useState(blank);
@@ -100,6 +110,8 @@ function PlanEditor({ open, plan, features, onClose, onSaved }: {
   const save = () => {
     const body = {
       name: form.name, tagline: form.tagline, description: form.description, pricePaisa: toPaisa(form.price || 0), graceDays: Number(form.graceDays),
+      referralPricePaisa: form.referralPrice.trim() === '' ? null : toPaisa(form.referralPrice), maxCycles: Number(form.maxCycles) || 0,
+      ...(plan?.isTrial ? { trialDays: Number(form.trialDays) || 15 } : {}),
       limits: { users: Number(form.users), branches: Number(form.branches), medicines: Number(form.medicines), desktopDevices: Number(form.desktopDevices), mobileDevices: Number(form.mobileDevices) },
       features: form.features, isPublic: form.isPublic, status: form.status
     };
@@ -125,9 +137,17 @@ function PlanEditor({ open, plan, features, onClose, onSaved }: {
         <TextInput label="Price" prefix="Rs" type="number" min={0} value={form.price} onChange={text('price')} hint="0 makes the plan free." disabled={plan?.isDefault} />
         <SelectInput label="Billed every" value={form.period} onChange={text('period')} disabled={!!plan}
           options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }, { value: 'perpetual', label: 'Never (free for ever)' }]} />
-        <TextInput label="People" type="number" min={1} value={form.users} onChange={text('users')} />
-        <TextInput label="Branches" type="number" min={1} value={form.branches} onChange={text('branches')} />
-        <TextInput label="Medicines" type="number" min={1} value={form.medicines} onChange={text('medicines')} />
+        {plan?.isTrial
+          ? <TextInput label="Free trial length" type="number" min={1} max={90} suffix="days" value={form.trialDays} onChange={text('trialDays')} hint="Every new pharmacy starts with this many days." />
+          : (
+            <>
+              <TextInput label="Referral price" prefix="Rs" type="number" min={0} value={form.referralPrice} onChange={text('referralPrice')} hint="What a pharmacy that came through a referral pays. Empty for none." />
+              <TextInput label="Periods a pharmacy may buy" type="number" min={0} max={120} value={form.maxCycles} onChange={text('maxCycles')} hint="0 for no limit. Monthly on the price sheet: 3." />
+            </>
+          )}
+        <TextInput label="People" type="number" min={-1} value={form.users} onChange={text('users')} hint="-1 for unlimited." />
+        <TextInput label="Branches" type="number" min={-1} value={form.branches} onChange={text('branches')} hint="-1 for unlimited." />
+        <TextInput label="Medicines" type="number" min={-1} value={form.medicines} onChange={text('medicines')} hint="-1 for unlimited." />
         <TextInput label="Grace period" type="number" min={0} max={60} suffix="days" value={form.graceDays} onChange={text('graceDays')} />
         <TextInput label="Computers per person" type="number" min={1} value={form.desktopDevices} onChange={text('desktopDevices')} />
         <TextInput label="Phones per person" type="number" min={1} value={form.mobileDevices} onChange={text('mobileDevices')} />
@@ -152,7 +172,7 @@ function PlanEditor({ open, plan, features, onClose, onSaved }: {
         <Switch label="On sale" checked={form.status !== 'retired'} disabled={plan?.isDefault} onChange={(on) => setForm((current) => ({ ...current, status: on ? 'active' : 'retired' }))} />
       </div>
       {plan?.isDefault && (
-        <div className="mt-4"><Alert tone="info">This is the default plan: every pharmacy lands on it when a paid plan ends, so it stays free and on sale.</Alert></div>
+        <div className="mt-4"><Alert tone="info">This is the free trial every new pharmacy starts on, so it stays free and on sale. When it ends, the pharmacy is asked to choose a paid plan.</Alert></div>
       )}
     </Modal>
   );

@@ -23,3 +23,4 @@ import './live.js';
 import './invoices.js';
 import './directory.js';
 import './platform-accounts.js';
+import './cron.js';

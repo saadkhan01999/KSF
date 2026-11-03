@@ -109,7 +109,7 @@ describe('live plans and subscriptions', { skip }, () => {
     const first = await openFeed(server.base, '/api/v1/public/events');
     const ready = await first.next('ready');
     first.close();
-    await admin.patch('/api/v1/platform/plans/weekly', { tagline: 'Pay as the week goes — now with exports' });
+    await admin.patch('/api/v1/platform/plans/yearly', { tagline: 'Best value — now with a free calendar' });
     await new Promise((resolve) => setTimeout(resolve, 600));
 
     const again = await openFeed(server.base, '/api/v1/public/events', '', ready.id);
@@ -127,7 +127,8 @@ describe('live plans and subscriptions', { skip }, () => {
     const locked = await shifa.client.call('GET', '/api/v1/reports/top-medicines');
     assert.equal(locked.status, 402);
     assert.equal(locked.body.feature, 'reports.advanced');
-    assert.deepEqual(locked.body.plans.map((plan) => plan.key), ['weekly', 'annual']);
+    /* The plans that still include it — never the free trial, which cannot be chosen. */
+    assert.deepEqual(locked.body.plans.map((plan) => plan.key), ['yearly']);
     /* The platform team in support mode is there to help, whatever the plan. */
     admin.pharmacyId = shifa.pharmacyId;
     await admin.get('/api/v1/reports/top-medicines');

@@ -13,26 +13,10 @@ import { connect, databaseHint, describeDatabase, disconnect, supportsTransactio
 import { bootstrap } from './db/bootstrap.js';
 import './modules/index.js';
 import { createApp } from './http/app.js';
-import { runSubscriptionMaintenance } from './services/subscriptions.js';
-import { drainMailQueue } from './services/mailer.js';
-import { pruneSessions } from './security/sessions.js';
-import { pruneCodes } from './security/otp.js';
+import { runMaintenance } from './services/maintenance.js';
 import { startLiveFeed } from './services/live.js';
 
-async function maintenance(): Promise<void> {
-  try {
-    const summary = await runSubscriptionMaintenance();
-    if (summary.trialsEnded || summary.graceStarted || summary.expired) {
-      console.log(`[KSF] subscriptions: ${summary.trialsEnded} trial(s) ended, ${summary.graceStarted} in grace, ${summary.expired} moved to Basic`);
-    }
-    const mail = await drainMailQueue();
-    if (mail.tried) console.log(`[KSF] mail queue: ${mail.sent} sent, ${mail.failed} still failing of ${mail.tried} retried`);
-    await pruneSessions();
-    await pruneCodes();
-  } catch (error) {
-    console.error('[KSF] maintenance failed:', (error as Error).message);
-  }
-}
+const maintenance = async (): Promise<void> => { await runMaintenance(); };
 
 async function start(): Promise<void> {
   const startedAt = Date.now();

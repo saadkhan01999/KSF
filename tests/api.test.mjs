@@ -78,8 +78,14 @@ describe('KSF API', { skip }, () => {
       const reply = await register(owner, 'Ayesha', 'ayesha@pharmacy.test');
       state.pharmacyId = reply.data.pharmacyId;
       assert.equal(reply.user.roleKey ?? reply.user.role?.key ?? 'admin', 'admin');
+      /* Every pharmacy starts on the 15-day free trial, with everything. */
       const ent = await owner.get('/api/v1/billing/entitlements');
-      assert.equal(ent.plan, 'basic');
+      assert.equal(ent.plan, 'starter');
+      assert.equal(ent.status, 'trial');
+      assert.equal(ent.entitled, true);
+      assert.equal(ent.locked, false);
+      assert.equal(ent.trial.daysLeft, 15);
+      assert.ok(ent.features.includes('staff.roles') && ent.features.includes('reports.export'));
     });
 
     it('completes the setup checklist from the real records', async () => {
@@ -90,17 +96,12 @@ describe('KSF API', { skip }, () => {
       assert.ok(setup.data.steps.find((step) => step.key === 'address').done);
     });
 
-    it('installs the five built-in roles, and custom roles once the plan includes them', async () => {
+    it('installs the five built-in roles, and custom roles on the free trial', async () => {
       const roles = await owner.get('/api/v1/roles');
       assert.deepEqual(roles.data.filter((role) => role.is_system).map((role) => role.key).sort(), ['admin', 'cashier', 'manager', 'pharmacist', 'regional-manager']);
       state.cashierRole = roles.data.find((role) => role.key === 'cashier').id;
       const role = { name: 'Night Supervisor', permissions: ['dashboard.view', 'pos.operate', 'sales.read'] };
-      /* Basic does not include custom roles: 402, with the plans that do. */
-      const locked = await owner.call('POST', '/api/v1/roles', role);
-      assert.equal(locked.status, 402);
-      assert.equal(locked.body.code, 'feature_locked');
-      assert.deepEqual(locked.body.plans.map((plan) => plan.key), ['weekly', 'monthly', 'annual']);
-      await admin.post(`/api/v1/platform/pharmacies/${state.pharmacyId}/subscription`, { planKey: 'weekly' });
+      /* Every plan, the trial included, has every feature. */
       await owner.post('/api/v1/roles', role);
     });
   });

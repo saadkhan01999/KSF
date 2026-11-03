@@ -12,6 +12,7 @@ import './styles/screens.css';
 import './styles/site.css';
 import './styles/site-pages.css';
 import './styles/account.css';
+import './styles/plans.css';
 import './styles/auth.css';
 import './styles/calculator.css';
 import './styles/support.css';

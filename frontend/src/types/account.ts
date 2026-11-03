@@ -23,7 +23,7 @@ export interface Plan {
   name: string;
   tagline: string | null;
   description: string | null;
-  period: 'perpetual' | 'week' | 'month' | 'year';
+  period: 'perpetual' | 'week' | 'month' | 'year' | 'trial';
   periodDays: number;
   pricePaisa: number;
   currency: string;
@@ -35,6 +35,23 @@ export interface Plan {
   isDefault: boolean;
   isFree: boolean;
   sortOrder: number;
+  /** The free trial (Starter): started once, at registration, never bought. */
+  isTrial: boolean;
+  trialDays: number;
+  /** What a pharmacy that came through a referral pays instead (Monthly: Rs 1,300), or null. */
+  referralPricePaisa: number | null;
+  /** How many periods one pharmacy may buy (Monthly: 3); 0 for no limit. */
+  maxCycles: number;
+}
+
+/** A plan as one pharmacy sees it, in Billing: its own price, and whether it can still have it. */
+export interface PlanOffer extends Plan {
+  yourPricePaisa: number;
+  referralApplied: boolean;
+  cyclesUsed: number;
+  cyclesLeft: number | null;
+  available: boolean;
+  unavailableReason: string | null;
 }
 
 export type SubscriptionStatus =
@@ -56,22 +73,33 @@ export interface SubscriptionState {
   planName: string;
   status: SubscriptionStatus;
   entitled: boolean;
+  /** The trial or the plan has ended: records can be read, not changed, until a plan is paid for. */
+  locked: boolean;
   /** What this account can use right now. */
   features: string[];
   /** What the chosen plan includes — the two differ while payment is pending. */
   planFeatures?: string[];
   limits: Partial<PlanLimits>;
   isFree: boolean;
+  isTrial: boolean;
   autoRenew: boolean;
+  pricePaisa?: number;
   startedAt?: string;
   periodStart?: string;
   periodEnd?: string;
   renewalAt?: string | null;
   graceUntil?: string | null;
   cancelledAt?: string | null;
+  endedAt?: string | null;
   failedPayments?: number;
   daysLeft: number | null;
   trial: TrialState | null;
+  /** Chosen, not yet paid for: it starts when the payment clears. */
+  pendingPlan: { key: string; name: string } | null;
+  /** "Month 2 of 3" on a plan that runs for a set number of periods. */
+  cycles: { used: number; max: number; period: string } | null;
+  /** The pharmacy came through a referral, so it pays the referral price. */
+  referralPricing: boolean;
 }
 
 export interface Payment {
@@ -97,10 +125,14 @@ export interface Payment {
 
 /* ----------------------------------------------------------- referrals --- */
 
+export interface ReferralPrice { plan: string; name: string; pricePaisa: number; listPricePaisa: number; period: string }
+
 export interface ReferralSummary {
   code: string;
   link: string;
   trialDays: number;
+  /** What a referral is worth: Monthly at Rs 1,300 instead of Rs 1,500. */
+  prices: ReferralPrice[];
   uses: number;
   successful: number;
   maxUses: number;
@@ -119,7 +151,7 @@ export interface PaymentProvider { key: string; label: string; mode: string; not
 
 export interface BillingOverview {
   subscription: SubscriptionState;
-  plans: Plan[];
+  plans: PlanOffer[];
   payments: Payment[];
   referrals: ReferralSummary;
   canManage: boolean;
@@ -280,6 +312,8 @@ export interface ReferralCheck {
   pharmacyName?: string;
   trialDays?: number;
   reason?: string;
+  /** What the referral is worth: Monthly at Rs 1,300 instead of Rs 1,500. */
+  prices?: ReferralPrice[];
 }
 
 /* ----------------------------------------------------------- migration --- */

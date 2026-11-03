@@ -40,6 +40,8 @@ Object.assign(process.env, {
   PASSWORD_SCRYPT_N: '16384',
   PUBLIC_APP_URL: 'http://localhost:5180',
   PUBLIC_ALLOWED_ORIGINS: 'http://localhost:5180',
+  /* The scheduler's door (Vercel Cron) is open in tests, behind this secret. */
+  CRON_SECRET: 'test-cron-secret-0123456789',
   /* Tests never reach the internet; scanning.test.mjs answers for the product databases itself. */
   BARCODE_LOOKUP_ONLINE: 'false'
 });

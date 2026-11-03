@@ -109,7 +109,8 @@ const schema = z.object({
   /* Testing only: the sign-up code is also sent back to the browser and shown
      on screen, so anyone can sign up with an address they do not own. */
   SHOW_SIGNUP_CODE: bool(false),
-  REFERRAL_TRIAL_DAYS: int(15, 0),
+  /* The free trial's length is the Starter plan's, set by the Super Admin
+     under Plans; REFERRAL_TRIAL_DAYS from earlier releases is not read. */
   REFERRAL_MAX_USES: int(100, 1),
   REFERRAL_MAX_PER_DAY: int(10, 1),
   REFERRAL_MAX_PER_IP_PER_DAY: int(3, 1),
@@ -119,6 +120,12 @@ const schema = z.object({
   /* "university" is the isolated copy made by scripts/university-copy.mjs:
      online payments are off, and the app says which edition it is. */
   KSF_EDITION: z.enum(['commercial', 'university']).default('commercial'),
+
+  /* ------------------------------------------------------------ scheduler */
+  /* On Vercel: the secret Vercel Cron sends to /api/v1/cron/maintenance.
+     Empty (the default) switches that address off — a normal server runs
+     its housekeeping by itself, hourly. */
+  CRON_SECRET: z.string().default(''),
 
   /* ------------------------------------------------------------- payments */
   PAYMENT_PROVIDER: z.string().default('manual'),

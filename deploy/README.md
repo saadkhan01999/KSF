@@ -256,6 +256,16 @@ the forwarding. Redeploy after changing either side.
 
 ---
 
+## Everything on Vercel (testing)
+
+The root `vercel.json` runs the whole system on one Vercel project: the
+website from `frontend/dist`, the API as one Vercel Function
+(`api/index.js` → `backend/dist/serverless.js`) in Mumbai, MongoDB Atlas for
+the database, and Vercel Cron calling `/api/v1/cron/maintenance` once a day
+with `CRON_SECRET`. It is used when the project's Root Directory is the
+repository itself; a project whose Root Directory is `frontend` is not
+affected. Step by step, with every setting: `VERCEL_DEPLOYMENT.txt`.
+
 ## Files here
 
 | File | Purpose |
@@ -264,3 +274,5 @@ the forwarding. Redeploy after changing either side.
 | `docker/Dockerfile` | Two-stage build: compile and type-check, then a small runtime image |
 | `nginx/nginx.conf` | Global Nginx settings, rate-limit zones, compression |
 | `nginx/ksf.conf` | The site: HTTP → HTTPS, TLS, security headers, proxy to `app` |
+| `HOSTINGER_DEPLOYMENT.txt` | Step by step on a Hostinger VPS, from buying it to backups and updates |
+| `VERCEL_DEPLOYMENT.txt` | Step by step with the whole system on Vercel and MongoDB Atlas, for testing |

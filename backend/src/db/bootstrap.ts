@@ -12,7 +12,7 @@ import type { IndexDescription } from 'mongodb';
 import { env } from '../config/env.js';
 import { col, db } from './mongo.js';
 import type { Plan, User } from './types.js';
-import { PLAN_SEED } from '../domain/plans.js';
+import { PLAN_SEED, RETIRED_PLAN_KEYS, TRIAL_PLAN_KEY, type PlanSeed } from '../domain/plans.js';
 import { PERMISSION_KEYS, PHARMACY_ADMIN_ROLE, ROLE_GRANTS_BY_RELEASE } from '../domain/permissions.js';
 import { starterFields } from '../domain/medicine-directory.js';
 import { hashPassword, passwordProblem } from '../security/password.js';
@@ -100,24 +100,60 @@ export async function ensureIndexes(): Promise<void> {
   }
 }
 
+/** The fields of a plan that come from the price sheet (everything but its identity and dates). */
+const sheetFields = (plan: PlanSeed) => ({
+  name: plan.name, tagline: plan.tagline, description: plan.description, period: plan.period, period_days: plan.periodDays,
+  price_paisa: plan.pricePaisa, currency: 'PKR', annual_discount_pct: plan.discount, trial_days: plan.trialDays, grace_days: plan.graceDays,
+  max_desktop_devices: plan.desktop, max_mobile_devices: plan.mobile, max_users: plan.users, max_branches: plan.branches,
+  max_medicines: plan.medicines, features: plan.features, auto_renew: plan.autoRenew, is_default: plan.isDefault, is_public: 1 as const,
+  is_free: plan.isFree, sort_order: plan.sort, status: 'active', referral_price_paisa: plan.referralPricePaisa,
+  max_cycles: plan.maxCycles, is_trial: plan.isTrial
+});
+
 export async function ensurePlans(): Promise<number> {
   let added = 0;
   const at = nowIso();
   for (const plan of PLAN_SEED) {
     const id = `PLAN-${plan.key.toUpperCase()}`;
-    const doc: Plan = {
-      _id: id, id, key: plan.key, name: plan.name, tagline: plan.tagline, description: plan.description,
-      period: plan.period, period_days: plan.periodDays, price_paisa: plan.pricePaisa, currency: 'PKR',
-      annual_discount_pct: plan.discount, trial_days: plan.trialDays, grace_days: plan.graceDays,
-      max_desktop_devices: plan.desktop, max_mobile_devices: plan.mobile, max_users: plan.users,
-      max_branches: plan.branches, max_medicines: plan.medicines, features: plan.features,
-      auto_renew: plan.autoRenew, is_default: plan.isDefault, is_public: 1, is_free: plan.isFree,
-      sort_order: plan.sort, status: 'active', created_at: at, updated_at: at
-    };
+    const doc: Plan = { _id: id, id, key: plan.key, ...sheetFields(plan), created_at: at, updated_at: at };
     const result = await col.plans().updateOne({ key: plan.key }, { $setOnInsert: doc }, { upsert: true });
     added += result.upsertedCount;
   }
   return added;
+}
+
+/**
+ * Move an installation from the plans of 2.5 and earlier (Basic, Weekly,
+ * Monthly, Annual) to the three on the price sheet — once, so a price the
+ * Super Admin changes afterwards is never put back.
+ *
+ *   - Starter, Monthly and Yearly take the sheet's prices and terms; Basic,
+ *     Weekly and Annual are retired (kept, so old invoices still name them).
+ *   - A pharmacy on the free Basic plan, a trial, or no plan at all starts a
+ *     fresh 15-day trial today, so nobody is locked out by the change.
+ *   - A pharmacy that has paid keeps what it paid for, to the end of its
+ *     period; then it chooses Monthly or Yearly like everyone else.
+ */
+export async function adoptPriceSheet(): Promise<{ trials: number }> {
+  const marker = await col.counters().updateOne(
+    { _id: 'plans:price-sheet-2026-11' }, { $setOnInsert: { pharmacy_id: 'platform', name: 'price-sheet', value: 1 } }, { upsert: true }
+  );
+  if (!marker.upsertedCount) return { trials: 0 };
+  const at = nowIso();
+  for (const plan of PLAN_SEED) await col.plans().updateOne({ key: plan.key }, { $set: { ...sheetFields(plan), updated_at: at } });
+  await col.plans().updateMany({ key: { $in: RETIRED_PLAN_KEYS } }, { $set: { status: 'retired', is_public: 0, is_default: 0, updated_at: at } });
+  await col.plans().updateMany({ key: { $ne: TRIAL_PLAN_KEY }, is_default: 1 }, { $set: { is_default: 0, updated_at: at } });
+
+  const { currentSubscription, isEntitled, startTrial } = await import('../services/subscriptions.js');
+  let trials = 0;
+  for (const pharmacy of await col.pharmacies().find({}, { projection: { _id: 1 } }).toArray()) {
+    const subscription = await currentSubscription(pharmacy._id);
+    const paid = subscription && !subscription.is_free && subscription.price_paisa > 0 && subscription.status !== 'trial' && isEntitled(subscription);
+    if (paid) continue;
+    await startTrial({ pharmacyId: pharmacy._id, source: 'plan-change', again: true });
+    trials += 1;
+  }
+  return { trials };
 }
 
 /**
@@ -199,11 +235,13 @@ export async function ensureSuperAdmin(): Promise<'exists' | 'created' | 'missin
 export async function bootstrap({ silent = false } = {}): Promise<void> {
   await ensureIndexes();
   const plans = await ensurePlans();
+  const sheet = await adoptPriceSheet();
   const roles = await syncSystemRoles();
   const directory = await ensureMedicineDirectory();
   const admin = await ensureSuperAdmin();
   if (silent) return;
   if (plans) console.log(`[KSF] added ${plans} subscription plan(s)`);
+  if (sheet.trials) console.log(`[KSF] moved to the Starter, Monthly and Yearly plans: ${sheet.trials} pharmacy(ies) on a free plan started a 15-day free trial`);
   if (roles) console.log(`[KSF] brought ${roles} built-in role(s) up to this release`);
   if (directory) console.log(`[KSF] added ${directory} medicine(s) to the directory's starter set — unverified until the team checks them`);
   if (admin === 'created') console.log(`[KSF] created the platform Super Admin account for ${env.SUPER_ADMIN_EMAIL}`);

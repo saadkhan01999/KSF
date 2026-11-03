@@ -286,13 +286,16 @@ function Terms({ business }: { business: Business }) {
       <p>
         A licence to use KSF for your pharmacy, for the period you have paid for, with the features
         of the plan you chose. Prices are shown on the <Link to="/pricing">pricing page</Link>, in
-        rupees, inclusive of the taxes stated there. The Basic plan is free and stays free.
+        rupees, inclusive of the taxes stated there. Every plan includes every feature; the
+        first fifteen days, on the Starter plan, are free.
       </p>
 
       <h2 id="billing">Billing, renewal and what happens if you stop paying</h2>
       <ul className="legal-list">
         <li>
-          A paid plan is billed for the cycle you choose, monthly or yearly, in advance.
+          A paid plan is billed for the cycle you choose, monthly or yearly, in advance. The
+          Monthly plan is a starter plan and can be paid for up to three months; after that the
+          Yearly plan carries on.
         </li>
         <li>
           <b>A subscription renews automatically</b> at the end of each cycle, at the price then
@@ -304,9 +307,10 @@ function Terms({ business }: { business: Business }) {
           keeps working, the owner is told, and the payment can be retried.
         </li>
         <li>
-          If it is still unpaid after the grace period, the account is <b>suspended</b>: nobody can
-          sign in until it is settled. <b>Nothing is deleted.</b> Your medicines, stock, customers,
-          sales and audit trail are exactly where you left them.
+          If it is still unpaid after the grace period, the plan <b>ends</b>: everybody can still
+          sign in and read and export the records, but nothing can be changed until a plan is paid
+          for. <b>Nothing is deleted.</b> Your medicines, stock, customers, sales and audit trail are
+          exactly where you left them.
         </li>
         <li>
           A payment is only ever treated as made when the payment provider confirms it to the server,
@@ -317,10 +321,12 @@ function Terms({ business }: { business: Business }) {
 
       <h2>Trials</h2>
       <p>
-        A referral trial gives you the full system for the period stated on the{' '}
-        <Link to="/pricing#referral">pricing page</Link>. No payment method is required to start one,
-        and it does not turn into a paid subscription by itself. When it ends you choose: pay, or drop
-        to Basic. Either way your data stays.
+        Every new pharmacy gets the full system free for the period stated on the{' '}
+        <Link to="/pricing#trial">pricing page</Link> (fifteen days). No payment method is required,
+        and it does not turn into a paid subscription by itself. When it ends you choose Monthly or
+        Yearly; until you do, your records can be read but not changed. Either way your data stays.
+        A pharmacy that registers through another pharmacy&apos;s referral pays the referral price
+        shown there.
       </p>
 
       <h2>What you are responsible for</h2>
@@ -400,8 +406,8 @@ function Refunds({ business }: { business: Business }) {
       <h2>Cancelling</h2>
       <p>
         Settings → Billing → Cancel. It takes one click and no conversation. You keep the plan until
-        the end of the cycle you have paid for, and then drop to Basic, which is free. Your data stays
-        either way — cancelling is not deleting.
+        the end of the cycle you have paid for; after that you can choose a plan again whenever you
+        are ready. Your data stays either way — cancelling is not deleting.
       </p>
 
       <h2>When money comes back</h2>
