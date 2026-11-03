@@ -1,6 +1,6 @@
 ==============================================================================
  KSF PHARMACY MANAGEMENT SYSTEM - THE WHOLE SYSTEM ON VERCEL (FOR TESTING)
- Version 2.6.0 - November 2026
+ Version 2.6.1 - November 2026
 ==============================================================================
 
  What this is: the website AND the API on one Vercel project, with the
@@ -14,7 +14,7 @@
 
 
 ------------------------------------------------------------------------------
- PART 0 - THE TWO WAYS KSF RUNS ON VERCEL
+ PART 0 - THE WAYS KSF RUNS ON VERCEL
 ------------------------------------------------------------------------------
 
   A. Website on Vercel, API on Railway  (what runs today)
@@ -22,7 +22,17 @@
      frontend/vercel.json sends every /api request to Railway. Nothing in
      this guide changes it.
 
-  B. Everything on Vercel  (this guide)
+  C. Everything on Vercel, as two services  (the simplest - recommended)
+     A Vercel project with Root Directory left EMPTY (the repository root),
+     which is what Vercel picks by itself when you import the repository.
+     The root vercel.json defines two services in one project:
+       backend   backend/ - the whole API as one function
+                 (backend/src/vercel.ts), at /api/...
+       frontend  frontend/ - the website (Vite), at every other address
+     plus the security headers and the daily Vercel Cron. Nothing else is
+     needed; the rest of this guide (database, settings, checks) applies.
+
+  B. Everything on Vercel, from one folder  (the alternative)
      A Vercel project with Root Directory = "deploy/vercel".
      deploy/vercel/vercel.json builds the whole repository (website and
      API), runs the API as one Vercel Function (deploy/vercel/api/index.mjs)
@@ -34,7 +44,7 @@
   is "backend". It only builds the API folder and is not used by the live
   site; 3B below turns it into the full system.)
 
-  What is different on B, and why it is fine for testing:
+  What is different on B and C, and why it is fine for testing:
    - Housekeeping (a trial or plan ending, grace periods, reminders, the
      mail queue) runs once a day from Vercel Cron instead of every hour.
      A trial still ends to the minute: the server checks the date on every
@@ -96,6 +106,22 @@
 ------------------------------------------------------------------------------
 
  Choose ONE of these:
+
+ 3C. The two-service set-up  (recommended)
+      1. https://vercel.com/new > Import the GitHub repository
+         saadkhan01999/KSF (or open an existing project's Settings).
+      2. Root Directory: leave it EMPTY (the repository root). Do not pick
+         "backend" or "frontend" - with "backend" the website is missing, and
+         with "frontend" the API is.
+      3. Framework Preset: leave it as Vercel shows it, and clear any Build,
+         Output or Install overrides - the services in vercel.json decide.
+      4. Environment Variables: add everything in Part 4 (or import the
+         ksf-vercel.env file).
+      5. Deploy. Then Part 5.
+
+      If the page says "This page is unavailable" (500 FUNCTION_INVOCATION
+      _FAILED), open /api/v1/health: since 2.6.0 it names any setting that
+      is missing instead of failing. Add it, then Redeploy.
 
  3A. A NEW project for testing (recommended - today's site keeps working)
       1. https://vercel.com/new > Import the GitHub repository

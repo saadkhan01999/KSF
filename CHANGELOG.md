@@ -3,6 +3,30 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.6.1] — 2026-11-03
+
+### Vercel
+- **Two services in one Vercel project.** The root `vercel.json` defines:
+  - `backend` (`backend/`, Node), the whole API as one function, at
+    `/api/…`;
+  - `frontend` (`frontend/`, Vite), the website, at every other address;
+  - the security headers and the daily Vercel Cron.
+
+  Import the repository with the Root Directory left empty. No bindings
+  are needed: the website is static and calls `/api/v1` on its own domain.
+- **`backend/src/vercel.ts`** is the API as a request handler that connects
+  to the database once per instance. Both Vercel set-ups use it.
+  `backend/package.json` now points `main` at it, so a Vercel project with
+  Root Directory `backend` runs it instead of the long-running server.
+  Docker, Railway and `npm start` still run `server.js` by its path.
+- **No more "This page is unavailable"** for a missing setting. On Vercel, a
+  missing or wrong setting (`MONGODB_URI`, the JWT secrets, …) now answers
+  every request with a short page naming it. The server used to exit, so
+  the function crashed with `500 FUNCTION_INVOCATION_FAILED`. Away from
+  Vercel the server still stops at start-up and says what to fix.
+- The server reads its version from `backend/package.json` when the root
+  one is not deployed with it.
+
 ## [2.6.0] — 2026-11-03
 
 ### The three plans from the price sheet

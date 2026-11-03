@@ -157,21 +157,47 @@ const schema = z.object({
   SUPPORT_HOURS: z.string().default('')
 });
 
+/* On Vercel (which sets VERCEL=1) a function that exits only shows "This
+   page is unavailable". There, a setting that needs attention is collected
+   instead, and every request is answered with what to fix (vercel.ts). */
+const ON_VERCEL = process.env.VERCEL === '1';
+
+/** Settings that need attention, by name — never their values. Empty when all is well. */
+export const CONFIG_PROBLEMS: string[] = [];
+
 const parsed = schema.safeParse(process.env);
 if (!parsed.success) {
-  const lines = parsed.error.issues.map((issue) => `  - ${issue.path.join('.') || 'value'}: ${issue.message}`);
-  console.error(`\n[KSF] The server cannot start: .env needs attention.\n${lines.join('\n')}\n`);
+  const lines = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'value'}: ${issue.message}`);
+  console.error(`\n[KSF] The server cannot start: .env needs attention.\n${lines.map((line) => `  - ${line}`).join('\n')}\n`);
   console.error(`      Settings file: ${envFile}\n`);
-  process.exit(1);
+  if (!ON_VERCEL) process.exit(1);
+  CONFIG_PROBLEMS.push(...parsed.error.issues.map((issue) => {
+    const key = String(issue.path[0] ?? 'value');
+    return process.env[key] === undefined || process.env[key] === '' ? `${key} is not set` : `${key}: ${issue.message}`;
+  }));
 }
 
-export const env = parsed.data;
+/** Stand-ins for the settings that failed, so the module loads and can say what is wrong. Never used to serve. */
+function standIns(): z.infer<typeof schema> {
+  const bad = new Set(parsed.success ? [] : parsed.error.issues.map((issue) => String(issue.path[0])));
+  const kept = Object.fromEntries(Object.entries(process.env).filter(([key]) => !bad.has(key)));
+  const placeholder = 'not-set-not-set-not-set-not-set-not-set';
+  return schema.parse({
+    ...kept,
+    ...(bad.has('MONGODB_URI') ? { MONGODB_URI: 'mongodb://127.0.0.1:1/' } : {}),
+    ...(bad.has('JWT_ACCESS_SECRET') ? { JWT_ACCESS_SECRET: `${placeholder}-a` } : {}),
+    ...(bad.has('JWT_REFRESH_SECRET') ? { JWT_REFRESH_SECRET: `${placeholder}-r` } : {})
+  });
+}
+
+export const env = parsed.success ? parsed.data : standIns();
 export const IS_PROD = env.NODE_ENV === 'production';
 export const IS_TEST = env.NODE_ENV === 'test';
 
 if (IS_PROD && env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
   console.error('[KSF] JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different in production.');
-  process.exit(1);
+  if (!ON_VERCEL) process.exit(1);
+  CONFIG_PROBLEMS.push('JWT_REFRESH_SECRET: must be different from JWT_ACCESS_SECRET in production');
 }
 
 /** The release number, typed once — in the root package.json. Read relative
@@ -179,12 +205,16 @@ if (IS_PROD && env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
     down), so a bundler that packs the server into one function (Vercel)
     sees the file and takes it along. */
 export const VERSION: string = (() => {
-  try {
-    return String(JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).version);
-  } catch {
-    console.warn('[KSF] The root package.json could not be read, so the version is unknown.');
-    return '0.0.0';
+  /* The root package.json, or — when only backend/ was deployed (a Vercel
+     service whose root is backend) — backend/package.json, which carries the
+     same number. */
+  for (const file of ['../../../package.json', '../../package.json']) {
+    try {
+      return String(JSON.parse(readFileSync(new URL(file, import.meta.url), 'utf8')).version);
+    } catch { /* try the next one */ }
   }
+  console.warn('[KSF] No package.json could be read, so the version is unknown.');
+  return '0.0.0';
 })();
 
 export const STATIC_FOLDER = (): string => fromRoot(env.STATIC_DIR);
