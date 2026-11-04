@@ -206,6 +206,14 @@ describe('deployment settings', () => {
     assert.equal(trustProxySetting('loopback, 10.0.0.1'), 'loopback, 10.0.0.1');
   });
 
+  it('keeps docs/API_INVENTORY.md in step with the route table', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const run = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/api-inventory.mjs', '--check'], {
+      cwd: new URL('..', import.meta.url), encoding: 'utf8'
+    });
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+  });
+
   it('gives every Vercel set-up a JavaScript entry, never a TypeScript source', () => {
     /* Vercel compiles a .ts entry file by file, and the backend imports its
        files by their compiled names (./config/env.js): run from src/ it died
