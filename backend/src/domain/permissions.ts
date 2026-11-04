@@ -209,6 +209,8 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   /* The biggest discount, as a percentage of the sale, that someone without
      pos.discount.override may give. */
   'pos.max_discount_percent': '10',
+  /* Whether the till adds GST to a sale unless the cashier turns it off (backend/src/domain/sale-totals.ts). */
+  'pos.gst_default': 'false',
   'tax.gst_percent': '0',
   'loyalty.enabled': 'true',
   'loyalty.points_per_100': '1',

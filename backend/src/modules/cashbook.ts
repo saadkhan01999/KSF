@@ -196,7 +196,8 @@ async function dayFigures(ctx: PharmacyCtx, businessDate: string, openingFloatPa
        is keyed on refunded_at, not sold_at. */
     col.sales().aggregate([
       { $match: { ...scope, status: 'refunded', ...onDay('refunded_at', businessDate) } },
-      { $group: { _id: null, total: { $sum: '$total_paisa' }, cash: { $sum: { $cond: [{ $eq: ['$payment_method', 'cash'] }, '$total_paisa', 0] } } } }
+      /* Cash back: a cash invoice in full; a loan only for what was paid at the till (refund_cash_paisa). */
+      { $group: { _id: null, total: { $sum: '$total_paisa' }, cash: { $sum: { $cond: [{ $eq: ['$payment_method', 'cash'] }, '$total_paisa', { $cond: [{ $eq: ['$payment_method', 'credit'] }, { $ifNull: ['$refund_cash_paisa', 0] }, 0] }] } } } }
     ]).toArray(),
     col.customerPayments().aggregate([
       { $match: { ...scope, reversed_at: null, ...onDay('received_at', businessDate) } },

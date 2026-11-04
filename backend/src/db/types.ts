@@ -180,6 +180,13 @@ export interface Sale extends Base {
   status: 'completed' | 'refunded' | 'held' | 'void'; customer_name: string | null; served_by: Id | null;
   served_by_name: string | null; notes: string | null; discount_reason: string | null; discount_note: string | null;
   refunded_at: When | null; refunded_by: Id | null; refund_reason?: string | null; created_at: When; updated_at: When;
+  /** GST was added to this sale at the till (the cashier's choice); its rate when every taxed line shared one. */
+  gst_applied?: Flag; gst_rate_percent?: number | null;
+  /** A loan (payment_method 'credit'): paid at the till now, left on the customer's account, the receipt for
+      the part paid (a customer payment, so the cash is counted with repayments), and what they owe after. */
+  paid_now_paisa?: number; loan_paisa?: number; loan_receipt_no?: string | null; balance_after_paisa?: number | null;
+  /** On refunding a loan: the cash handed back for what had been paid at the till. */
+  refund_cash_paisa?: number;
 }
 
 export interface Expense extends Base {

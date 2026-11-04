@@ -354,7 +354,8 @@ route('PATCH', '/api/v1/settings', 'settings.write', async (ctx) => {
         ntn: toStr(p.ntn, 40) || null, strn: toStr(p.strn, 40) || null, drap_licence: toStr(p.drapLicence, 60) || null,
         phone: toStr(p.phone, 40) || null, email: toStr(p.email, 160) || null, address: toStr(p.address, 300) || null,
         city: toStr(p.city, 80) || current.city, province: toStr(p.province, 60) || current.province,
-        gst_percent: Number(p.gstPercent ?? current.gst_percent) || 0, updated_at: nowIso()
+        /* A rate the till can charge: 0 to 100 %. */
+        gst_percent: Math.min(100, Math.max(0, Number(p.gstPercent ?? current.gst_percent) || 0)), updated_at: nowIso()
       }
     });
     changed.push('pharmacy details');

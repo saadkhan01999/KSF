@@ -204,7 +204,7 @@ export default function SettingsPage() {
               <TextInput
                 label="Default GST rate" type="number" suffix="%" min={0} max={100} step="0.5"
                 wrapClass="span-2"
-                hint="Applied to new medicines. Each medicine can still override it."
+                hint="Charged at the till when the cashier adds GST to a sale. A medicine with its own GST % keeps that rate."
                 value={pharmacy.gstPercent ?? '0'} onChange={(e) => setP('gstPercent', e.target.value)}
                 disabled={!can('settings.write')}
               />
@@ -243,7 +243,8 @@ export default function SettingsPage() {
                   { value: 'cash', label: 'Cash' },
                   { value: 'card', label: 'Debit / Credit card' },
                   { value: 'easypaisa', label: 'Easypaisa' },
-                  { value: 'jazzcash', label: 'JazzCash' }
+                  { value: 'jazzcash', label: 'JazzCash' },
+                  { value: 'bank-transfer', label: 'Bank transfer' }
                 ]}
                 disabled={!can('settings.write')}
               />
@@ -272,6 +273,23 @@ export default function SettingsPage() {
                 <p className="hint mt-2">
                   Strongly recommended. Turning this off lets any cashier sell antibiotics and
                   controlled medicine without a pharmacist checking the prescription.
+                </p>
+              </div>
+
+              <div>
+                <Switch
+                  checked={flag('pos.gst_default')}
+                  onChange={(v) => set('pos.gst_default', String(v))}
+                  label="Add GST to every sale unless the cashier turns it off"
+                  disabled={!can('settings.write')}
+                />
+                <p className="hint mt-2">
+                  GST is the cashier's choice on each sale, with a switch in the cart and in the payment window.
+                  This only decides whether that switch starts on or off. When it is added, it is worked out on the
+                  amount after any discount and printed on the receipt with its rate.
+                  {Number(pharmacy.gstPercent ?? 0) > 0
+                    ? ` The default rate is ${pharmacy.gstPercent}% (Pharmacy details).`
+                    : ' Set the Default GST rate under Pharmacy details first.'}
                 </p>
               </div>
 

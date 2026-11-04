@@ -20,14 +20,25 @@ import { BRAND } from '../brand';
 import type { Sale } from '../types';
 
 export function Receipt({ sale }: { sale: Sale }) {
+  /* GST is printed only when it was added to this sale, with its rate when
+     every taxed line shared one ("GST 18%"). */
+  const taxed = sale.gst_paisa > 0;
+  const gstLabel = taxed && sale.gst_rate_percent ? `GST ${sale.gst_rate_percent}%` : 'GST';
+  const isLoan = sale.payment_method === 'credit';
+  /* A loan sold before part-payments existed left the whole total on the account. */
+  const onLoan = sale.loan_paisa ?? sale.total_paisa;
+  const paidNow = sale.paid_now_paisa ?? 0;
   return (
     <div className="receipt">
       <h3>{sale.pharmacy?.name ?? 'KSF PHARMACY'}</h3>
       <div className="rc-sub">
         {[sale.pharmacy?.address, sale.pharmacy?.city].filter(Boolean).join(', ')}<br />
         {sale.pharmacy?.phone}<br />
-        {sale.pharmacy?.ntn && <>NTN {sale.pharmacy.ntn} · </>}
-        {sale.pharmacy?.drap_licence && <>Lic {sale.pharmacy.drap_licence}</>}
+        {[
+          sale.pharmacy?.ntn && `NTN ${sale.pharmacy.ntn}`,
+          taxed && sale.pharmacy?.strn && `STRN ${sale.pharmacy.strn}`,
+          sale.pharmacy?.drap_licence && `Lic ${sale.pharmacy.drap_licence}`
+        ].filter(Boolean).join(' · ')}
       </div>
       <hr />
       <div className="rc-line"><span>Invoice</span><span>{sale.invoice_no}</span></div>
@@ -59,11 +70,26 @@ export function Receipt({ sale }: { sale: Sale }) {
       <hr />
       <div className="rc-line"><span>Subtotal</span><span>{amount(sale.subtotal_paisa)}</span></div>
       {sale.discount_paisa > 0 && <div className="rc-line"><span>Discount</span><span>-{amount(sale.discount_paisa)}</span></div>}
-      {sale.gst_paisa > 0 && <div className="rc-line"><span>GST</span><span>{amount(sale.gst_paisa)}</span></div>}
-      <div className="rc-line rc-total"><span>TOTAL</span><span>Rs {amount(sale.total_paisa)}</span></div>
-      {sale.payment_method === 'credit' ? (
+      {taxed && (
         <>
-          <div className="rc-line"><span>On account (udhaar)</span><span>{amount(sale.total_paisa)}</span></div>
+          {/* What the tax was worked out on, when a discount makes it differ from the subtotal. */}
+          {sale.discount_paisa > 0 && (
+            <div className="rc-line"><span>Value excl. GST</span><span>{amount(sale.subtotal_paisa - sale.discount_paisa)}</span></div>
+          )}
+          <div className="rc-line"><span>{gstLabel}</span><span>{amount(sale.gst_paisa)}</span></div>
+        </>
+      )}
+      <div className="rc-line rc-total"><span>TOTAL{taxed ? ' (incl. GST)' : ''}</span><span>Rs {amount(sale.total_paisa)}</span></div>
+      {isLoan ? (
+        <>
+          {paidNow > 0 && <div className="rc-line"><span>Paid now (cash)</span><span>{amount(paidNow)}</span></div>}
+          <div className="rc-line rc-strong"><span>On loan (udhaar)</span><span>{amount(onLoan)}</span></div>
+          {typeof sale.balance_after_paisa === 'number' && (
+            <div className="rc-line"><span>Account now owes</span><span>{amount(sale.balance_after_paisa)}</span></div>
+          )}
+          {sale.loan_receipt_no && (
+            <div className="rc-line"><span>Payment receipt</span><span>{sale.loan_receipt_no}</span></div>
+          )}
           {typeof sale.loyalty_points === 'number' && (
             <div className="rc-line"><span>Points</span><span>{sale.loyalty_points}</span></div>
           )}

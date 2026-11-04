@@ -161,7 +161,7 @@ export default function DayClose() {
             <dt>Card</dt><dd className="num">{amount(figures?.nonCash.cardPaisa ?? 0)}</dd>
             <dt>Easypaisa / JazzCash</dt><dd className="num">{amount(figures?.nonCash.walletPaisa ?? 0)}</dd>
             <dt>Bank transfer</dt><dd className="num">{amount(figures?.nonCash.bankPaisa ?? 0)}</dd>
-            <dt>Sold on account</dt><dd className="num">{amount(figures?.nonCash.creditPaisa ?? 0)}</dd>
+            <dt>Sold on loan (udhaar)</dt><dd className="num">{amount(figures?.nonCash.creditPaisa ?? 0)}</dd>
           </dl>
           <Alert tone="warn" title="These are what the till recorded, not what arrived">
             KSF has no way to see your merchant account. Match each figure against the provider's or the bank's own
@@ -343,7 +343,7 @@ function CashUpSlip({ closing }: { closing: DayClosing }) {
       <div className="rc-line"><span>Card</span><span>{amount(closing.card_sales_paisa)}</span></div>
       <div className="rc-line"><span>Easypaisa / JazzCash</span><span>{amount(closing.wallet_sales_paisa)}</span></div>
       <div className="rc-line"><span>Bank transfer</span><span>{amount(closing.bank_sales_paisa)}</span></div>
-      <div className="rc-line"><span>On account</span><span>{amount(closing.credit_sales_paisa)}</span></div>
+      <div className="rc-line"><span>Loans (udhaar)</span><span>{amount(closing.credit_sales_paisa)}</span></div>
       <div className="rc-trace">Not cash — check against the statement.</div>
       {closing.note && (
         <>

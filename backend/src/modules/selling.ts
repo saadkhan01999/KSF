@@ -16,11 +16,12 @@
 
 import type { Document, Filter } from 'mongodb';
 import { col, s, supportsTransactions, tx } from '../db/mongo.js';
-import type { Batch, Customer, Medicine, Prescription, PrescriptionItem, Sale, SaleItem } from '../db/types.js';
+import type { Batch, Customer, CustomerPayment, Medicine, Prescription, PrescriptionItem, Sale, SaleItem } from '../db/types.js';
 import { bad, forbid, HttpError, missing } from '../core/errors.js';
 import { getSetting, logActivity, nextNumber } from '../core/trails.js';
 import { contains, escapeRegex, isCnic, isEmail, isPkPhone, nowIso, randomUUID, today, toInt, toStr, uid } from '../core/util.js';
 import { lookupField } from '../db/pipeline.js';
+import { saleTotals } from '../domain/sale-totals.js';
 import { route } from '../http/router.js';
 import type { PharmacyCtx } from '../http/context.js';
 import {
@@ -61,7 +62,6 @@ route('POST', '/api/v1/sales', 'pos.operate', async (ctx) => {
   const plan: PlannedLine[] = [];
   let subtotal = 0;
   let costTotal = 0;
-  let gstTotal = 0;
   const wanted = new Map<string, number>();
 
   for (const [index, line] of lines.entries()) {
@@ -117,11 +117,9 @@ route('POST', '/api/v1/sales', 'pos.operate', async (ctx) => {
     }
 
     const lineTotal = unitPrice * quantity;
-    const gst = medicine.gst_percent > 0 ? Math.round(lineTotal * medicine.gst_percent / 100) : 0;
     subtotal += lineTotal;
-    gstTotal += gst;
     costTotal += takes.reduce((sum, item) => sum + item.batch.cost_paisa * item.take, 0);
-    plan.push({ medicine, quantity, unitPrice, lineTotal, gst, takes });
+    plan.push({ medicine, quantity, unitPrice, lineTotal, gst: 0, takes });
   }
 
   /* ---- Discount ---- */
@@ -140,26 +138,58 @@ route('POST', '/api/v1/sales', 'pos.operate', async (ctx) => {
     }
   }
 
+  /* ---- GST: the cashier's choice on each sale; off unless Settings › Till turns it on by default ---- */
+  const applyGst = typeof ctx.body.applyGst === 'boolean' ? ctx.body.applyGst : await getSetting(ctx.pharmacyId, 'pos.gst_default') === 'true';
+  const pharmacyTax = await col.pharmacies().findOne({ _id: ctx.pharmacyId }, { projection: { gst_percent: 1 } });
+  const totals = saleTotals({
+    lines: plan.map((line) => ({ lineTotalPaisa: line.lineTotal, gstPercent: line.medicine.gst_percent })),
+    discountPaisa: discount, applyGst, defaultGstPercent: pharmacyTax?.gst_percent ?? 0
+  });
+  if (totals.gstRateMissing) {
+    bad('There is no GST rate to add: set the Default GST rate in Settings › Pharmacy, or a GST % on the medicine.', 'applyGst');
+  }
+  plan.forEach((line, index) => { line.gst = totals.lineGstPaisa[index]; });
+  const gstTotal = totals.gstPaisa;
+  const total = totals.totalPaisa;
+
+  /* The till sends the total it showed. A price or a GST rate can change
+     while a sale is being rung up; the customer is never charged a figure
+     the cashier did not see. */
+  if (ctx.body.expectedTotalPaisa !== undefined && toInt(ctx.body.expectedTotalPaisa, -1) !== total) {
+    const error = new HttpError(409, `The total is now Rs ${rupees(total)}, not the Rs ${rupees(toInt(ctx.body.expectedTotalPaisa, 0))} shown. `
+      + 'Nothing has been charged — check the amount and complete the sale again.', 'expectedTotalPaisa', 'total_changed');
+    error.details = { totals: { subtotalPaisa: totals.subtotalPaisa, discountPaisa: totals.discountPaisa, gstPaisa: gstTotal, totalPaisa: total } };
+    throw error;
+  }
+
   /* ---- Payment ---- */
-  const total = subtotal - discount + gstTotal;
   const paymentMethod = toStr(ctx.body.paymentMethod, 20) || await getSetting(ctx.pharmacyId, 'pos.default_payment') || 'cash';
   if (!PAYMENT_METHODS.includes(paymentMethod)) bad('Choose a valid payment method.', 'paymentMethod');
-  const paid = toInt(ctx.body.paidPaisa, total);
-  if (paymentMethod !== 'credit' && paid < total) {
+  const isLoan = paymentMethod === 'credit';
+  const paid = toInt(ctx.body.paidPaisa, isLoan ? 0 : total);
+  if (!isLoan && paid < total) {
     bad(`The amount received (Rs ${rupees(paid)}) is less than the total due (Rs ${rupees(total)}).`, 'paidPaisa');
   }
-  if (paymentMethod === 'credit') {
-    if (!customer) bad('A credit sale needs a registered customer.', 'customerId');
-    if (customer!.credit_limit_paisa > 0 && customer!.balance_paisa + total > customer!.credit_limit_paisa) {
+  /* A loan (udhaar): the customer may pay part now; the rest goes on their account. */
+  let loan = 0;
+  if (isLoan) {
+    if (!customer) bad('A loan (udhaar) needs a customer: choose one, or add them with a name and phone number.', 'customerId');
+    if (paid < 0) bad('The amount paid now cannot be negative.', 'paidPaisa');
+    if (paid >= total) bad(`Rs ${rupees(paid)} pays the whole total, so nothing is left on loan. Choose Cash (or another method) instead.`, 'paidPaisa');
+    loan = total - paid;
+    if (customer!.credit_limit_paisa > 0 && customer!.balance_paisa + loan > customer!.credit_limit_paisa) {
       bad(`This would take ${customer!.name} over their credit limit of Rs ${rupees(customer!.credit_limit_paisa)}.`, 'paymentMethod');
     }
   }
-  const change = paymentMethod === 'credit' ? 0 : Math.max(0, paid - total);
+  const paidNow = isLoan ? paid : 0;
+  const change = isLoan ? 0 : Math.max(0, paid - total);
 
   /* ---- Commit ---- */
   const saleId = uid('SAL');
   const at = nowIso();
   const invoiceNo = await nextNumber(ctx.pharmacyId, 'invoice', await getSetting(ctx.pharmacyId, 'invoice.prefix') || 'KSF');
+  const loanReceiptNo = paidNow > 0 ? await nextNumber(ctx.pharmacyId, 'receipt', 'KSF-RC') : null;
+  let balanceAfter: number | null = null;
   const applied: Take[] = [];
 
   try {
@@ -205,15 +235,33 @@ route('POST', '/api/v1/sales', 'pos.operate', async (ctx) => {
         const loyaltyOn = await getSetting(ctx.pharmacyId, 'loyalty.enabled') !== 'false';
         const perHundred = Number(await getSetting(ctx.pharmacyId, 'loyalty.points_per_100') || 1);
         const points = loyaltyOn ? Math.floor(total / 10_000) * perHundred : 0;
-        const credit = paymentMethod === 'credit' ? total : 0;
-        /* The credit limit is checked again here, against the balance the
-           database holds now. */
+        /* Only what is left on loan goes on the account. The credit limit is
+           checked again here, against the balance the database holds now. */
+        const credit = loan;
         const filter: Filter<Customer> = { _id: customer.id };
         if (credit > 0) {
           filter.$expr = { $or: [{ $lte: ['$credit_limit_paisa', 0] }, { $lte: [{ $add: ['$balance_paisa', credit] }, '$credit_limit_paisa'] }] };
         }
-        const charged = await col.customers().updateOne(filter, { $inc: { loyalty_points: points, balance_paisa: credit }, $set: { updated_at: at } }, s());
-        if (!charged.matchedCount) throw new HttpError(409, `This would take ${customer.name} over their credit limit. Nothing has been charged.`, 'paymentMethod');
+        const charged = await col.customers().findOneAndUpdate(
+          filter, { $inc: { loyalty_points: points, balance_paisa: credit }, $set: { updated_at: at } }, { returnDocument: 'after', ...s() }
+        );
+        if (!charged) throw new HttpError(409, `This would take ${customer.name} over their credit limit. Nothing has been charged.`, 'paymentMethod');
+        if (isLoan) balanceAfter = charged.balance_paisa;
+
+        /* What was paid at the till is a repayment like any other, so the day
+           close counts it as cash in and the account's statement reads: the
+           invoice in full, then the payment against it. */
+        if (paidNow > 0) {
+          const paymentId = uid('CPY');
+          const payment: CustomerPayment = {
+            _id: paymentId, id: paymentId, pharmacy_id: ctx.pharmacyId, branch_id: ctx.user.branch_id, customer_id: customer.id, sale_id: saleId,
+            receipt_no: loanReceiptNo!, amount_paisa: paidNow, payment_method: 'cash', reference: invoiceNo, note: `Paid at the till on invoice ${invoiceNo}`,
+            balance_before_paisa: charged.balance_paisa + paidNow, balance_after_paisa: charged.balance_paisa,
+            received_by: ctx.user.id, received_by_name: ctx.user.full_name, received_at: at, reversed_at: null, reversed_by: null,
+            reversal_reason: null, created_at: at
+          };
+          await col.customerPayments().insertOne(payment, s());
+        }
       }
 
       if (prescription && prescription.status === 'verified') {
@@ -226,7 +274,9 @@ route('POST', '/api/v1/sales', 'pos.operate', async (ctx) => {
       const sale: Sale = {
         _id: saleId, id: saleId, pharmacy_id: ctx.pharmacyId, branch_id: ctx.user.branch_id, customer_id: customerId, prescription_id: prescriptionId,
         invoice_no: invoiceNo, sold_at: at, items, subtotal_paisa: subtotal, discount_paisa: discount, gst_paisa: gstTotal, total_paisa: total,
-        paid_paisa: paymentMethod === 'credit' ? 0 : paid, change_paisa: change, cost_paisa: costTotal, payment_method: paymentMethod,
+        paid_paisa: isLoan ? 0 : paid, change_paisa: change, cost_paisa: costTotal, payment_method: paymentMethod,
+        gst_applied: applyGst && gstTotal > 0 ? 1 : 0, gst_rate_percent: gstTotal > 0 ? totals.gstRatePercent : null,
+        ...(isLoan ? { paid_now_paisa: paidNow, loan_paisa: loan, loan_receipt_no: loanReceiptNo, balance_after_paisa: balanceAfter } : {}),
         status: 'completed', customer_name: customer?.name ?? 'Walk-in customer', served_by: ctx.user.id, served_by_name: ctx.user.full_name,
         notes: toStr(ctx.body.notes, 300) || null, discount_reason: discountReason || null, discount_note: discountNote || null,
         refunded_at: null, refunded_by: null, created_at: at, updated_at: at
@@ -240,9 +290,11 @@ route('POST', '/api/v1/sales', 'pos.operate', async (ctx) => {
 
   await logActivity(ctx, {
     action: 'sale.completed', entity: 'sale', entityId: saleId, severity: discount > 0 ? 'warn' : 'info',
-    summary: `Invoice ${invoiceNo} — ${plan.length} item(s), Rs ${rupees(total)} by ${paymentMethod}`
+    summary: `Invoice ${invoiceNo} — ${plan.length} item(s), Rs ${rupees(total)} `
+      + (isLoan ? `on loan to ${customer!.name} (Rs ${rupees(loan)} owed${paidNow > 0 ? `, Rs ${rupees(paidNow)} paid now` : ''})` : `by ${paymentMethod}`)
+      + (gstTotal > 0 ? ` incl. GST Rs ${rupees(gstTotal)}` : '')
       + (discount > 0 ? ` — discount Rs ${rupees(discount)} (${DISCOUNT_REASONS[discountReason]}${discountNote ? `: ${discountNote}` : ''})` : ''),
-    meta: { invoiceNo, totalPaisa: total, discountPaisa: discount, discountReason, discountNote, paymentMethod, items: plan.length }
+    meta: { invoiceNo, totalPaisa: total, discountPaisa: discount, discountReason, discountNote, paymentMethod, items: plan.length, gstPaisa: gstTotal, loanPaisa: loan, paidNowPaisa: paidNow }
   });
   await refreshStockAlerts(ctx.pharmacyId);
   return { data: await saleDetail(ctx, saleId), __status: 201 };
@@ -356,6 +408,7 @@ route('POST', '/api/v1/sales/:id/refund', 'sales.refund', async (ctx) => {
 
   const at = nowIso();
   const restocked = { shelf: 0, held: 0 };
+  let cashBack = 0;
   await tx(async () => {
     /* Claim the invoice first, so two refunds of the same sale cannot both
        put the stock back. */
@@ -397,11 +450,18 @@ route('POST', '/api/v1/sales/:id/refund', 'sales.refund', async (ctx) => {
     }
 
     if (sale.customer_id && sale.payment_method === 'credit') {
-      /* Only a credit sale put money on the account, so only a credit sale
-         takes it off again — floored at zero. */
+      /* Only a loan put money on the account, so only a loan takes it off
+         again — floored at zero. What was paid at the till for this invoice
+         (and not reversed since) is handed back in cash; the rest of the
+         invoice comes off the account. */
+      const tillPayment = sale.loan_receipt_no
+        ? await col.customerPayments().findOne({ pharmacy_id: ctx.pharmacyId, receipt_no: sale.loan_receipt_no, sale_id: sale.id, reversed_at: null }, s())
+        : null;
+      cashBack = Math.min(tillPayment?.amount_paisa ?? 0, sale.total_paisa);
       await col.customers().updateOne({ _id: sale.customer_id }, [{
-        $set: { balance_paisa: { $max: [0, { $subtract: ['$balance_paisa', sale.total_paisa] }] }, updated_at: at }
+        $set: { balance_paisa: { $max: [0, { $subtract: ['$balance_paisa', sale.total_paisa - cashBack] }] }, updated_at: at }
       }], s());
+      if (cashBack > 0) await col.sales().updateOne({ _id: sale.id }, { $set: { refund_cash_paisa: cashBack } }, s());
     }
   });
 
@@ -410,12 +470,14 @@ route('POST', '/api/v1/sales/:id/refund', 'sales.refund', async (ctx) => {
     summary: `Invoice ${sale.invoice_no} refunded (Rs ${rupees(sale.total_paisa)}) — ${reason}`
   });
   await refreshStockAlerts(ctx.pharmacyId);
+  const stock = restocked.held > 0
+    ? `${restocked.shelf} unit(s) are back on the shelf; ${restocked.held} unit(s) are quarantined because the batch is expired, on hold or written off — check the expiry screen before they are sold again.`
+    : `${restocked.shelf} unit(s) are back on the shelf.`;
   return {
     data: await saleDetail(ctx, sale.id),
     restocked,
-    message: restocked.held > 0
-      ? `Refunded. ${restocked.shelf} unit(s) are back on the shelf; ${restocked.held} unit(s) are quarantined because the batch is expired, on hold or written off — check the expiry screen before they are sold again.`
-      : `Refunded. ${restocked.shelf} unit(s) are back on the shelf.`
+    cashBackPaisa: cashBack,
+    message: `Refunded. ${cashBack > 0 ? `Give back Rs ${rupees(cashBack)} in cash (paid at the till for this loan); the rest is off the customer's account. ` : ''}${stock}`
   };
 });
 
@@ -467,7 +529,10 @@ route('GET', '/api/v1/customers/:id', 'customers.read', async (ctx) => {
     ]).toArray(),
     /* Udhaar coming back, so the screen shows both sides of the account. */
     col.customerPayments().find({ customer_id: customer.id }, {
-      projection: { receipt_no: 1, amount_paisa: 1, payment_method: 1, received_at: 1, received_by_name: 1, reversed_at: 1, balance_after_paisa: 1 }
+      projection: {
+        receipt_no: 1, amount_paisa: 1, payment_method: 1, received_at: 1, received_by_name: 1, reversed_at: 1,
+        balance_before_paisa: 1, balance_after_paisa: 1, sale_id: 1, reference: 1, note: 1
+      }
     }).sort({ received_at: -1 }).limit(25).toArray()
   ]);
   return {

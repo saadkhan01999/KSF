@@ -3,6 +3,66 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.8.0] — 2026-11-04
+
+GST and loans (udhaar) at the till. GST is now the cashier's choice on each
+sale, and when it is added it is shown in the cart, in the payment window
+and on the receipt. A loan is offered right after Cash, for any customer.
+
+### Till
+- **GST is optional on each sale.** A switch in the cart and in the payment
+  window adds it or leaves it off. It starts off unless Settings › Till ›
+  "Add GST to every sale unless the cashier turns it off" is on.
+  - A medicine with its own GST % keeps that rate. Every other line takes
+    the pharmacy's Default GST rate (Settings › Pharmacy), which until now
+    selling never used.
+  - The tax is worked out on what the customer pays: the discount is shared
+    across the lines in proportion to their value, in whole paisa, before
+    the GST. Before, it was charged on the price before the discount.
+  - The payment window shows the breakdown (subtotal, discount, GST with its
+    rate, total). With no rate set anywhere the switch is greyed out and
+    says where to set one.
+- **The till shows the figure the server charges.** The till did not
+  receive each medicine's GST rate, so it showed one total and the server
+  charged another (Rs 28,000 on screen, Rs 30,500 charged).
+  - The lookup now sends the rate, and the till and the server use one
+    calculation (`backend/src/domain/sale-totals.ts`, copied word for word
+    to `frontend/src/utils/sale-totals.ts`; a unit test keeps the copies
+    identical and runs 2,000 random carts through both).
+  - The till sends the total it showed (`expectedTotalPaisa`). If a price or
+    a rate changed meanwhile, the sale is refused with 409 `total_changed`
+    and the new figures, and nothing is charged.
+- **Loan (udhaar), right after Cash.**
+  - It is always offered. Choosing it asks whose account it goes on: pick
+    the customer, or add a new one there with a name and phone number.
+  - The customer may pay part now ("Paid now (optional)"). Only the rest
+    goes on their account and counts against their credit limit. The
+    window shows what is left on loan, what they will owe and any credit
+    limit problem before the sale is completed.
+  - The part paid now is recorded as a cash repayment with its own receipt
+    number, inside the same transaction as the sale. The day close counts
+    it as cash in, and the account statement reads: the invoice in full,
+    then the payment against it.
+  - Refunding a loan hands that cash back (`cashBackPaisa`, "Give back
+    Rs …") and takes the rest off the account. The day close and the cash
+    flow report count the cash handed back.
+- Cheque is no longer listed at the till; the server never accepted it
+  there. Bank transfer can now be the default payment method.
+
+### Receipt
+- With GST added it prints "Value excl. GST", "GST 18%" (or just "GST" when
+  the medicines carry different rates), "TOTAL (incl. GST)" and the
+  pharmacy's STRN.
+- A loan prints "Paid now (cash)", "On loan (udhaar)", what the account now
+  owes, and the receipt number of the part paid now.
+
+### Other
+- The Default GST rate is kept between 0 and 100%.
+- The customer screen's payments carry the invoice they were paid against.
+- The day close says "Loans (udhaar)" instead of "On account".
+- Tests: `tests/selling-gst-loan.test.mjs` (16 API tests) and 8 unit tests
+  for the calculation.
+
 ## [2.7.0] — 2026-11-04
 
 A security and engineering-quality release: nothing a pharmacy uses changes,

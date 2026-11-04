@@ -178,8 +178,11 @@ export const PAYMENT_LABELS: Record<string, string> = {
   jazzcash: 'JazzCash',
   'bank-transfer': 'Bank transfer',
   cheque: 'Cheque',
-  credit: 'On account (udhaar)'
+  credit: 'Loan (udhaar)'
 };
+
+/** What the till takes, in the order it offers them: a loan straight after cash. */
+export const TILL_METHODS = ['cash', 'credit', 'card', 'easypaisa', 'jazzcash', 'bank-transfer'] as const;
 
 /* Names a subscription payment carries that are not choices at a till. */
 const PROVIDER_LABELS: Record<string, string> = {

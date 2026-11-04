@@ -11,12 +11,17 @@
        prescription attached, and the card says so plainly.
      - Out-of-stock and expired stock never appear as sellable.
      - The running total is always visible, including on a phone.
+     - GST is the cashier's choice on each sale, and the figure on screen is
+       the one the server charges (utils/sale-totals.ts, shared with it).
+     - A loan (udhaar) sits right after Cash: pick or add the customer, take
+       whatever they pay now, and the rest goes on their account.
      - After payment the receipt is on screen and one tap from the printer. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, User, Pill, Camera,
-  Printer, CheckCircle2, Percent, ChevronRight, Stethoscope, PackageX, Lock, CircleAlert
+  Printer, CheckCircle2, Percent, ChevronRight, Stethoscope, PackageX, Lock, CircleAlert,
+  Receipt as ReceiptIcon, HandCoins, UserPlus
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useApiData, useDebounced, useAction } from '../hooks/useApi';
@@ -24,9 +29,10 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { api, query } from '../services/api';
 import {
   Button, Modal, SelectInput, TextInput, EmptyState, Badge,
-  Allow, Alert, Spinner, Segmented, Menu
+  Allow, Alert, Spinner, Segmented, Menu, Switch
 } from '../components/ui';
-import { rupees, toPaisa, date, inDays, payment, PAYMENT_LABELS, shortName } from '../utils/format';
+import { rupees, toPaisa, date, inDays, payment, PAYMENT_LABELS, TILL_METHODS, shortName } from '../utils/format';
+import { saleTotals } from '../utils/sale-totals';
 import { beep } from '../utils/beep';
 import { looksLikeBarcode } from '../utils/scanner';
 import type { Medicine, Customer, Prescription, Sale, CartLine } from '../types';
@@ -35,6 +41,9 @@ import { ScannerPanel, type LastScan } from './pos/ScannerPanel';
 import { UnknownBarcode, type UnknownCode } from './pos/UnknownBarcode';
 import { ScanToast, type ScanNote } from './pos/ScanToast';
 import { Receipt, ReceiptPrint, printReceipt } from '../components/receipt';
+
+/** An amount due, with its paisa when it has any: GST makes Rs 637.20 common, and "Rs 637" would not match the receipt. */
+const due = (paisa: number): string => rupees(paisa, { decimals: paisa % 100 !== 0 });
 
 /** Where a code came from: typed and Enter, a hardware scanner, or the camera. */
 type ScanSource = 'typed' | 'scanner' | 'camera';
@@ -59,6 +68,12 @@ export default function Pos() {
   const [discountReason, setDiscountReason] = useState('');
   const [discountNote, setDiscountNote] = useState('');
   const [method, setMethod] = useState('cash');
+  /* GST: off unless Settings › Till turns it on by default; the cashier decides on each sale. */
+  const gstByDefault = workspace?.settings?.['pos.gst_default'] === 'true';
+  const [applyGst, setApplyGst] = useState(gstByDefault);
+  /* A loan: what the customer pays now (optional), and adding a new customer on the spot. */
+  const [paidNow, setPaidNow] = useState('');
+  const [newCustomer, setNewCustomer] = useState<{ name: string; phone: string } | null>(null);
   const [tendered, setTendered] = useState('');
   /* The amount received follows the total until the cashier types their own. */
   const [tenderedTouched, setTenderedTouched] = useState(false);
@@ -72,7 +87,7 @@ export default function Pos() {
   const { data: catalogue, loading } = useApiData<{ data: Medicine[] }>(
     `/medicines-lookup${query({ q: search })}`, [search]
   );
-  const { data: customers } = useApiData<{ data: Customer[] }>('/customers?size=200');
+  const { data: customers, reload: reloadCustomers } = useApiData<{ data: Customer[] }>('/customers?size=200');
   const { data: verifiedRx } = useApiData<{ data: Prescription[] }>(
     can('prescriptions.read') ? '/prescriptions?status=verified&size=60' : null
   );
@@ -82,7 +97,11 @@ export default function Pos() {
   const customer = customers?.data.find((c) => c.id === customerId) ?? null;
   const prescription = verifiedRx?.data.find((r) => r.id === prescriptionId) ?? null;
 
-  useEffect(() => { setMethod(workspace?.settings?.['pos.default_payment'] ?? 'cash'); }, [workspace]);
+  /* The default method must be one the till offers (a cheque is not taken at the counter). */
+  const defaultMethod = workspace?.settings?.['pos.default_payment'] ?? 'cash';
+  const startMethod = (TILL_METHODS as readonly string[]).includes(defaultMethod) ? defaultMethod : 'cash';
+  useEffect(() => { setMethod(startMethod); }, [startMethod]);
+  useEffect(() => { setApplyGst(gstByDefault); }, [gstByDefault]);
 
   /* Keep the caret in the search box: a barcode scanner is just a very fast
      keyboard, and it types wherever the focus happens to be. */
@@ -234,7 +253,11 @@ export default function Pos() {
   const clearDiscount = () => {
     setDiscountOpen(false); setDiscountValue(''); setDiscountReason(''); setDiscountNote(''); setDiscountMode('percent');
   };
-  const clearCart = () => { setCart([]); clearDiscount(); setPrescriptionId(''); setCustomerId(''); focusSearch(); };
+  const clearCart = () => {
+    setCart([]); clearDiscount(); setPrescriptionId(''); setCustomerId('');
+    setApplyGst(gstByDefault); setMethod(startMethod); setPaidNow(''); setNewCustomer(null);
+    focusSearch();
+  };
 
   /* ------------------------------ totals ------------------------------ */
   const subtotal = useMemo(() => cart.reduce((sum, l) => sum + l.unitPricePaisa * l.quantity, 0), [cart]);
@@ -257,15 +280,50 @@ export default function Pos() {
   const discountBlocked = discountOverLimit || discountNeedsReason || discountNeedsNote;
   const reasonLabel = (key: string) => workspace?.discountReasons?.find((r) => r.value === key)?.label ?? key;
   const discountChips = [5, 10, 15, 20].filter((p) => canOverride || p <= discountLimit);
-  const gstPaisa = useMemo(
-    () => cart.reduce((sum, l) => sum + (l.medicine.gst_percent > 0
-      ? Math.round(l.unitPricePaisa * l.quantity * l.medicine.gst_percent / 100) : 0), 0),
+
+  /* GST, the same calculation the server charges with: a medicine's own rate
+     wins, every other line takes the pharmacy's default rate, and the tax is
+     worked out on what is paid after the discount. */
+  const defaultGstPercent = workspace?.pharmacy?.gstPercent ?? 0;
+  const totalsLines = useMemo(
+    () => cart.map((l) => ({ lineTotalPaisa: l.unitPricePaisa * l.quantity, gstPercent: l.medicine.gst_percent })),
     [cart]
   );
-  const total = subtotal - discountPaisa + gstPaisa;
+  const gstPossible = defaultGstPercent > 0 || cart.some((l) => l.medicine.gst_percent > 0);
+  const gstOn = applyGst && gstPossible;
+  const totals = useMemo(
+    () => saleTotals({ lines: totalsLines, discountPaisa, applyGst: gstOn, defaultGstPercent }),
+    [totalsLines, discountPaisa, gstOn, defaultGstPercent]
+  );
+  const gstPaisa = totals.gstPaisa;
+  const total = totals.totalPaisa;
+  /* "GST 18%" when every taxed line shares one rate; otherwise just "GST". */
+  const gstRateText = gstOn
+    ? (totals.gstRatePercent !== null ? `${totals.gstRatePercent}%` : 'at each medicine\'s rate')
+    : defaultGstPercent > 0 ? `${defaultGstPercent}%` : '';
+  const gstLabel = gstOn && totals.gstRatePercent !== null ? `GST (${totals.gstRatePercent}%)` : 'GST';
+  /* What it would have been without the discount, for the struck-through figure. */
+  const undiscountedPaisa = useMemo(
+    () => saleTotals({ lines: totalsLines, applyGst: gstOn, defaultGstPercent }).totalPaisa,
+    [totalsLines, gstOn, defaultGstPercent]
+  );
+
+  const isLoan = method === 'credit';
   const tenderedPaisa = toPaisa(tendered || 0);
-  const changePaisa = Math.max(0, tenderedPaisa - total);
-  const shortfall = method !== 'credit' && tendered !== '' && tenderedPaisa < total;
+  const changePaisa = isLoan ? 0 : Math.max(0, tenderedPaisa - total);
+  const shortfall = !isLoan && tendered !== '' && tenderedPaisa < total;
+
+  /* ------------------------------- loan -------------------------------
+     The customer may pay part now; the rest goes on their account. The
+     server checks all of this again, and the credit limit inside the same
+     transaction that charges it. */
+  const paidNowPaisa = Math.max(0, toPaisa(paidNow || 0));
+  const loanPaisa = Math.max(0, total - paidNowPaisa);
+  const owesAfterPaisa = (customer?.balance_paisa ?? 0) + loanPaisa;
+  const loanNeedsCustomer = isLoan && !customer;
+  const loanPaysAll = isLoan && total > 0 && paidNowPaisa >= total;
+  const loanOverLimit = isLoan && !!customer && customer.credit_limit_paisa > 0 && owesAfterPaisa > customer.credit_limit_paisa;
+  const loanBlocked = loanNeedsCustomer || loanPaysAll || loanOverLimit;
   const units = cart.reduce((sum, l) => sum + l.quantity, 0);
 
   /* Cash rounding suggestions — the notes a Pakistani customer actually hands over. */
@@ -290,6 +348,30 @@ export default function Pos() {
     if (payOpen && method === 'cash' && !tenderedTouched) setTendered(String(Math.ceil(total / 100)));
   }, [payOpen, method, total, tenderedTouched]);
 
+  const chooseMethod = (next: string) => {
+    setMethod(next);
+    if (next === 'credit') { setPaidNow(''); return; }
+    setNewCustomer(null);
+    setTendered(next === 'cash' ? String(Math.ceil(total / 100)) : '');
+    setTenderedTouched(false);
+  };
+
+  /* A customer added from the payment window, for a loan: a name and a phone
+     number to reach them on, and nothing else asked at the counter. */
+  const newCustomerReady = !!newCustomer && newCustomer.name.trim().length > 1 && newCustomer.phone.trim().length >= 10;
+  const addCustomer = () => {
+    if (!newCustomer || !newCustomerReady) return;
+    void run(
+      () => api.post<{ data: Customer }>('/customers', { name: newCustomer.name.trim(), phone: newCustomer.phone.trim() }),
+      async (result) => {
+        await reloadCustomers(true);
+        setCustomerId(result.data.id);
+        setNewCustomer(null);
+        ok(`${result.data.name} added`, 'The loan will go on their account.');
+      }
+    );
+  };
+
   const completeSale = () => run(
     () => api.post<{ data: Sale }>('/sales', {
       items: cart.map((l) => ({ medicineId: l.medicine.id, quantity: l.quantity, unitPricePaisa: l.unitPricePaisa })),
@@ -298,15 +380,28 @@ export default function Pos() {
       discountPaisa,
       discountReason: discountPaisa > 0 ? discountReason : undefined,
       discountNote: discountPaisa > 0 ? discountNote.trim() || undefined : undefined,
+      applyGst: gstOn,
+      /* The server refuses (409) rather than charge a figure the cashier did not see. */
+      expectedTotalPaisa: total,
       paymentMethod: method,
-      paidPaisa: method === 'credit' ? 0 : (tenderedPaisa || total)
+      paidPaisa: isLoan ? paidNowPaisa : (tenderedPaisa || total)
     }),
     (result) => {
-      setReceipt(result.data);
+      const sale = result.data;
+      setReceipt(sale);
       setPayOpen(false);
       clearCart();
       void refreshWorkspace();
-      ok(`Invoice ${result.data.invoice_no} completed`, `${rupees(result.data.total_paisa)} taken by ${payment(result.data.payment_method)}.`);
+      if (sale.payment_method === 'credit') {
+        void reloadCustomers(true);
+        ok(
+          `Invoice ${sale.invoice_no} completed`,
+          `${due(sale.loan_paisa ?? sale.total_paisa)} on loan to ${sale.customer_name ?? 'the customer'}`
+            + `${(sale.paid_now_paisa ?? 0) > 0 ? `, ${due(sale.paid_now_paisa ?? 0)} paid now` : ''}.`
+        );
+      } else {
+        ok(`Invoice ${sale.invoice_no} completed`, `${due(sale.total_paisa)} taken by ${payment(sale.payment_method)}.`);
+      }
     }
   );
 
@@ -563,12 +658,22 @@ export default function Pos() {
                 <span className="amt">−{rupees(discountPaisa, { decimals: true })}</span>
               </div>
             )}
-            {gstPaisa > 0 && (
-              <div className="total-row"><span>GST</span><span className="amt">{rupees(gstPaisa, { decimals: true })}</span></div>
+            {/* GST is a choice on each sale, right where the total is. */}
+            <div className={`total-row cart-gst ${gstOn ? 'is-on' : ''}`}>
+              <Switch
+                checked={gstOn}
+                disabled={!gstPossible}
+                onChange={setApplyGst}
+                label={<>Add GST{gstRateText ? <small> {gstRateText}</small> : null}</>}
+              />
+              <span className="amt">{gstOn ? `+${rupees(gstPaisa, { decimals: true })}` : 'Not added'}</span>
+            </div>
+            {!gstPossible && cart.length > 0 && (
+              <div className="t-xs t-dim">No GST rate is set. Add the Default GST rate in Settings › Pharmacy to offer it here.</div>
             )}
             <div className="total-row grand">
               <span>Total</span>
-              <span className="amt">{rupees(total)}</span>
+              <span className="amt">{due(total)}</span>
             </div>
           </div>
 
@@ -581,7 +686,7 @@ export default function Pos() {
               icon={<CheckCircle2 size={20} />}
               onClick={openPayment}
             >
-              Take payment · {rupees(total)}
+              Take payment · {due(total)}
             </Button>
           </div>
         </aside>
@@ -592,7 +697,7 @@ export default function Pos() {
         <div className="cart-sticky only-sm">
           <div>
             <small>{units} item{units === 1 ? '' : 's'}</small>
-            <span className="amt">{rupees(total)}</span>
+            <span className="amt">{due(total)}</span>
           </div>
           <Button variant="gold" onClick={openPayment} icon={<CheckCircle2 size={18} />}>Pay</Button>
         </div>
@@ -609,8 +714,8 @@ export default function Pos() {
         footer={
           <>
             <Button variant="outline" onClick={() => setPayOpen(false)}>Back</Button>
-            <Button variant="primary" loading={busy} disabled={shortfall || discountBlocked} onClick={completeSale}>
-              Complete sale
+            <Button variant="primary" loading={busy} disabled={shortfall || discountBlocked || loanBlocked} onClick={completeSale}>
+              {isLoan ? 'Complete sale on loan' : 'Complete sale'}
             </Button>
           </>
         }
@@ -618,13 +723,44 @@ export default function Pos() {
         <div className="mini-card mb-4 t-center">
           <div className="lbl">Amount due</div>
           {discountPaisa > 0 && (
-            <div className="pay-was">{rupees(subtotal + gstPaisa)}</div>
+            <div className="pay-was">{due(undiscountedPaisa)}</div>
           )}
-          <div className="val" style={{ fontSize: 'var(--fs-3xl)', color: 'var(--brand-700)' }}>{rupees(total)}</div>
+          <div className="val" style={{ fontSize: 'var(--fs-3xl)', color: 'var(--brand-700)' }}>{due(total)}</div>
           {discountPaisa > 0 && (
             <div className={`pay-saving ${discountOverLimit ? 'is-over' : ''}`}>Discount {rupees(discountPaisa)} ({discountPercent}%)</div>
           )}
+          {/* How the figure is made up, so the cashier can read it out. */}
+          <dl className="pay-breakdown">
+            <div><dt>Subtotal</dt><dd>{rupees(subtotal, { decimals: true })}</dd></div>
+            {discountPaisa > 0 && <div className="is-discount"><dt>Discount</dt><dd>−{rupees(discountPaisa, { decimals: true })}</dd></div>}
+            <div className={gstOn ? 'is-gst' : 'is-off'}>
+              <dt>{gstLabel}</dt>
+              <dd>{gstOn ? `+${rupees(gstPaisa, { decimals: true })}` : 'Not added'}</dd>
+            </div>
+            <div className="is-total"><dt>Total</dt><dd>{rupees(total, { decimals: true })}</dd></div>
+          </dl>
         </div>
+
+        {/* ------------------------- GST ----------------------------- */}
+        <section className={`pay-gst ${gstOn ? 'is-on' : ''}`} aria-label="GST">
+          <ReceiptIcon size={18} aria-hidden="true" />
+          <div className="pay-gst-text">
+            <Switch
+              checked={gstOn}
+              disabled={!gstPossible}
+              onChange={setApplyGst}
+              label={<>Add GST{gstRateText ? ` (${gstRateText})` : ''}</>}
+            />
+            <p className="pay-discount-hint">
+              {!gstPossible
+                ? 'No GST rate is set. Add the Default GST rate in Settings › Pharmacy, or a GST % on the medicine.'
+                : gstOn
+                  ? `Worked out on the amount after any discount${totals.gstRatePercent === null ? ', each medicine at its own rate' : ''}. It is printed on the receipt.`
+                  : 'The customer pays no GST on this sale. Turn it on if they want a tax invoice.'}
+            </p>
+          </div>
+          <strong className="pay-gst-amt">{gstOn ? `+${rupees(gstPaisa, { decimals: true })}` : '—'}</strong>
+        </section>
 
         {/* ---------------------- discount ----------------------------- */}
         <Allow permission="pos.discount">
@@ -713,14 +849,12 @@ export default function Pos() {
         <SelectInput
           label="Payment method"
           value={method}
-          onChange={(e) => setMethod(e.target.value)}
-          options={Object.entries(PAYMENT_LABELS)
-            .filter(([key]) => key !== 'credit' || !!customerId)
-            .map(([value, label]) => ({ value, label }))}
-          hint={!customerId ? 'On-account sales need a registered customer.' : undefined}
+          onChange={(e) => chooseMethod(e.target.value)}
+          options={TILL_METHODS.map((value) => ({ value, label: PAYMENT_LABELS[value] ?? value }))}
+          hint={isLoan ? 'The customer takes the medicine now and pays later. It goes on their account.' : undefined}
         />
 
-        {method !== 'credit' && (
+        {!isLoan && (
           <>
             <div className="mt-4">
               <TextInput
@@ -754,11 +888,99 @@ export default function Pos() {
           </>
         )}
 
-        {method === 'credit' && customer && (
-          <Alert tone="warn" title="This will be added to the customer account">
-            {customer.name} currently owes {rupees(customer.balance_paisa)}.
-            {customer.credit_limit_paisa > 0 && ` Their limit is ${rupees(customer.credit_limit_paisa)}.`}
-          </Alert>
+        {isLoan && (
+          <section className="pay-loan" aria-label="Loan (udhaar)">
+            <header>
+              <strong><HandCoins size={16} aria-hidden="true" /> Loan (udhaar)</strong>
+              {customer && !newCustomer && (
+                <button type="button" className="link-button" onClick={() => setCustomerId('')}>Change customer</button>
+              )}
+            </header>
+
+            {/* Who it is for: a loan always needs a name to chase. */}
+            {!customer && !newCustomer && (
+              <>
+                <SelectInput
+                  label="Whose account?"
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  placeholder="Choose the customer"
+                  options={(customers?.data ?? [])
+                    .filter((c) => c.status !== 'archived')
+                    .map((c) => ({ value: c.id, label: `${c.name}${c.phone ? ` — ${c.phone}` : ''}` }))}
+                  hint="A loan needs a customer. Choose one, or add them below."
+                />
+                <Allow permission="customers.write">
+                  <button type="button" className="pay-discount-open" onClick={() => setNewCustomer({ name: '', phone: '' })}>
+                    <UserPlus size={16} aria-hidden="true" /> New customer
+                    <span>name and phone number</span>
+                  </button>
+                </Allow>
+              </>
+            )}
+
+            {newCustomer && (
+              <div className="pay-loan-new">
+                <TextInput
+                  label="Customer name"
+                  value={newCustomer.name}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                  placeholder="e.g. Imran Ali"
+                  maxLength={120}
+                  autoFocus
+                />
+                <TextInput
+                  label="Phone number"
+                  type="tel"
+                  inputMode="tel"
+                  value={newCustomer.phone}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                  placeholder="+92 300 1234567"
+                  maxLength={40}
+                />
+                <div className="row" style={{ gap: 8 }}>
+                  <Button variant="outline" size="sm" onClick={() => setNewCustomer(null)}>Cancel</Button>
+                  <Button variant="primary" size="sm" loading={busy} disabled={!newCustomerReady} icon={<UserPlus size={15} />} onClick={addCustomer}>
+                    Add customer
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {customer && (
+              <>
+                <div className="pay-loan-who">
+                  <User size={15} aria-hidden="true" />
+                  <span><strong>{customer.name}</strong>{customer.phone ? ` · ${customer.phone}` : ''}</span>
+                  <span className="t-dim">owes {rupees(customer.balance_paisa)} now</span>
+                </div>
+                <TextInput
+                  label="Paid now (optional)"
+                  type="number"
+                  inputMode="decimal"
+                  prefix="Rs"
+                  min={0}
+                  value={paidNow}
+                  onChange={(e) => setPaidNow(e.target.value)}
+                  placeholder="0"
+                  hint="Any cash they hand over now. Leave it empty if the whole amount is on loan."
+                  error={loanPaysAll ? 'That pays the whole bill, so nothing is left on loan. Choose Cash instead.' : undefined}
+                />
+                <dl className="pay-breakdown pay-loan-sum">
+                  <div><dt>Bill</dt><dd>{rupees(total, { decimals: true })}</dd></div>
+                  {paidNowPaisa > 0 && <div><dt>Paid now (cash)</dt><dd>−{rupees(paidNowPaisa, { decimals: true })}</dd></div>}
+                  <div className="is-total"><dt>On loan</dt><dd>{rupees(loanPaisa, { decimals: true })}</dd></div>
+                  <div><dt>{customer.name} will owe</dt><dd>{rupees(owesAfterPaisa, { decimals: true })}</dd></div>
+                </dl>
+                {loanOverLimit && (
+                  <Alert tone="danger" title="Over the credit limit">
+                    {customer.name}'s limit is {rupees(customer.credit_limit_paisa)}. Take more now, or ask a manager to raise
+                    the limit on the customer's page.
+                  </Alert>
+                )}
+              </>
+            )}
+          </section>
         )}
       </Modal>
 
