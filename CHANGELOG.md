@@ -3,6 +3,33 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.6.4] — 2026-11-04
+
+### Vercel: the backend no longer crashes with "Cannot find module"
+- **One JavaScript entry for every Vercel set-up: `backend/index.js`.** A
+  project whose Root Directory is `backend`, and the `backend` service of
+  the two-service set-up, could run the TypeScript source (`src/server.ts`,
+  `src/vercel.ts`). Vercel compiles such an entry file by file, and the
+  backend imports its files by their compiled names (`./config/env.js`),
+  so the function died on every request with `Cannot find module
+  …/config/env.js` — "500 FUNCTION_INVOCATION_FAILED" on the backend
+  project, and "error 500" for the prices on the website. `backend/index.js`
+  is plain JavaScript that loads the built handler (`dist/vercel.js`); it
+  carries the express import Vercel's Express detection looks for, so a
+  Root Directory `backend` project now builds with the Express preset too.
+  `backend/package.json` `main`, the backend service's `entrypoint`,
+  `frontend/api/index.mjs` and `deploy/vercel/api/index.mjs` all use it.
+- **A failure says why.** If the built handler cannot be loaded, every
+  request is answered with the reason ("The KSF server could not be
+  loaded: …") instead of a crashed function. A start-up check that fails
+  after the database was reached (indexes, plans, the Super Admin) now says
+  so, with its message, instead of "cannot reach its database"; the
+  database message itself is shown too, without the user and password.
+- A database connection that fails is closed before the next attempt.
+- Checked with `vercel build` and Vercel's own function runner on Node 24,
+  against a database left by 2.5.2: Root Directory `backend`, `frontend`
+  and empty all answer health, plans and sign-in.
+
 ## [2.6.3] — 2026-11-04
 
 ### Vercel: no more 500 when Vercel picks the always-on server

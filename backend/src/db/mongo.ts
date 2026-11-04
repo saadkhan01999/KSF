@@ -41,7 +41,14 @@ export async function connect(uri = env.MONGODB_URI, dbName = env.MONGODB_DB): P
     serverSelectionTimeoutMS: 15_000,
     retryWrites: true
   });
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (error) {
+    /* Not left half-open: the next attempt (the next request, on Vercel) starts clean. */
+    await client.close().catch(() => undefined);
+    client = null;
+    throw error;
+  }
   database = client.db(dbName);
 
   /* A replica set (or a sharded cluster) can run transactions. */
