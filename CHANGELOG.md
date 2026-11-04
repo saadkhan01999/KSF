@@ -3,6 +3,80 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.7.0] — 2026-11-04
+
+A security and engineering-quality release: nothing a pharmacy uses changes,
+except that sign-in is harder to attack. `QUALITY_AUDIT.md` has the audit,
+the findings and the evidence.
+
+### Security
+- **Request checks before any handler** (`backend/src/http/safety.ts`).
+  - A body may not carry MongoDB operator keys (`$ne`, `$where`) or
+    prototype keys (`__proto__`, `constructor`).
+  - Bodies are limited to 2 MB (12 MB only for the two file imports).
+  - A body the server cannot read (an unknown charset or encoding) is
+    answered 4xx instead of 500.
+- **Open redirect fixed.** The payment-return redirect accepted any
+  address that started with `PUBLIC_APP_URL`, so
+  `https://<app>.evil.com` passed. The origin must now match exactly, and a
+  path with a tab or line break (which browsers drop, making
+  `/<tab>/evil` into `//evil`) is refused, on the server and in the web
+  app.
+- **Sign-in protection shared by every server instance.**
+  - The limits on sign-in, sign-up, codes, password resets and
+    referral-code guesses, and the two-step sign-in and device-release
+    tickets, are kept in MongoDB (`rate_limits`, `auth_tickets`, both
+    TTL-indexed) instead of one instance's memory.
+  - On Vercel a memory counter reset on every cold start, and a ticket
+    issued by one instance was unknown to the next, so a correct two-step
+    code could be refused.
+  - Tickets are stored by their SHA-256 hash only.
+- **Each authenticator code is accepted once** (RFC 6238 §5.2). A code
+  seen over someone's shoulder can no longer sign in again during its 90
+  seconds. A reused code gets its own message.
+- **Dependencies:** `npm audit fix` (body-parser, high; qs, moderate) and
+  Vite 6.4.5 (high, development server only). No high or critical
+  advisory remains; the one moderate left is in `SECURITY.md`.
+
+### Testing
+- `tests/security.test.mjs`, 19 tests:
+  - the request checks;
+  - forged (`alg: none`, another secret), expired, tampered and
+    wrong-audience tokens;
+  - headers and CORS;
+  - shared counters;
+  - two-step replay and attempt limits;
+  - sign-out, password reset, sign-out everywhere and recovery codes;
+  - **every registered route fed hostile input**: wrong types, huge
+    strings, array bodies, odd ids and queries, with no server error and
+    no stack trace allowed.
+- 183 tests, all passing.
+- `npm run test:coverage` fails under 85% lines, 65% branches or 80%
+  functions. Backend coverage went from 86.17 / 64.19 / 82.91% to 89.24 /
+  66.51 / 86.83%.
+- `docs/API_INVENTORY.md`, generated from the route table by
+  `npm run api:inventory`, lists all 268 endpoints, who may call each, and
+  the tests that name it. A test fails when it is out of date.
+
+### Engineering
+- **ESLint 10** over the whole repository (`npm run lint`). Its 68
+  findings were fixed rather than silenced:
+  - unused code and dead assignments;
+  - invisible characters written as escapes;
+  - a rethrown error now keeps its cause;
+  - React hooks: memoised lists, a camera cleanup that clears the right
+    element, and two mis-placed suppressions.
+- **CI** (`.github/workflows/ci.yml`) on every push to `main` and every
+  pull request:
+  - type check, lint and the inventory check;
+  - every test on a MongoDB 7 replica set with the coverage thresholds;
+  - the production build, then a smoke test of the built server;
+  - the Docker image (non-root, with a health check);
+  - `npm audit` on what ships.
+- **Dependabot** for npm and GitHub Actions.
+- **New documents:** `SECURITY.md`, `CONTRIBUTING.md`, a pull-request
+  template and issue templates, and `QUALITY_AUDIT.md`.
+
 ## [2.6.4] — 2026-11-04
 
 ### Vercel: the backend no longer crashes with "Cannot find module"
