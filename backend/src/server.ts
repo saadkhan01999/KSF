@@ -6,6 +6,12 @@
    (subscription dates, the mail retry queue, old sessions and codes) runs at
    start-up and then hourly; a failure there is logged and never stops the
    server.
+
+   On Vercel nothing may listen or run between requests, and a missing
+   setting must not end the process (that is "500 FUNCTION_INVOCATION
+   _FAILED" for every page). Vercel's Express detection can still pick this
+   file as the function, so there it starts nothing and its default export,
+   the request handler in vercel.ts, answers instead.
    ========================================================================== */
 
 import { env, VERSION } from './config/env.js';
@@ -15,6 +21,9 @@ import './modules/index.js';
 import { createApp } from './http/app.js';
 import { runMaintenance } from './services/maintenance.js';
 import { startLiveFeed } from './services/live.js';
+import handleOnVercel from './vercel.js';
+
+export default handleOnVercel;
 
 const maintenance = async (): Promise<void> => { await runMaintenance(); };
 
@@ -49,9 +58,11 @@ async function start(): Promise<void> {
   process.on('SIGTERM', () => stop('SIGTERM'));
 }
 
-start().catch((error) => {
-  console.error('[KSF] The server could not start.');
-  console.error((error as Error).message);
-  for (const line of databaseHint(error as Error)) console.error(`      ${line}`);
-  process.exit(1);
-});
+if (process.env.VERCEL !== '1') {
+  start().catch((error) => {
+    console.error('[KSF] The server could not start.');
+    console.error((error as Error).message);
+    for (const line of databaseHint(error as Error)) console.error(`      ${line}`);
+    process.exit(1);
+  });
+}

@@ -207,8 +207,9 @@ if (IS_PROD && env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
 export const VERSION: string = (() => {
   /* The root package.json, or — when only backend/ was deployed (a Vercel
      service whose root is backend) — backend/package.json, which carries the
-     same number. */
-  for (const file of ['../../../package.json', '../../package.json']) {
+     same number. Vercel's Express build puts the contents of dist/ at the
+     function's root with backend/package.json beside them: the third. */
+  for (const file of ['../../../package.json', '../../package.json', '../backend/package.json']) {
     try {
       return String(JSON.parse(readFileSync(new URL(file, import.meta.url), 'utf8')).version);
     } catch { /* try the next one */ }

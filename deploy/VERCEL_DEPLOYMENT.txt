@@ -1,6 +1,6 @@
 ==============================================================================
  KSF PHARMACY MANAGEMENT SYSTEM - THE WHOLE SYSTEM ON VERCEL (FOR TESTING)
- Version 2.6.2 - November 2026
+ Version 2.6.3 - November 2026
 ==============================================================================
 
  What this is: the website AND the API on one Vercel project, at one
@@ -47,7 +47,7 @@
   for the other test projects - one project is all KSF needs.)
 
   KSF no longer uses Railway: since 2.6.2 nothing sends requests there.
-  Once ksf-x86j answers /api/v1/health with version 2.6.2 (Part 5), the
+  Once ksf-x86j answers /api/v1/health with version 2.6.3 (Part 5), the
   Railway service can be deleted.
 
   What is different on Vercel, and why it is fine for testing:
@@ -128,7 +128,7 @@
          Import .env with the ksf-vercel.env file), for Production and
          Preview.
       4. Deployments > the latest > Redeploy. Then Part 5.
-      5. When /api/v1/health shows "version":"2.6.2", delete the Railway
+      5. When /api/v1/health shows "version":"2.6.3", delete the Railway
          service: nothing uses it any more.
 
  3B. A new project with the Root Directory EMPTY  (two services)
@@ -224,7 +224,7 @@
 ------------------------------------------------------------------------------
 
  5.1  Open https://<PROJECT>.vercel.app/api/v1/health
-      It answers {"ok":true, ..., "version":"2.6.2", "transactions":true}.
+      It answers {"ok":true, ..., "version":"2.6.3", "transactions":true}.
       If it answers 503, see Part 7.
 
  5.2  Open https://<PROJECT>.vercel.app/pricing
@@ -276,6 +276,19 @@
 ------------------------------------------------------------------------------
  PART 7 - IF SOMETHING IS WRONG
 ------------------------------------------------------------------------------
+
+ The address shows "404: NOT_FOUND" / page not found
+   You opened a project that builds only the API - Root Directory
+   "backend", like the project called "ksf". It has no website. Open
+   https://ksf-x86j.vercel.app instead (Root Directory "frontend", 3A): it
+   has the website AND the API. A project with only the API is not needed.
+
+ "This page is unavailable" - 500 FUNCTION_INVOCATION_FAILED
+   Before 2.6.3, a project rooted at backend/ (or the backend service) ran
+   the always-on server, which stopped when a setting was missing or the
+   database could not be reached. Redeploy from main: since 2.6.3 it
+   answers instead, and /api/v1/health names what needs attention. Then
+   Vercel > the project > Logs shows the rest.
 
  /api/v1/health answers 503 "cannot reach its database"
    Vercel > the project > Logs shows why. Almost always: Atlas Network

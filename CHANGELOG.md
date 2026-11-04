@@ -3,6 +3,25 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.6.3] — 2026-11-04
+
+### Vercel: no more 500 when Vercel picks the always-on server
+- **`backend/dist/server.js` is safe on Vercel.** Vercel's Express detection
+  runs `server.js` (not the configured handler) for a project rooted at
+  `backend/` and for the `backend` service of the two-service set-up. That
+  server listened, ran hourly timers and ended the process when a setting
+  was missing or the database could not be reached, so every request was
+  `500 FUNCTION_INVOCATION_FAILED`. On Vercel (`VERCEL=1`) it now starts
+  nothing and its default export, the handler in `backend/src/vercel.ts`,
+  answers: a short message naming any missing setting, then the API.
+  Docker, Hostinger and `npm start` run it as before.
+- `backend/src/vercel.ts` makes the Express app on the first request, so
+  importing it costs nothing.
+- The server finds its version in that Vercel layout too (it said `0.0.0`,
+  so the version check claimed the server had not updated).
+- The Vercel guide explains "404: NOT_FOUND" (a project that builds only
+  the API, without the website) and the 500.
+
 ## [2.6.2] — 2026-11-04
 
 ### Everything on Vercel; Railway removed
