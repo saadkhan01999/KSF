@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.6.1** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.6.2** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -250,7 +250,7 @@ from typing — gets the same beep and card.
 | Setting it up | Plug it in (or pair it over Bluetooth) and scan. An **Enter** at the end of each scan is the factory setting and the fastest; Tab, or nothing at all, works too |
 | How the till tells it from a person | A scanner types a whole code at a few milliseconds a key; a person cannot keep up 40 ms a key. A burst that fast is taken as a scan and kept out of whichever box has the cursor; normal typing is left alone. Slower Bluetooth scanners, which stutter, still count, and so does a scanner typing on the number pad with Num Lock off |
 | The pack's 2D code | The GS1 DataMatrix on medicine packs (product, expiry, batch, serial) finds the medicine by its product number — with the GS separators most scanners send as Ctrl+] — and so does a GS1 Digital Link in a QR code (`https://…/01/<product number>/…`). A lost leading zero does not matter |
-| Camera | The camera button beside the search box scans with a phone's or laptop's camera: the back camera in full HD, with continuous focus, **tap to focus**, **zoom** and the light where the phone has them. It beeps the moment it reads a code. The browser asks for permission once. The live camera needs **https** (Vercel and Railway give it; `localhost` counts too) |
+| Camera | The camera button beside the search box scans with a phone's or laptop's camera: the back camera in full HD, with continuous focus, **tap to focus**, **zoom** and the light where the phone has them. It beeps the moment it reads a code. The browser asks for permission once. The live camera needs **https** (Vercel and the Hostinger set-up give it; `localhost` counts too) |
 | How the camera reads hard packs | Two readers at once: the browser's own (on Android and macOS) and ZXing in a background worker, which looks at each frame a different way in turn — the whole frame; the scan area at full resolution; the middle enlarged twice over (a tiny barcode on a strip or a dropper bottle); turned a quarter turn (a barcode printed upright on a narrow box); sharpened (faded or slightly blurred print); a second binariser; and inverted (light bars on dark foil). Codes with a check digit or error correction are taken at the first read; Code 39, Code 93, Codabar and short ITF must read the same twice, so a smudge never adds the wrong medicine |
 | Scan a photo | In the camera window, **Scan a photo** reads the code from a picture, every one of those ways — on a phone it opens the camera app. It works on any address, even where the live camera is not allowed |
 | A barcode the pharmacy does not stock | The till shows what KSF knows about the pack and offers **Add with these details**; or say which medicine it is, and the barcode is saved on it (with `medicines.write`) so the next scan finds it |
@@ -301,7 +301,7 @@ added without a line here.
 
 | | |
 |---|---|
-| Base URL | `/api/v1` on the API server (on Vercel, the website forwards `/api` to Railway, so the browser uses the same origin) |
+| Base URL | `/api/v1` on the same address as the website (on Vercel the API is a function of the same project, so the browser uses the same origin) |
 | Format | JSON in and out (`Content-Type: application/json`), UTF-8. Request fields are camelCase (`amountPaisa`); answers are documents in snake_case (`amount_paisa`) with readable ids (`MED-…`). Dates are ISO 8601 (`2026-10-12` or `2026-10-12T09:30:00.000Z`) |
 | Money | Integer **paisa** in every field that ends `Paisa` / `_paisa` (Rs 125.50 is `12550`) |
 | Signing in | `POST /auth/login` answers `accessToken` (15 minutes). Send it as `Authorization: Bearer <token>`. The refresh token is an HttpOnly cookie on `/api/v1/auth`; `POST /auth/refresh` exchanges it for a new pair |
@@ -802,25 +802,26 @@ stock, sales, purchases, accounts and a prescription — and the copy's
 
 **Hostinger:** `deploy/HOSTINGER_DEPLOYMENT.txt` is the step-by-step guide,
 from buying the VPS (KVM 2 recommended, Ubuntu 24.04 with Docker, Mumbai) to
-HTTPS, backups, updates and moving over from Railway and Vercel.
+HTTPS, backups, updates and moving over from Vercel.
 
-**Everything on Vercel, for testing:** `deploy/VERCEL_DEPLOYMENT.txt`.
-- The root `vercel.json` defines two Vercel services in one project.
-  - `backend`: the API as one function, `backend/src/vercel.ts`, at
-    `/api/…`.
-  - `frontend`: the Vite website, at every other address.
-- Import the repository with the Root Directory left empty.
-- MongoDB Atlas is the database, and a daily Vercel Cron does the
-  housekeeping.
-- `deploy/vercel/` (Root Directory `deploy/vercel`) is the same as one
-  folder.
+**Everything on Vercel, for testing:** `deploy/VERCEL_DEPLOYMENT.txt`. The
+website and the API run in one Vercel project, at one address; no other
+server is involved. MongoDB Atlas is the database, and a daily Vercel Cron
+does the housekeeping. Whichever Root Directory the project uses, it gets
+the whole system:
+- `frontend` (the live project, `ksf-x86j`): `frontend/vercel.json` builds
+  the repository, serves the website and runs the API as one function,
+  `frontend/api/index.mjs`, at `/api/…`.
+- empty (the repository root): the root `vercel.json` defines two Vercel
+  services, `backend` (`backend/src/vercel.ts`, at `/api/…`) and `frontend`
+  (the Vite website, at every other address).
+- `deploy/vercel`: the same as one folder.
 
-The project whose Root Directory is `frontend` keeps working as before: the
-website on Vercel, the API on Railway.
+All three use the same handler, `backend/src/vercel.ts`.
 
 `deploy/README.md` covers a production server with Docker (the app, Nginx
-with HTTPS, and MongoDB Atlas or a bundled replica set), Railway (API) with
-Vercel (website), and the settings that must change for production:
+with HTTPS, and MongoDB Atlas or a bundled replica set), Vercel, and the
+settings that must change for production:
 `NODE_ENV=production`, `COOKIE_SECURE=true`, your domain in `PUBLIC_APP_URL`
 and `PUBLIC_ALLOWED_ORIGINS`, SMTP for e-mail, and — to take card payments —
 `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` with the webhook registered in
@@ -831,9 +832,9 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.6.1 · Server 2.6.1 — up to date", or
-which one still has to redeploy from `main` (Railway › the service ›
-Deployments, or Vercel › Deployments).
+System) compares the two: "Website 2.6.2 · Server 2.6.2 — up to date", or
+what to do when they differ (on Vercel both deploy together from `main`:
+Vercel › Deployments).
 
 ---
 

@@ -197,37 +197,54 @@ Run it under a process manager (systemd, PM2, or Windows Task Scheduler at
 start-up) behind any reverse proxy that terminates TLS; set `TRUST_PROXY`
 to the proxy's address.
 
-## Railway (API) and Vercel (website)
+## Everything on Vercel (testing)
 
-The API runs on Railway and the website on Vercel. Vercel forwards every
-`/api/…` request to Railway (`frontend/vercel.json`), so the browser only ever talks
-to the Vercel address. The sign-in cookies stay first-party, `SameSite`
-keeps working, and Safari does not sign people out on every reload the way
-it would with cross-site cookies.
+The website and the API run in one Vercel project, at one address
+(`https://ksf-x86j.vercel.app`). The API is a Vercel Function of the same
+project, so the browser only ever talks to that address: the sign-in cookies
+stay first-party, `SameSite` keeps working, and Safari does not sign people
+out on every reload the way it would with cross-site cookies. No other
+server is involved.
 
-**1. MongoDB Atlas.** Railway has no fixed outgoing address. In Atlas ›
+Whichever *Root Directory* the project uses, it gets the whole system, and
+all three use the same handler (`backend/src/vercel.ts`):
+
+| Root Directory | Read from | How |
+|---|---|---|
+| `frontend` (the live project, `ksf-x86j`) | `frontend/vercel.json` | Builds the repository from its root, serves `frontend/dist`, runs the API as `frontend/api/index.mjs` |
+| empty (the repository root) | `vercel.json` | Two Vercel services: `backend` at `/api/…`, `frontend` everywhere else |
+| `deploy/vercel` | `deploy/vercel/vercel.json` | The same as one folder; the website is copied into `deploy/vercel/public` |
+
+Each runs the daily housekeeping with Vercel Cron, which calls
+`/api/v1/cron/maintenance` with `CRON_SECRET`.
+
+**1. MongoDB Atlas.** Vercel has no fixed outgoing address. In Atlas ›
 Security › Network Access › Add IP Address, choose *Allow access from
 anywhere* (`0.0.0.0/0`). Without it Atlas drops the connection during the
-TLS handshake, and the server stops at start-up with
-`SSL routines … tlsv1 alert internal error … SSL alert number 80`.
+TLS handshake, and every API call answers 503 with
+`SSL routines … tlsv1 alert internal error … SSL alert number 80` in the
+function log.
 
-**2. Railway › the service › Variables.**
+**2. Vercel › the project › Settings › Environment Variables** (Production
+and Preview):
 
 ```ini
 NODE_ENV=production
 COOKIE_SECURE=true
 PUBLIC_APP_URL=https://ksf-x86j.vercel.app
 PUBLIC_ALLOWED_ORIGINS=https://ksf-x86j.vercel.app,https://ksf-x86j-*-ssam1.vercel.app
-TRUST_PROXY=2
+TRUST_PROXY=1
 
 MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
 MONGODB_DB=ksf_pharmacy
 
 JWT_ACCESS_SECRET=<48 random bytes>
 JWT_REFRESH_SECRET=<a different 48 random bytes>
+CRON_SECRET=<32 random bytes>
+MIGRATION_BACKUP_DIR=/tmp/ksf-backups
 
 SUPER_ADMIN_EMAIL=you@yourcompany.pk
-SUPER_ADMIN_PASSWORD=<a strong password>
+SUPER_ADMIN_PASSWORD="<a strong password>"
 
 MAIL_TRANSPORT=smtp
 MAIL_HOST=smtp.example.com
@@ -236,40 +253,22 @@ MAIL_PASSWORD=...
 ```
 
 The `*` entry lets sign-in work on Vercel's per-deployment addresses
-(`ksf-x86j-<id>-ssam1.vercel.app`) too. Railway sets `PORT` itself; leave it out. `TRUST_PROXY=2` counts the two
-proxies in front of the API (Vercel, then Railway's edge), so rate limits
-and the security log see each visitor's own address rather than Vercel's.
-Sign-up codes and password resets are e-mailed, so they need the SMTP
-settings. To try sign-up before SMTP is ready, add `SHOW_SIGNUP_CODE=true`:
-the confirm screen then shows the code. Remove it before real customers sign
-up, because anyone could then register an address they do not own. Build command `npm run build`, start command `npm start` (the
-defaults Railway picks from `package.json`).
+(`ksf-x86j-<id>-ssam1.vercel.app`) too. Vercel sets `PORT` itself; leave it
+out. `TRUST_PROXY=1` counts Vercel's edge in front of the function, so rate
+limits and the security log see each visitor's own address. Put a value
+that contains `#` in quotes (the password above): unquoted, everything from
+the `#` on is read as a comment. Sign-up codes and password resets are
+e-mailed, so they need the SMTP settings. To try sign-up before SMTP is
+ready, use `MAIL_TRANSPORT=none` with `SHOW_SIGNUP_CODE=true`: the confirm
+screen then shows the code. Remove it before real customers sign up, because
+anyone could then register an address they do not own. Do **not** set
+`VITE_API_BASE_URL`; the default `/api/v1` is the same address.
 
-**3. Vercel.** Set the project's *Root Directory* to `frontend`; Vercel
-then reads `frontend/vercel.json`, which holds the Railway address. If the
-Railway address changes, change it there. Do **not** set
-`VITE_API_BASE_URL` in Vercel; the default `/api/v1` is what goes through
-the forwarding. Redeploy after changing either side.
+**3. Deploy.** Deployments › Redeploy after changing any setting.
 
 **4. Check.** `https://ksf-x86j.vercel.app/api/v1/health` answers
-`{"ok":true,…}` from Railway through Vercel. Then sign in as the Super Admin.
-
----
-
-## Everything on Vercel (testing)
-
-`vercel/` here runs the whole system on one Vercel project whose Root
-Directory is `deploy/vercel`:
-- the website, copied from `frontend/dist` into `deploy/vercel/public`;
-- the API as one Vercel Function (`deploy/vercel/api/index.mjs`, built
-  from `backend/src`) in Mumbai;
-- MongoDB Atlas for the database;
-- Vercel Cron calling `/api/v1/cron/maintenance` once a day with
-  `CRON_SECRET`.
-
-`deploy/vercel/vercel.json` installs and builds at the repository root.
-Everything for it is in that folder, so projects with Root Directory
-`frontend` or `backend` are not affected. Step by step, with every setting:
+`{"ok":true,…,"version":"2.6.2"}`. If a setting is missing it names it
+instead. Then sign in as the Super Admin. Step by step, with every setting:
 `VERCEL_DEPLOYMENT.txt`.
 
 ## Files here
@@ -282,4 +281,4 @@ Everything for it is in that folder, so projects with Root Directory
 | `nginx/ksf.conf` | The site: HTTP → HTTPS, TLS, security headers, proxy to `app` |
 | `HOSTINGER_DEPLOYMENT.txt` | Step by step on a Hostinger VPS, from buying it to backups and updates |
 | `VERCEL_DEPLOYMENT.txt` | Step by step with the whole system on Vercel and MongoDB Atlas, for testing |
-| `vercel/vercel.json`, `vercel/api/index.mjs` | That Vercel project: the build, the routes, the API function, the daily cron |
+| `vercel/vercel.json`, `vercel/api/index.mjs` | The one-folder Vercel set-up: the build, the routes, the API function, the daily cron |

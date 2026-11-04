@@ -11,8 +11,8 @@
        freshly generated sign-in keys, its own Super Admin, e-mail written to
        files, sign-up codes shown on screen, and online payments switched off
        (KSF_EDITION=university)
-     - none of the commercial deployment: no Vercel or Railway settings that
-       point at the live service, no client reports
+     - none of the commercial deployment: no Vercel settings for the live
+       service, no client reports
      - UNIVERSITY.md: what the project is, how it is built, how to run it,
        the demonstration accounts, and how it was tested
 
@@ -52,7 +52,9 @@ function fail(message) {
    node_modules, a build, a .env or a backup — except what belongs to the
    commercial service. */
 const LEAVE_OUT = [
-  'frontend/vercel.json',        // points the web app at the live Railway API
+  'vercel.json',                 // the live service's Vercel set-up (two services)
+  'frontend/vercel.json',        // the live service's Vercel set-up (website + API)
+  'frontend/api/',               // the API as a Vercel Function, for that set-up
   'deploy/',                     // production Docker and Nginx for the live domain
   'docs/client-report/',         // the client's own reports
   'docs/HANDOVER_REVIEW.md',     // internal hand-over notes

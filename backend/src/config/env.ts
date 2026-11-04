@@ -240,8 +240,8 @@ export function originMatcher(entries: string[]): (origin: string) => boolean {
 }
 
 /* The address people open KSF at is always allowed, so a deployment whose
-   web app lives on another host (Vercel in front of Railway, say) cannot
-   lock its own sign-in page out by leaving it off the list. */
+   web app lives on another host (a custom domain in front of the API, say)
+   cannot lock its own sign-in page out by leaving it off the list. */
 export const ALLOWED_ORIGINS = new Set(
   [...env.PUBLIC_ALLOWED_ORIGINS.split(','), originOf(env.PUBLIC_APP_URL)]
     /* Quotes and a trailing slash are how the list usually gets typed into a dashboard; neither is part of an origin. */

@@ -1,7 +1,7 @@
 {
   "name": "@ksf/backend",
   "private": true,
-  "version": "2.6.1",
+  "version": "2.6.2",
   "type": "module",
   "description": "KSF Pharmacy API \u2014 Express 5, TypeScript and MongoDB, with short-lived JWT access tokens and rotating refresh tokens.",
   "main": "src/vercel.ts",

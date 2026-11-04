@@ -83,7 +83,7 @@ export function databaseHint(error: Error): string[] {
     return [
       'MongoDB Atlas refused the connection from this server\'s address.',
       'In Atlas open Security > Network Access > Add IP Address and allow this server.',
-      'Railway, Render and similar hosts have no fixed address: add 0.0.0.0/0',
+      'Vercel and similar hosts have no fixed address: add 0.0.0.0/0',
       '("Allow access from anywhere"); the database user and password still guard the data.'
     ];
   }

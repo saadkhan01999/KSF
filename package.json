@@ -1,7 +1,7 @@
 {
   "name": "ksf-pharmacy",
   "private": true,
-  "version": "2.6.1",
+  "version": "2.6.2",
   "type": "module",
   "description": "KSF Pharmacy Management System — multi-pharmacy SaaS for Pakistan. React + TypeScript client, Express + TypeScript API, MongoDB.",
   "workspaces": [
