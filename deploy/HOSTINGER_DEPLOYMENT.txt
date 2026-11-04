@@ -1,6 +1,6 @@
 ==============================================================================
  KSF PHARMACY MANAGEMENT SYSTEM - DEPLOYING ON HOSTINGER, FROM A TO Z
- Version 2.6.1 - November 2026
+ Version 2.6.2 - November 2026
 ==============================================================================
 
  Who this is for: the person putting KSF on the internet for real pharmacies.
@@ -385,7 +385,7 @@ exec docker compose --env-file /srv/ksf/deploy/.env -f /srv/ksf/deploy/docker-co
 
         curl -k https://localhost/api/v1/health
 
-      Expected: {"ok":true,"service":"KSF","version":"2.6.1",...,
+      Expected: {"ok":true,"service":"KSF","version":"2.6.2",...,
                  "transactions":true}
 
 
@@ -465,7 +465,7 @@ cp /etc/letsencrypt/live/<YOUR-DOMAIN>/privkey.pem /srv/ksf/deploy/nginx/certs/k
         https://<YOUR-DOMAIN>/api/v1/payments/webhook/<provider>
       and their return pages, as listed in docs/PAYMENTS.md.
 
- 9.5  The platform console > Overview shows "Website 2.6.1 - Server 2.6.1 -
+ 9.5  The platform console > Overview shows "Website 2.6.2 - Server 2.6.2 -
       up to date".
 
 
@@ -599,12 +599,12 @@ find /srv/ksf-backups -name 'ksf-*' -mtime +30 -delete
 
 
 ------------------------------------------------------------------------------
- PART 13 - MOVING OVER FROM RAILWAY AND VERCEL (THE CURRENT SETUP)
+ PART 13 - MOVING OVER FROM VERCEL (THE CURRENT SETUP)
 ------------------------------------------------------------------------------
 
- Today KSF runs on Railway (the server) and Vercel (the website), with the
- database on MongoDB Atlas. To move it to Hostinger without losing a single
- sale:
+ Today KSF runs on Vercel (the website and the server, in one project), with
+ the database on MongoDB Atlas. To move it to Hostinger without losing a
+ single sale:
 
  13.1  Do Parts 1 to 9 first, on the new domain, while the old setup keeps
        running.
@@ -612,7 +612,7 @@ find /srv/ksf-backups -name 'ksf-*' -mtime +30 -delete
  13.2  Choose ONE of these:
 
        A) KEEP USING THE SAME ATLAS DATABASE (simplest, no data copy):
-          in deploy/.env set MONGODB_URI to the Atlas address Railway uses,
+          in deploy/.env set MONGODB_URI to the Atlas address Vercel uses,
           and remove "--profile local-db" from /usr/local/bin/ksf. In Atlas
           > Network Access, add <SERVER-IP>. Then:
 
@@ -623,11 +623,13 @@ find /srv/ksf-backups -name 'ksf-*' -mtime +30 -delete
        B) MOVE THE DATA ONTO THE SERVER (cheapest from then on). At a quiet
           time, about 15 minutes:
 
-          1. Railway > the service > Settings > stop it (or remove its
-             domain), so nobody writes to Atlas during the copy.
+          1. Vercel > the project > Settings > Environment Variables:
+             rename MONGODB_URI (to MONGODB_URI_OFF, say) and Redeploy, so
+             nobody writes to Atlas during the copy.
           2. Take a backup straight from Atlas (one line, the Atlas
              address in quotes). Atlas > Network Access must allow
-             <SERVER-IP>; Railway's "allow from anywhere" already does.
+             <SERVER-IP>; the "allow from anywhere" Vercel needs already
+             does.
 
                ksf run --rm -T -e MONGODB_URI="<ATLAS ADDRESS>" app node backend/dist/cli/backup.js
 
@@ -644,9 +646,9 @@ find /srv/ksf-backups -name 'ksf-*' -mtime +30 -delete
  13.3  Point the domain at the server (Part 2), and change the Stripe
        webhook URL (9.4) to the new domain.
 
- 13.4  Keep Railway and Vercel for one week, untouched, as a fallback.
-       Then delete the Railway service and the Vercel project, and with
-       choice B also the Atlas cluster.
+ 13.4  Keep the Vercel project for one week, untouched, as a fallback.
+       Then delete the Vercel project, and with choice B also the Atlas
+       cluster.
 
 
 ------------------------------------------------------------------------------
@@ -717,8 +719,8 @@ find /srv/ksf-backups -name 'ksf-*' -mtime +30 -delete
  [ ] Hostinger weekly backups on (daily add-on for a live business)
  [ ] Uptime monitor on /api/v1/health
  [ ] Stripe webhook on the new domain (if you take cards)
- [ ] After one calm week: Railway, Vercel (and Atlas, if you moved the data)
-     removed
+ [ ] After one calm week: the Vercel project (and Atlas, if you moved the
+     data) removed
 
 ==============================================================================
  Sources for the plan facts (October 2026; prices change, so check the live

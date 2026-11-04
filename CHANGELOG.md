@@ -3,6 +3,31 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.6.2] — 2026-11-04
+
+### Everything on Vercel; Railway removed
+- **The website's own Vercel project now runs the API too.** A project
+  whose Root Directory is `frontend` (the live `ksf-x86j`) builds the whole
+  repository, serves the website and runs the API as one Vercel Function,
+  `frontend/api/index.mjs`, at `/api/…`, with the security headers and the
+  daily Vercel Cron. Nothing in the project's settings has to change: add
+  the environment variables and redeploy. The website and the API share one
+  address, and every Root Directory (`frontend`, empty, `deploy/vercel`)
+  now gets the whole system from the same handler, `backend/src/vercel.ts`.
+- **Railway is no longer used.** `frontend/vercel.json` no longer forwards
+  `/api` to Railway, and the Railway set-up is gone from the guides
+  (`deploy/README.md`, `deploy/VERCEL_DEPLOYMENT.txt`,
+  `deploy/HOSTINGER_DEPLOYMENT.txt`, `README.md`) and from the screens and
+  messages that named it (the version check, Payment methods, the
+  database hint). `TRUST_PROXY` on Vercel is `1`.
+- The API function's rewrite no longer adds a `?path=` parameter to every
+  request (`frontend/vercel.json` and `deploy/vercel/vercel.json`).
+- The university copy also leaves out the root `vercel.json` and
+  `frontend/api/`.
+- The Vercel guide says to quote a value with `#` in it (the Super Admin
+  password) in an imported `.env` file: unquoted, everything from the `#`
+  on is read as a comment.
+
 ## [2.6.1] — 2026-11-03
 
 ### Vercel

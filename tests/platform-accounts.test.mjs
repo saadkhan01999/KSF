@@ -68,13 +68,13 @@ describe('platform accounts', { skip }, () => {
       kind: 'income', category: 'Setup and training fees', description: 'Staff training at a new pharmacy', amountPaisa: 20_000, party: 'Amna Pharmacy'
     }, 201);
     const server = await admin.post('/api/v1/platform/accounts/entries', {
-      kind: 'expense', category: 'Servers and hosting', description: 'Railway and Atlas', amountPaisa: 40_000, paymentMethod: 'card'
+      kind: 'expense', category: 'Servers and hosting', description: 'Vercel and Atlas', amountPaisa: 40_000, paymentMethod: 'card'
     }, 201);
     assert.equal(server.data.created_by_name, (await admin.get('/api/v1/auth/session')).user.fullName);
     state.server = server.data.id;
     const edited = await admin.patch(`/api/v1/platform/accounts/entries/${state.server}`, { amountPaisa: 50_000 });
     assert.equal(edited.data.amount_paisa, 50_000);
-    assert.equal(edited.data.description, 'Railway and Atlas');
+    assert.equal(edited.data.description, 'Vercel and Atlas');
     await admin.post('/api/v1/platform/accounts/entries', {
       kind: 'expense', category: 'Team salaries', description: 'October salary', amountPaisa: 100_000, party: 'Fiza Finance'
     }, 201);
@@ -99,8 +99,8 @@ describe('platform accounts', { skip }, () => {
     assert.deepEqual(all.totals, { inPaisa: 800_000, outPaisa: 240_000, netPaisa: 560_000 });
     const out = await admin.get('/api/v1/platform/accounts/transactions?direction=out');
     assert.deepEqual(out.data.map((row) => row.source).sort(), ['expense', 'expense', 'refund']);
-    const found = await admin.get('/api/v1/platform/accounts/transactions?q=Railway');
-    assert.equal(found.data[0].description, 'Railway and Atlas');
+    const found = await admin.get('/api/v1/platform/accounts/transactions?q=Vercel');
+    assert.equal(found.data[0].description, 'Vercel and Atlas');
     const subscription = all.data.find((row) => row.source === 'subscription');
     assert.match(subscription.reference, /^KSF-INV-/);
 

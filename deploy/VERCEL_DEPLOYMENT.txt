@@ -1,10 +1,11 @@
 ==============================================================================
  KSF PHARMACY MANAGEMENT SYSTEM - THE WHOLE SYSTEM ON VERCEL (FOR TESTING)
- Version 2.6.1 - November 2026
+ Version 2.6.2 - November 2026
 ==============================================================================
 
- What this is: the website AND the API on one Vercel project, with the
- database on MongoDB Atlas. No Railway, no server to look after. It is meant
+ What this is: the website AND the API on one Vercel project, at one
+ address, with the database on MongoDB Atlas. No other server to look
+ after. It is meant
  for testing; for real pharmacies use the Hostinger VPS guide
  (deploy/HOSTINGER_DEPLOYMENT.txt), which is cheaper at scale and has no
  serverless limits.
@@ -17,34 +18,39 @@
  PART 0 - THE WAYS KSF RUNS ON VERCEL
 ------------------------------------------------------------------------------
 
-  A. Website on Vercel, API on Railway  (what runs today)
-     Vercel project ksf-x86j, Root Directory = "frontend".
-     frontend/vercel.json sends every /api request to Railway. Nothing in
-     this guide changes it.
+  Whichever Root Directory a Vercel project uses, it gets the whole system:
+  the website, the API at /api/..., the security headers and the daily
+  Vercel Cron. All three run the same API code (backend/src/vercel.ts);
+  they differ only in which folder Vercel starts from.
 
-  C. Everything on Vercel, as two services  (the simplest - recommended)
-     A Vercel project with Root Directory left EMPTY (the repository root),
-     which is what Vercel picks by itself when you import the repository.
-     The root vercel.json defines two services in one project:
-       backend   backend/ - the whole API as one function
-                 (backend/src/vercel.ts), at /api/...
+  A. Root Directory = "frontend"  (ksf-x86j, the live site - recommended)
+     frontend/vercel.json builds the whole repository from its root, serves
+     the website, and runs the API as one Vercel Function
+     (frontend/api/index.mjs). Nothing in the project's settings has to
+     change: add the Environment Variables (Part 4) and redeploy.
+
+  B. Root Directory left EMPTY  (two services)
+     What Vercel picks by itself when you import the repository. The root
+     vercel.json defines two services in one project:
+       backend   backend/ - the API as one function (backend/src/vercel.ts),
+                 at /api/...
        frontend  frontend/ - the website (Vite), at every other address
-     plus the security headers and the daily Vercel Cron. Nothing else is
-     needed; the rest of this guide (database, settings, checks) applies.
 
-  B. Everything on Vercel, from one folder  (the alternative)
-     A Vercel project with Root Directory = "deploy/vercel".
-     deploy/vercel/vercel.json builds the whole repository (website and
-     API), runs the API as one Vercel Function (deploy/vercel/api/index.mjs)
-     in Mumbai (bom1), and runs the daily housekeeping with Vercel Cron.
-     Everything for it lives in that one folder, so no other Vercel project
-     is affected by it.
+  C. Root Directory = "deploy/vercel"  (one folder)
+     deploy/vercel/vercel.json builds the whole repository, copies the
+     website into deploy/vercel/public and runs the API as
+     deploy/vercel/api/index.mjs in Mumbai (bom1).
 
   (Your Vercel account also has a project called "ksf" whose Root Directory
-  is "backend". It only builds the API folder and is not used by the live
-  site; 3B below turns it into the full system.)
+  is "backend". It only builds the API, without the website, and the live
+  site does not use it. Delete it, or point it at A, B or C. The same goes
+  for the other test projects - one project is all KSF needs.)
 
-  What is different on B and C, and why it is fine for testing:
+  KSF no longer uses Railway: since 2.6.2 nothing sends requests there.
+  Once ksf-x86j answers /api/v1/health with version 2.6.2 (Part 5), the
+  Railway service can be deleted.
+
+  What is different on Vercel, and why it is fine for testing:
    - Housekeeping (a trial or plan ending, grace periods, reminders, the
      mail queue) runs once a day from Vercel Cron instead of every hour.
      A trial still ends to the minute: the server checks the date on every
@@ -65,8 +71,8 @@
 
  1.2  Create a cluster:
         - Free (M0) is enough for testing.
-        - Provider AWS, region Mumbai (ap-south-1) - the same city as the
-          Vercel function, so every request is quick.
+        - Provider AWS, region Mumbai (ap-south-1). Put the Vercel
+          function in the same city (3A step 2), so every request is quick.
         - Name: ksf
 
  1.3  Database Access > Add New Database User:
@@ -107,46 +113,51 @@
 
  Choose ONE of these:
 
- 3C. The two-service set-up  (recommended)
-      1. https://vercel.com/new > Import the GitHub repository
-         saadkhan01999/KSF (or open an existing project's Settings).
-      2. Root Directory: leave it EMPTY (the repository root). Do not pick
-         "backend" or "frontend" - with "backend" the website is missing, and
-         with "frontend" the API is.
-      3. Framework Preset: leave it as Vercel shows it, and clear any Build,
-         Output or Install overrides - the services in vercel.json decide.
-      4. Environment Variables: add everything in Part 4 (or import the
-         ksf-vercel.env file).
-      5. Deploy. Then Part 5.
+ 3A. ksf-x86j, the live site  (recommended - nothing to rebuild)
+      1. Vercel > ksf-x86j > Settings > Build and Deployment:
+           - Root Directory: frontend (as it is).
+           - "Include files outside the Root Directory in the Build Step":
+             ON (it is by default) - the build needs backend/ as well.
+           - Framework Preset: Vite. Switch OFF any override of the Build,
+             Output or Install Command - frontend/vercel.json sets them.
+      2. Settings > Functions > Function Region: the region of your Atlas
+         cluster (Atlas shows it beside the cluster's name; Mumbai,
+         ap-south-1, is bom1). Far apart, every page waits for the
+         database across the world.
+      3. Settings > Environment Variables: add everything in Part 4 (or
+         Import .env with the ksf-vercel.env file), for Production and
+         Preview.
+      4. Deployments > the latest > Redeploy. Then Part 5.
+      5. When /api/v1/health shows "version":"2.6.2", delete the Railway
+         service: nothing uses it any more.
 
-      If the page says "This page is unavailable" (500 FUNCTION_INVOCATION
-      _FAILED), open /api/v1/health: since 2.6.0 it names any setting that
-      is missing instead of failing. Add it, then Redeploy.
-
- 3A. A NEW project for testing (recommended - today's site keeps working)
+ 3B. A new project with the Root Directory EMPTY  (two services)
       1. https://vercel.com/new > Import the GitHub repository
          saadkhan01999/KSF.
-      2. Project name: for example ksf-test.
-      3. Root Directory: click Edit and choose  deploy/vercel
-         Leave "Include files outside the Root Directory in the Build Step"
-         switched ON (it is by default) - the build needs the whole
-         repository.
-      4. Framework Preset: Other. Leave Build, Output and Install empty -
-         deploy/vercel/vercel.json sets them (it installs and builds at the
-         repository root, then copies the website into deploy/vercel/public).
-      5. Open "Environment Variables" and add everything in Part 4.
-      6. Deploy.
+      2. Root Directory: leave it EMPTY (the repository root). Do not pick
+         "backend" - with "backend" the website is missing.
+      3. Framework Preset: leave it as Vercel shows it, and clear any Build,
+         Output or Install overrides - the services in vercel.json decide.
+      4. Environment Variables: add everything in Part 4, with this
+         project's own address in PUBLIC_APP_URL.
+      5. Deploy. Then Part 5.
 
- 3B. Turn the EXISTING project into the full system
-      The natural one is the project called "ksf" (Root Directory "backend"
-      today, not used by the live site). Doing this to ksf-x86j instead
-      would stop that site using Railway.
-      1. Vercel > the project > Settings > Build and Deployment.
-      2. Root Directory: deploy/vercel. Keep "Include files outside the Root
-         Directory" ON. Save.
-      3. Framework Preset: Other. Clear any Build/Output/Install overrides.
-      4. Settings > Environment Variables: add everything in Part 4.
-      5. Deployments > the latest > Redeploy.
+ 3C. A project with Root Directory "deploy/vercel"  (one folder)
+      1. https://vercel.com/new > Import the GitHub repository
+         saadkhan01999/KSF (or open an existing project's Settings > Build
+         and Deployment).
+      2. Root Directory: click Edit and choose  deploy/vercel
+         Leave "Include files outside the Root Directory in the Build Step"
+         switched ON - the build needs the whole repository.
+      3. Framework Preset: Other. Leave Build, Output and Install empty -
+         deploy/vercel/vercel.json sets them.
+      4. Environment Variables: add everything in Part 4, with this
+         project's own address in PUBLIC_APP_URL.
+      5. Deploy. Then Part 5.
+
+ If the page says "This page is unavailable" (500 FUNCTION_INVOCATION
+ _FAILED), open /api/v1/health: it names any setting that is missing
+ instead of failing. Add it, then Redeploy.
 
 
 ------------------------------------------------------------------------------
@@ -154,8 +165,12 @@
 ------------------------------------------------------------------------------
 
  Add each one for "Production" (and "Preview" too if you test preview links).
- Replace <PROJECT> with your project's address name, e.g. ksf-test, and
+ Replace <PROJECT> with your project's address name, e.g. ksf-x86j, and
  <TEAM> with your Vercel team's name in preview links (e.g. ssam1).
+
+ In a .env file you import, put a value that contains # in quotes, e.g.
+ SUPER_ADMIN_PASSWORD="Ksf#Example2026!" - without them everything from the
+ # on is read as a comment. Typed into Vercel's Value box, no quotes.
 
    Required
    --------
@@ -209,7 +224,7 @@
 ------------------------------------------------------------------------------
 
  5.1  Open https://<PROJECT>.vercel.app/api/v1/health
-      It answers {"ok":true, ..., "transactions":true}.
+      It answers {"ok":true, ..., "version":"2.6.2", "transactions":true}.
       If it answers 503, see Part 7.
 
  5.2  Open https://<PROJECT>.vercel.app/pricing
@@ -285,6 +300,12 @@
  The pages load but say they cannot reach the KSF server
    The Vercel Firewall (Attack Challenge Mode) is blocking /api. Vercel >
    Firewall: switch it off, or allow /api.
+
+ /api/v1/health answers 404 (Root Directory "frontend")
+   The deployment is older than 2.6.2, or the API function was not built.
+   Redeploy from main. If the build log does not list api/index.mjs, check
+   that "Include files outside the Root Directory in the Build Step" is ON
+   and that no Build or Install Command override is switched on (3A).
 
  The cron job answers 401
    CRON_SECRET in Vercel does not match, or it was added after the last

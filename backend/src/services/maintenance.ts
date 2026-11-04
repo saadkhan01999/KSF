@@ -3,7 +3,7 @@
    --------------------------------------------------------------------------
    Subscription dates (a trial or a plan ending, grace periods, reminders),
    the mail retry queue, and old sessions and codes. A long-running server
-   (Docker, a VPS, Railway) runs it at start-up and then hourly; a serverless
+   (Docker, a VPS such as Hostinger) runs it at start-up and then hourly; a serverless
    host (Vercel) has no "hourly", so its scheduler calls
    /api/v1/cron/maintenance instead. Safe to run as often as you like, and a
    failure in one part never stops the others.

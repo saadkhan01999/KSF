@@ -223,12 +223,12 @@ describe('deployment settings', () => {
   });
 
   it('takes the browser\'s same-origin mark from any address, and refuses other sites', () => {
-    const railway = 'ksf-production-9911.up.railway.app';
-    assert.equal(originAllowed('https://ksf-x86j-anything-ssam1.vercel.app', railway, 'same-origin'), true);
-    assert.equal(originAllowed('https://pharmacy.example.pk', railway, 'same-origin'), true);
-    assert.equal(originAllowed('https://evil.example', railway, 'cross-site'), false);
-    assert.equal(originAllowed('https://evil.example', railway, 'same-site'), false);
-    assert.equal(originAllowed('https://evil.example', railway, undefined), false);
+    const api = 'ksf-x86j.vercel.app';
+    assert.equal(originAllowed('https://ksf-x86j-anything-ssam1.vercel.app', api, 'same-origin'), true);
+    assert.equal(originAllowed('https://pharmacy.example.pk', api, 'same-origin'), true);
+    assert.equal(originAllowed('https://evil.example', api, 'cross-site'), false);
+    assert.equal(originAllowed('https://evil.example', api, 'same-site'), false);
+    assert.equal(originAllowed('https://evil.example', api, undefined), false);
   });
 
   it('explains an Atlas IP Access List refusal', () => {

@@ -1,7 +1,8 @@
-/* Is the new release live everywhere? The website and the API are deployed
-   separately (Vercel and Railway), so one can be a release ahead of the other.
+/* Is the new release live everywhere? On Vercel the website and the API are
+   built and deployed together, but a browser can still hold an older copy of
+   the website, and a server (Hostinger, Docker) can lag behind a release.
    This asks the server which version it runs and says plainly whether the
-   two agree — and, when they do not, which one to redeploy. */
+   two agree — and, when they do not, what to do. */
 
 import { useEffect, useState } from 'react';
 import { CheckCircle2, CircleAlert, Loader2 } from 'lucide-react';
@@ -47,8 +48,8 @@ export function VersionCheck() {
         {same
           ? ' — up to date'
           : order < 0
-            ? ' — the server has not updated yet: redeploy the API on Railway from main'
-            : ' — the website has not updated yet: redeploy it on Vercel from main'}
+            ? ' — the server has not updated yet: redeploy it from main'
+            : ' — this page is older than the server: reload it'}
       </span>
     </div>
   );

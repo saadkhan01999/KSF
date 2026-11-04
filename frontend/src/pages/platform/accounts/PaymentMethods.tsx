@@ -49,7 +49,7 @@ export function PaymentMethods() {
         : on.length === 0
           ? (
             <StatusNote tone="warn" title="Pharmacies cannot pay online yet">
-              No way to pay is set up. Add the settings named under a provider below to the API server (Railway › Variables), then redeploy it.
+              No way to pay is set up. Add the settings named under a provider below to the server (on Vercel: the project › Settings › Environment Variables), then redeploy it.
               Until then, record payments by hand from a pharmacy&apos;s page.
             </StatusNote>
           )
