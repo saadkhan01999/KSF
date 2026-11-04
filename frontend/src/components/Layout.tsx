@@ -27,6 +27,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useHomeRoute } from '../hooks/useHomeRoute';
 import { PersonAvatar } from './people';
 import { SubscriptionBanner } from './SubscriptionBanner';
+import { UpdateBanner } from './UpdateBanner';
 import { PlanGate } from './PlanGate';
 import { useBusiness } from '../services/business';
 
@@ -396,6 +397,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Button size="sm" variant="outline" icon={<ArrowLeftCircle size={15} />} onClick={() => { void backToPlatform(); }}>Back to the platform</Button>
           </div>
         )}
+        <UpdateBanner />
         {!isPlatform && <SubscriptionBanner />}
         <header className="topbar">
           <button

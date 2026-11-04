@@ -30,7 +30,7 @@ role holds the access named (`any` is every team member).
 | GET | `/api/v1/public/brand` | anyone |  |  |  |
 | GET | `/api/v1/public/events` | anyone |  |  | live |
 | POST | `/api/v1/public/password-strength` | anyone |  |  |  |
-| GET | `/api/v1/public/plans` | anyone |  |  | live, plans |
+| GET | `/api/v1/public/plans` | anyone |  |  | live, plans, security |
 | GET | `/api/v1/public/referral/:code` | anyone |  |  |  |
 | POST | `/api/v1/register/cancel` | anyone |  |  |  |
 | POST | `/api/v1/register/resend` | anyone |  |  |  |

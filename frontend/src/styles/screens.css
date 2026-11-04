@@ -743,7 +743,9 @@
   font-weight: 600;
   text-align: left;
 }
-.pay-discount-open span { margin-left: auto; font-size: var(--fs-xs); font-weight: 500; color: var(--text-dim); }
+/* "Give a discount" stays on one line; the example after it gives way first. */
+.pay-discount-open { white-space: nowrap; }
+.pay-discount-open span { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xs); font-weight: 500; color: var(--text-dim); }
 .pay-discount-open:hover { background: var(--accent-soft-strong); }
 
 .pay-discount {
@@ -806,6 +808,32 @@
 .pay-gst-text { display: grid; gap: 2px; min-width: 0; }
 .pay-gst-amt { margin-top: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pay-gst.is-on .pay-gst-amt { color: var(--brand-700); }
+
+/* How the customer pays: every method a button, Loan (udhaar) right after Cash. */
+.pay-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); }
+.pay-method {
+  min-height: var(--tap);
+  padding: var(--s-2) var(--s-3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  text-align: left;
+  line-height: 1.2;
+}
+.pay-method > span:first-child { display: inline-flex; flex: none; color: var(--text-dim); }
+.pay-method:hover { border-color: var(--ink-400); color: var(--text); background: var(--surface-2); }
+.pay-method:focus-visible { outline: none; box-shadow: var(--ring); }
+.pay-method.is-on { border-color: var(--brand-600); background: var(--accent-soft); color: var(--brand-700); box-shadow: 0 0 0 1px var(--brand-600) inset; }
+.pay-method.is-on > span:first-child { color: var(--brand-700); }
+.pay-method.is-loan > span:first-child { color: var(--warn-text); }
+.pay-method.is-loan.is-on { border-color: var(--warn-500); background: var(--warn-100); color: var(--warn-text); box-shadow: 0 0 0 1px var(--warn-500) inset; }
+@media (max-width: 420px) { .pay-methods { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* A loan (udhaar): whose account, what is paid now, and what is left owing. */
 .pay-loan {

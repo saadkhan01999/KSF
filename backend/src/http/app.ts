@@ -205,11 +205,18 @@ export function createApp(): express.Express {
     next();
   });
 
-  /* Cross-origin calls are allowed only from the configured web origins. */
+  /* Cross-origin calls are allowed only from the configured web origins.
+     Every API answer names the server's version (public already, on
+     /api/v1/health), so a browser tab left open across a release can tell
+     it is running the old screens and offer to reload. */
   app.use((req, res, next) => {
+    if (req.path.startsWith('/api/')) res.set('X-KSF-Version', VERSION);
     const origin = req.headers.origin;
     if (origin && isAllowedOrigin(origin)) {
-      res.set({ 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin' });
+      res.set({
+        'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Expose-Headers': 'X-KSF-Version', Vary: 'Origin'
+      });
     }
     if (req.method === 'OPTIONS') {
       res.set({

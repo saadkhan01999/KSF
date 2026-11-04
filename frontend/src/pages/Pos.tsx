@@ -17,11 +17,11 @@
        whatever they pay now, and the rest goes on their account.
      - After payment the receipt is on screen and one tap from the printer. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, User, Pill, Camera,
   Printer, CheckCircle2, Percent, ChevronRight, Stethoscope, PackageX, Lock, CircleAlert,
-  Receipt as ReceiptIcon, HandCoins, UserPlus
+  Receipt as ReceiptIcon, HandCoins, UserPlus, Banknote, CreditCard, Smartphone, Landmark
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useApiData, useDebounced, useAction } from '../hooks/useApi';
@@ -41,6 +41,18 @@ import { ScannerPanel, type LastScan } from './pos/ScannerPanel';
 import { UnknownBarcode, type UnknownCode } from './pos/UnknownBarcode';
 import { ScanToast, type ScanNote } from './pos/ScanToast';
 import { Receipt, ReceiptPrint, printReceipt } from '../components/receipt';
+
+/* The till's payment methods as buttons, in the order TILL_METHODS gives them:
+   Loan (udhaar) right after Cash, where the counter expects it, and every
+   choice in sight without opening a list. */
+const METHOD_BUTTONS: Record<string, { label: string; icon: ReactNode }> = {
+  cash: { label: 'Cash', icon: <Banknote size={18} /> },
+  credit: { label: 'Loan (udhaar)', icon: <HandCoins size={18} /> },
+  card: { label: 'Card', icon: <CreditCard size={18} /> },
+  easypaisa: { label: 'Easypaisa', icon: <Smartphone size={18} /> },
+  jazzcash: { label: 'JazzCash', icon: <Smartphone size={18} /> },
+  'bank-transfer': { label: 'Bank transfer', icon: <Landmark size={18} /> }
+};
 
 /** An amount due, with its paisa when it has any: GST makes Rs 637.20 common, and "Rs 637" would not match the receipt. */
 const due = (paisa: number): string => rupees(paisa, { decimals: paisa % 100 !== 0 });
@@ -846,13 +858,28 @@ export default function Pos() {
             )}
         </Allow>
 
-        <SelectInput
-          label="Payment method"
-          value={method}
-          onChange={(e) => chooseMethod(e.target.value)}
-          options={TILL_METHODS.map((value) => ({ value, label: PAYMENT_LABELS[value] ?? value }))}
-          hint={isLoan ? 'The customer takes the medicine now and pays later. It goes on their account.' : undefined}
-        />
+        <div className="field">
+          <span className="label" id="pay-method-label">Payment method</span>
+          <div className="pay-methods" role="radiogroup" aria-labelledby="pay-method-label">
+            {TILL_METHODS.map((value) => {
+              const choice = METHOD_BUTTONS[value] ?? { label: PAYMENT_LABELS[value] ?? value, icon: <Banknote size={18} /> };
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={method === value}
+                  className={`pay-method ${method === value ? 'is-on' : ''} ${value === 'credit' ? 'is-loan' : ''}`}
+                  onClick={() => chooseMethod(value)}
+                >
+                  <span aria-hidden="true">{choice.icon}</span>
+                  <span>{choice.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {isLoan && <span className="hint">The customer takes the medicine now and pays later. It goes on their account.</span>}
+        </div>
 
         {!isLoan && (
           <>

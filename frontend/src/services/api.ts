@@ -19,6 +19,9 @@
    Errors come back as ApiError carrying the server's own wording, which is
    written for pharmacy staff, and the field it refers to. */
 
+import { BRAND } from '../brand';
+import { compareVersions } from '../utils/version';
+
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 const SUPPORT_STORE = 'ksf-support-pharmacy';
 
@@ -84,6 +87,24 @@ export function setPlanRequiredHandler(handler: () => void): void {
   onPlanRequired = handler;
 }
 
+/* A newer release is live: this tab still runs the screens it loaded, and
+   says so once per version (components/UpdateBanner.tsx). */
+let onNewerServer: ((version: string) => void) | null = null;
+let newerAnnounced = '';
+
+/** Called with the server's version when it is newer than this page. */
+export function setNewerServerHandler(handler: ((version: string) => void) | null): void {
+  onNewerServer = handler;
+  if (handler && newerAnnounced) handler(newerAnnounced);
+}
+
+function noteServerVersion(version: string | null): void {
+  if (!version || !/^\d{1,4}(\.\d{1,4}){0,3}$/.test(version) || version === newerAnnounced) return;
+  if (compareVersions(version, BRAND.version) <= 0) return;
+  newerAnnounced = version;
+  onNewerServer?.(version);
+}
+
 /** Called when the server wants the password confirmed; resolves true when it was. */
 export function setStepUpHandler(handler: () => Promise<boolean>): void {
   onStepUp = handler;
@@ -140,7 +161,9 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   const pharmacyScoped = !path.startsWith('/platform/') && (!path.startsWith('/auth/') || path === '/auth/session');
   if (supportPharmacyId && pharmacyScoped) headers['X-Pharmacy-Id'] = supportPharmacyId;
   try {
-    return await fetch(`${API_BASE_URL}${path}`, { ...init, credentials: 'include', headers });
+    const response = await fetch(`${API_BASE_URL}${path}`, { ...init, credentials: 'include', headers });
+    noteServerVersion(response.headers.get('X-KSF-Version'));
+    return response;
   } catch {
     throw new ApiError(0, 'Cannot reach the KSF server. Check your internet connection and try again.');
   }
