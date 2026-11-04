@@ -206,6 +206,21 @@ describe('deployment settings', () => {
     assert.equal(trustProxySetting('loopback, 10.0.0.1'), 'loopback, 10.0.0.1');
   });
 
+  it('gives every Vercel set-up a JavaScript entry, never a TypeScript source', () => {
+    /* Vercel compiles a .ts entry file by file, and the backend imports its
+       files by their compiled names (./config/env.js): run from src/ it died
+       with "Cannot find module" on every request. */
+    const json = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
+    const text = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+    assert.equal(json('../backend/package.json').main, 'index.js');
+    assert.equal(json('../vercel.json').services.backend.entrypoint, 'index.js');
+    const entry = text('../backend/index.js');
+    assert.match(entry, /import\('\.\/dist\/vercel\.js'\)/, 'backend/index.js loads the built handler');
+    assert.match(entry, /(?:from|require|import)\s*(?:\(\s*)?["']express["']/, 'Vercel\'s Express detection needs an express import');
+    assert.match(text('../frontend/api/index.mjs'), /from '\.\.\/\.\.\/backend\/index\.js'/);
+    assert.match(text('../deploy/vercel/api/index.mjs'), /from '\.\.\/\.\.\/\.\.\/backend\/index\.js'/);
+  });
+
   it('allows the address people open KSF at', () => {
     assert.ok(ALLOWED_ORIGINS.has(new URL(process.env.PUBLIC_APP_URL ?? 'http://localhost:5180').origin));
   });

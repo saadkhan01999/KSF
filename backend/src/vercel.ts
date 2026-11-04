@@ -27,11 +27,16 @@ import { startLiveFeed } from './services/live.js';
 let app: ReturnType<typeof createApp> | null = null;
 let starting: Promise<void> | null = null;
 
+/** Which step failed: reaching the database, or the start-up checks after it. */
+class StartError extends Error {
+  constructor(readonly step: 'database' | 'checks', readonly reason: Error) { super(reason.message); }
+}
+
 /** Connect and check the database, once per instance; tried again after a failure. */
 function ready(): Promise<void> {
   starting ??= (async () => {
-    await connect();
-    await bootstrap({ silent: true });
+    try { await connect(); } catch (error) { throw new StartError('database', error as Error); }
+    try { await bootstrap({ silent: true }); } catch (error) { throw new StartError('checks', error as Error); }
     startLiveFeed();
   })().catch((error: Error) => {
     starting = null;
@@ -39,6 +44,9 @@ function ready(): Promise<void> {
   });
   return starting;
 }
+
+/* An error message can quote the connection string; never its user and password. */
+const withoutSecrets = (text: string): string => text.replace(/(mongodb(?:\+srv)?:\/\/)[^@\s/]+@/gi, '$1***@').slice(0, 400);
 
 const escape = (text: string): string => text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 
@@ -66,13 +74,22 @@ export default async function handle(req: IncomingMessage, res: ServerResponse):
   try {
     await ready();
   } catch (error) {
-    /* The usual first-deployment problem: the database cannot be reached.
-       Say so in the function log, with what to do, and answer plainly. */
-    console.error('[KSF] The database could not be reached:', (error as Error).message);
-    for (const line of databaseHint(error as Error)) console.error(`      ${line}`);
-    unavailable(req, res, 'The KSF server cannot reach its database right now.', [
-      'Check MONGODB_URI, and that MongoDB Atlas > Network Access allows 0.0.0.0/0. The Vercel function logs say exactly why.'
-    ]);
+    const failure = error instanceof StartError ? error : new StartError('checks', error as Error);
+    if (failure.step === 'database') {
+      /* The usual first-deployment problem: the database cannot be reached.
+         Say so in the function log, with what to do, and answer plainly. */
+      console.error('[KSF] The database could not be reached:', failure.reason.message);
+      for (const line of databaseHint(failure.reason)) console.error(`      ${line}`);
+      unavailable(req, res, 'The KSF server cannot reach its database right now.', [
+        withoutSecrets(failure.reason.message),
+        'Check MONGODB_URI, and that MongoDB Atlas > Network Access allows 0.0.0.0/0. The Vercel function logs say exactly why.'
+      ]);
+      return;
+    }
+    /* Reached the database, but a start-up check (indexes, plans, the Super
+       Admin) failed: say which, rather than blaming the database. */
+    console.error('[KSF] The start-up checks failed:', failure.reason);
+    unavailable(req, res, 'The KSF server reached its database but could not finish starting.', [withoutSecrets(failure.reason.message)]);
     return;
   }
   app ??= createApp();

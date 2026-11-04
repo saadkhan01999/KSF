@@ -4,7 +4,7 @@
     "backend": {
       "root": "backend",
       "runtime": "node",
-      "entrypoint": "src/vercel.ts"
+      "entrypoint": "index.js"
     },
     "frontend": {
       "root": "frontend",

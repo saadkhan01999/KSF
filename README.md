@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.6.3** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.6.4** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -813,11 +813,14 @@ the whole system:
   the repository, serves the website and runs the API as one function,
   `frontend/api/index.mjs`, at `/api/…`.
 - empty (the repository root): the root `vercel.json` defines two Vercel
-  services, `backend` (`backend/src/vercel.ts`, at `/api/…`) and `frontend`
+  services, `backend` (`backend/index.js`, at `/api/…`) and `frontend`
   (the Vite website, at every other address).
 - `deploy/vercel`: the same as one folder.
 
-All three use the same handler, `backend/src/vercel.ts`.
+All three run the same entry, `backend/index.js`: plain JavaScript that loads
+the built handler (`backend/dist/vercel.js`, from `backend/src/vercel.ts`) and,
+if that fails, answers with the reason instead of crashing. A project whose
+Root Directory is `backend` runs it too, for the API alone.
 
 `deploy/README.md` covers a production server with Docker (the app, Nginx
 with HTTPS, and MongoDB Atlas or a bundled replica set), Vercel, and the
@@ -832,7 +835,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.6.3 · Server 2.6.3 — up to date", or
+System) compares the two: "Website 2.6.4 · Server 2.6.4 — up to date", or
 what to do when they differ (on Vercel both deploy together from `main`:
 Vercel › Deployments).
 
