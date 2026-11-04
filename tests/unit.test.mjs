@@ -23,6 +23,8 @@ const calc = await import('../frontend/src/utils/calculator.ts');
 const { compareVersions } = await import('../frontend/src/utils/version.ts');
 const { ScanDetector, looksLikeBarcode, readable, GS, ReadConfirmer, gtinValid } = await import('../frontend/src/utils/scanner.ts');
 const { easeInOutCubic, glideDuration } = await import('../frontend/src/utils/glide.ts');
+const serverTotals = (await import('../backend/src/domain/sale-totals.ts')).saleTotals;
+const tillTotals = (await import('../frontend/src/utils/sale-totals.ts')).saleTotals;
 
 describe('reading imported files', () => {
   it('detects semicolons and keeps quoted commas and newlines', () => {
@@ -560,5 +562,84 @@ describe('telling a barcode scanner from a person', () => {
   it('knows a barcode from a search word', () => {
     for (const code of ['8964000111222', '12345670', '(01)08964000111222(17)271231', ']d20108964000111222', 'KSF-A1B2C3', 'https://id.gs1.org/01/08964000111222/10/AB12']) assert.ok(looksLikeBarcode(code), code);
     for (const word of ['panadol', 'Brufen 400', '123']) assert.equal(looksLikeBarcode(word), false, word);
+  });
+});
+
+describe('what a sale comes to (GST and discount)', () => {
+  const cart = (...lines) => lines.map(([lineTotalPaisa, gstPercent]) => ({ lineTotalPaisa, gstPercent }));
+
+  it('adds no GST unless the cashier asks for it', () => {
+    const totals = serverTotals({ lines: cart([100_000, 18], [50_000, 0]), defaultGstPercent: 18 });
+    assert.equal(totals.gstPaisa, 0);
+    assert.equal(totals.totalPaisa, 150_000);
+    assert.equal(totals.gstRateMissing, false);
+    assert.deepEqual(totals.lineGstPaisa, [0, 0]);
+  });
+
+  it("uses the pharmacy's default rate for a medicine with none, and keeps a medicine's own rate", () => {
+    const totals = serverTotals({ lines: cart([100_000, 0], [100_000, 5]), applyGst: true, defaultGstPercent: 18 });
+    assert.deepEqual(totals.lineGstPaisa, [18_000, 5_000]);
+    assert.equal(totals.gstPaisa, 23_000);
+    assert.equal(totals.totalPaisa, 223_000);
+    assert.equal(totals.gstRatePercent, null, 'two rates: the receipt says just "GST"');
+    const one = serverTotals({ lines: cart([100_000, 0], [40_000, null]), applyGst: true, defaultGstPercent: 18 });
+    assert.equal(one.gstRatePercent, 18);
+  });
+
+  it('charges GST on what the customer pays after the discount', () => {
+    /* Rs 1,000 + Rs 500, Rs 150 off, GST 18%: the tax is on Rs 1,350, not Rs 1,500. */
+    const totals = serverTotals({ lines: cart([100_000, 0], [50_000, 0]), discountPaisa: 15_000, applyGst: true, defaultGstPercent: 18 });
+    assert.equal(totals.discountPaisa, 15_000);
+    assert.equal(totals.gstPaisa, 24_300);
+    assert.equal(totals.totalPaisa, 150_000 - 15_000 + 24_300);
+  });
+
+  it('shares the discount in whole paisa that add up exactly', () => {
+    /* Three equal lines and 100 paisa off: 34 + 33 + 33, never 33 × 3. */
+    const totals = serverTotals({ lines: cart([1_000, 10], [1_000, 10], [1_000, 10]), discountPaisa: 100, applyGst: true });
+    assert.deepEqual(totals.lineGstPaisa, [97, 97, 97]);
+    assert.equal(totals.totalPaisa, 3_000 - 100 + 291);
+  });
+
+  it('says so when GST is asked for and there is no rate to charge', () => {
+    const totals = serverTotals({ lines: cart([10_000, 0]), applyGst: true, defaultGstPercent: 0 });
+    assert.equal(totals.gstRateMissing, true);
+    assert.equal(totals.gstPaisa, 0);
+    assert.equal(serverTotals({ lines: [], applyGst: true }).gstRateMissing, false, 'an empty cart is not an error');
+  });
+
+  it('never lets the discount exceed the sale, nor a rate go below 0 or above 100%', () => {
+    const totals = serverTotals({ lines: cart([10_000, 250], [5_000, -5]), discountPaisa: 99_999, applyGst: true, defaultGstPercent: 18 });
+    assert.equal(totals.discountPaisa, 15_000);
+    assert.equal(totals.totalPaisa, 0);
+    const capped = serverTotals({ lines: cart([10_000, 250]), applyGst: true });
+    assert.equal(capped.gstPaisa, 10_000, 'a rate above 100% is read as 100%');
+  });
+
+  it('the till and the server come to the same figure on every cart, to the paisa', () => {
+    /* A small seeded generator, so a failure can be reproduced. */
+    let seed = 20_261_104;
+    const next = (n) => { seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648; return seed % n; };
+    const rates = [0, 0, 5, 12, 17, 18, 18.5, 25];
+    for (let round = 0; round < 2_000; round += 1) {
+      const lines = Array.from({ length: 1 + next(7) }, () => ({ lineTotalPaisa: next(500_000), gstPercent: rates[next(rates.length)] }));
+      const subtotal = lines.reduce((sum, line) => sum + line.lineTotalPaisa, 0);
+      const input = {
+        lines,
+        discountPaisa: next(3) === 0 ? 0 : next(subtotal + 1),
+        applyGst: next(2) === 0,
+        defaultGstPercent: rates[next(rates.length)]
+      };
+      const server = serverTotals(input);
+      assert.deepEqual(tillTotals(input), server, `round ${round}`);
+      assert.equal(server.totalPaisa, server.subtotalPaisa - server.discountPaisa + server.gstPaisa);
+      assert.equal(server.gstPaisa, server.lineGstPaisa.reduce((sum, value) => sum + value, 0));
+    }
+  });
+
+  it('keeps the two copies of the calculation word for word', () => {
+    const body = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/^\/\*[\s\S]*?\*\/\s*/, '');
+    assert.equal(body('../frontend/src/utils/sale-totals.ts'), body('../backend/src/domain/sale-totals.ts'),
+      'frontend/src/utils/sale-totals.ts must stay an exact copy of backend/src/domain/sale-totals.ts below the header');
   });
 });

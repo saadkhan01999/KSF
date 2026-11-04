@@ -101,17 +101,17 @@ role holds the access named (`any` is every team member).
 | PATCH | `/api/v1/categories/:id` | pharmacy: categories.manage |  |  |  |
 | GET | `/api/v1/customer-payments` | pharmacy: customers.read |  |  |  |
 | POST | `/api/v1/customer-payments/:id/reverse` | pharmacy: sales.refund |  |  | api |
-| GET | `/api/v1/customers` | pharmacy: customers.read |  |  | api |
-| POST | `/api/v1/customers` | pharmacy: customers.write |  |  | api |
-| DELETE | `/api/v1/customers/:id` | pharmacy: customers.write |  |  | api |
-| GET | `/api/v1/customers/:id` | pharmacy: customers.read |  |  | api |
-| PATCH | `/api/v1/customers/:id` | pharmacy: customers.write |  |  | api |
+| GET | `/api/v1/customers` | pharmacy: customers.read |  |  | api, selling-gst-loan |
+| POST | `/api/v1/customers` | pharmacy: customers.write |  |  | api, selling-gst-loan |
+| DELETE | `/api/v1/customers/:id` | pharmacy: customers.write |  |  | api, selling-gst-loan |
+| GET | `/api/v1/customers/:id` | pharmacy: customers.read |  |  | api, selling-gst-loan |
+| PATCH | `/api/v1/customers/:id` | pharmacy: customers.write |  |  | api, selling-gst-loan |
 | POST | `/api/v1/customers/:id/payments` | pharmacy: pos.operate |  |  | api |
 | GET | `/api/v1/dashboard` | pharmacy: dashboard.view |  |  | api |
 | GET | `/api/v1/day-close` | pharmacy: day-close.manage |  |  | api |
 | POST | `/api/v1/day-close` | pharmacy: day-close.manage |  |  | api |
-| GET | `/api/v1/day-close/:id` | pharmacy: day-close.manage |  |  | api |
-| GET | `/api/v1/day-close/preview` | pharmacy: day-close.manage |  |  | api |
+| GET | `/api/v1/day-close/:id` | pharmacy: day-close.manage |  |  | api, selling-gst-loan |
+| GET | `/api/v1/day-close/preview` | pharmacy: day-close.manage |  |  | api, selling-gst-loan |
 | GET | `/api/v1/expenses` | pharmacy: expenses.read |  |  | accounting |
 | POST | `/api/v1/expenses` | pharmacy: expenses.write |  |  | accounting |
 | DELETE | `/api/v1/expenses/:id` | pharmacy: expenses.write |  |  |  |
@@ -122,14 +122,14 @@ role holds the access named (`any` is every team member).
 | POST | `/api/v1/expiry/:id/release` | pharmacy: expiry.manage |  |  |  |
 | POST | `/api/v1/expiry/:id/write-off` | pharmacy: expiry.manage |  |  |  |
 | POST | `/api/v1/expiry/quarantine-expired` | pharmacy: expiry.manage |  |  |  |
-| GET | `/api/v1/inventory` | pharmacy: inventory.read |  |  | api |
+| GET | `/api/v1/inventory` | pharmacy: inventory.read |  |  | api, selling-gst-loan |
 | POST | `/api/v1/inventory/adjust` | pharmacy: inventory.adjust |  |  |  |
 | GET | `/api/v1/inventory/batches` | pharmacy: inventory.read |  |  |  |
 | POST | `/api/v1/inventory/batches` | pharmacy: inventory.adjust |  |  |  |
-| GET | `/api/v1/medicines` | pharmacy: medicines.read |  |  | accounting, api, plans, scanning |
-| POST | `/api/v1/medicines` | pharmacy: medicines.write |  |  | accounting, api, plans, scanning |
+| GET | `/api/v1/medicines` | pharmacy: medicines.read |  |  | accounting, api, plans, scanning, selling-gst-loan |
+| POST | `/api/v1/medicines` | pharmacy: medicines.write |  |  | accounting, api, plans, scanning, selling-gst-loan |
 | GET | `/api/v1/medicines-barcode-info` | pharmacy: medicines.write |  |  | scanning |
-| GET | `/api/v1/medicines-lookup` | pharmacy: medicines.read |  |  |  |
+| GET | `/api/v1/medicines-lookup` | pharmacy: medicines.read |  |  | selling-gst-loan |
 | GET | `/api/v1/medicines-scan` | pharmacy: medicines.read |  |  | api, scanning |
 | DELETE | `/api/v1/medicines/:id` | pharmacy: medicines.delete |  |  | api, scanning |
 | GET | `/api/v1/medicines/:id` | pharmacy: medicines.read |  |  | api, scanning |
@@ -169,14 +169,14 @@ role holds the access named (`any` is every team member).
 | PATCH | `/api/v1/prescriptions/:id` | pharmacy: prescriptions.read |  |  | api |
 | POST | `/api/v1/prescriptions/:id/reject` | pharmacy: prescriptions.verify |  |  |  |
 | POST | `/api/v1/prescriptions/:id/verify` | pharmacy: prescriptions.verify |  |  | api |
-| GET | `/api/v1/purchases` | pharmacy: purchases.read |  |  | accounting, api |
-| POST | `/api/v1/purchases` | pharmacy: purchases.write |  |  | accounting, api |
-| GET | `/api/v1/purchases/:id` | pharmacy: purchases.read |  |  | api |
-| PATCH | `/api/v1/purchases/:id` | pharmacy: purchases.write |  |  | api |
+| GET | `/api/v1/purchases` | pharmacy: purchases.read |  |  | accounting, api, selling-gst-loan |
+| POST | `/api/v1/purchases` | pharmacy: purchases.write |  |  | accounting, api, selling-gst-loan |
+| GET | `/api/v1/purchases/:id` | pharmacy: purchases.read |  |  | api, selling-gst-loan |
+| PATCH | `/api/v1/purchases/:id` | pharmacy: purchases.write |  |  | api, selling-gst-loan |
 | POST | `/api/v1/purchases/:id/approve` | pharmacy: purchases.approve |  |  |  |
 | POST | `/api/v1/purchases/:id/cancel` | pharmacy: purchases.write |  |  |  |
 | POST | `/api/v1/purchases/:id/payment` | pharmacy: purchases.write |  |  | api |
-| POST | `/api/v1/purchases/:id/receive` | pharmacy: purchases.write |  |  | api |
+| POST | `/api/v1/purchases/:id/receive` | pharmacy: purchases.write |  |  | api, selling-gst-loan |
 | GET | `/api/v1/reports/category-mix` | pharmacy: reports.view | reports.advanced |  |  |
 | GET | `/api/v1/reports/discounts` | pharmacy: reports.view | reports.advanced |  |  |
 | GET | `/api/v1/reports/expenses` | pharmacy: reports.view |  |  |  |
@@ -192,12 +192,12 @@ role holds the access named (`any` is every team member).
 | DELETE | `/api/v1/roles/:id` | pharmacy: roles.manage | staff.roles |  |  |
 | PATCH | `/api/v1/roles/:id` | pharmacy: roles.manage | staff.roles |  |  |
 | POST | `/api/v1/roles/:id/duplicate` | pharmacy: roles.manage | staff.roles |  |  |
-| GET | `/api/v1/sales` | pharmacy: sales.read |  |  | accounting, api, security |
-| POST | `/api/v1/sales` | pharmacy: pos.operate |  |  | accounting, api, security |
-| GET | `/api/v1/sales/:id` | pharmacy: sales.read |  |  | api |
-| POST | `/api/v1/sales/:id/refund` | pharmacy: sales.refund |  |  | api |
-| GET | `/api/v1/settings` | pharmacy: settings.read |  |  |  |
-| PATCH | `/api/v1/settings` | pharmacy: settings.write |  |  |  |
+| GET | `/api/v1/sales` | pharmacy: sales.read |  |  | accounting, api, security, selling-gst-loan |
+| POST | `/api/v1/sales` | pharmacy: pos.operate |  |  | accounting, api, security, selling-gst-loan |
+| GET | `/api/v1/sales/:id` | pharmacy: sales.read |  |  | api, selling-gst-loan |
+| POST | `/api/v1/sales/:id/refund` | pharmacy: sales.refund |  |  | api, selling-gst-loan |
+| GET | `/api/v1/settings` | pharmacy: settings.read |  |  | selling-gst-loan |
+| PATCH | `/api/v1/settings` | pharmacy: settings.write |  |  | selling-gst-loan |
 | GET | `/api/v1/settings/appearance` | pharmacy: settings.read |  |  | api |
 | PATCH | `/api/v1/settings/appearance` | pharmacy: settings.write |  |  | api |
 | POST | `/api/v1/setup/address` | pharmacy: settings.write |  |  | api |
@@ -218,8 +218,8 @@ role holds the access named (`any` is every team member).
 | POST | `/api/v1/staff/:id/unlock` | pharmacy: staff.manage |  |  |  |
 | GET | `/api/v1/staff/help` | pharmacy: staff.manage |  |  |  |
 | GET | `/api/v1/stock-movements` | pharmacy: inventory.read |  |  |  |
-| GET | `/api/v1/suppliers` | pharmacy: suppliers.read |  |  | accounting, api |
-| POST | `/api/v1/suppliers` | pharmacy: suppliers.write |  |  | accounting, api |
+| GET | `/api/v1/suppliers` | pharmacy: suppliers.read |  |  | accounting, api, selling-gst-loan |
+| POST | `/api/v1/suppliers` | pharmacy: suppliers.write |  |  | accounting, api, selling-gst-loan |
 | DELETE | `/api/v1/suppliers/:id` | pharmacy: suppliers.write |  |  |  |
 | PATCH | `/api/v1/suppliers/:id` | pharmacy: suppliers.write |  |  |  |
 | GET | `/api/v1/support/tickets` | pharmacy: support.raise |  |  | api |

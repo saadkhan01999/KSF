@@ -212,6 +212,12 @@ export interface Sale {
   pharmacy?: { name: string; address: string; city: string; phone: string; ntn: string; strn: string; drap_licence: string };
   footer?: string;
   loyalty_points?: number | null; refunded_at?: string | null;
+  /** GST added at the till, and its rate when every taxed line shared one. */
+  gst_applied?: 0 | 1; gst_rate_percent?: number | null;
+  /** A loan (udhaar): paid at the till, left on the account, the receipt for the part paid, and what is owed after. */
+  paid_now_paisa?: number; loan_paisa?: number; loan_receipt_no?: string | null; balance_after_paisa?: number | null;
+  /** Cash handed back when a loan with a part paid at the till was refunded. */
+  refund_cash_paisa?: number;
 }
 
 /* One cash-up. A corrected count is a new row with a higher attempt_no; the

@@ -1,7 +1,7 @@
 {
   "name": "ksf-pharmacy",
   "private": true,
-  "version": "2.7.0",
+  "version": "2.8.0",
   "type": "module",
   "description": "KSF Pharmacy Management System — multi-pharmacy SaaS for Pakistan. React + TypeScript client, Express + TypeScript API, MongoDB.",
   "workspaces": [
@@ -25,10 +25,10 @@
     "seed:demo": "npm run seed:demo -w backend --",
     "university:copy": "node scripts/university-copy.mjs",
     "api:inventory": "node --import tsx scripts/api-inventory.mjs",
-    "test": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/unit.test.mjs tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/plans.test.mjs tests/directory.test.mjs tests/access.test.mjs tests/platform-accounts.test.mjs tests/scanning.test.mjs tests/security.test.mjs",
+    "test": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/unit.test.mjs tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/plans.test.mjs tests/directory.test.mjs tests/access.test.mjs tests/platform-accounts.test.mjs tests/scanning.test.mjs tests/selling-gst-loan.test.mjs tests/security.test.mjs",
     "test:coverage": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 --experimental-test-coverage --test-coverage-include='backend/src/**' --test-coverage-exclude='backend/src/cli/**' --test-coverage-lines=85 --test-coverage-branches=65 --test-coverage-functions=80 tests/*.test.mjs",
     "test:unit": "node --import tsx --import ./tests/setup.mjs --test tests/unit.test.mjs",
-    "test:api": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/plans.test.mjs tests/directory.test.mjs tests/access.test.mjs tests/platform-accounts.test.mjs tests/scanning.test.mjs tests/security.test.mjs"
+    "test:api": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/plans.test.mjs tests/directory.test.mjs tests/access.test.mjs tests/platform-accounts.test.mjs tests/scanning.test.mjs tests/selling-gst-loan.test.mjs tests/security.test.mjs"
   },
   "engines": {
     "node": ">=20.11.0"

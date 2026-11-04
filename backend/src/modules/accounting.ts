@@ -202,9 +202,10 @@ export async function cashFlow(pharmacyId: string, from: string, to: string) {
       { $match: { pharmacy_id: pharmacyId, expense_date: days, status: { $ne: 'rejected' }, category: { $ne: SALARIES_CATEGORY } } },
       { $group: { _id: null, amount: { $sum: '$amount_paisa' } } }
     ]).toArray(),
+    /* Money that went back out: a paid invoice in full, a loan only for what had been paid at the till. */
     col.sales().aggregate([
-      { $match: { pharmacy_id: pharmacyId, status: 'refunded', payment_method: { $ne: 'credit' }, refunded_at: moments } },
-      { $group: { _id: null, amount: { $sum: '$total_paisa' } } }
+      { $match: { pharmacy_id: pharmacyId, status: 'refunded', refunded_at: moments } },
+      { $group: { _id: null, amount: { $sum: { $cond: [{ $eq: ['$payment_method', 'credit'] }, { $ifNull: ['$refund_cash_paisa', 0] }, '$total_paisa'] } } } }
     ]).toArray()
   ]);
 

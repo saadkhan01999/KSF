@@ -267,6 +267,8 @@ export { barcodeVariants, canonicalBarcode, gs1Of, type Gs1Code } from '../domai
 
 const TILL_FIELDS = {
   _id: 1, id: 1, name: 1, generic_name: 1, form: 1, strength: 1, pack_size: 1, barcode: 1, sku: 1, price_paisa: 1, cost_paisa: 1,
+  /* The till works out GST itself, to show what the server will charge. */
+  gst_percent: 1,
   min_stock: 1, requires_prescription: 1, is_controlled: 1, shelf_location: 1, category_id: 1
 };
 

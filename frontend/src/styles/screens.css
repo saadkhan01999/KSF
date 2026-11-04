@@ -637,6 +637,7 @@
 .receipt .rc-item { margin-bottom: 5px; }
 .receipt .rc-item .rc-name { font-weight: 700; }
 .receipt .rc-total { font-size: 15px; font-weight: 800; }
+.receipt .rc-strong { font-weight: 800; }
 .receipt .rc-foot { text-align: center; font-size: 10.5px; color: var(--paper-ink-dim); margin-top: 10px; }
 /* Batch and expiry under each line, small but legible on a 76mm roll. */
 .receipt .rc-trace { font-size: 10px; color: var(--paper-ink-dim); letter-spacing: .02em; }
@@ -760,6 +761,70 @@
 .pay-discount-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-3); align-items: end; }
 .pay-discount-row .segment { min-height: var(--tap); }
 .pay-discount-hint { margin: 0; font-size: var(--fs-xs); color: var(--text-dim); line-height: var(--lh-snug); }
+
+/* GST: a choice on each sale, in the cart and in the payment window. */
+.cart-gst { padding: 0; }
+.cart-gst .switch { min-height: 36px; gap: 8px; }
+.cart-gst .switch .txt { font-size: var(--fs-sm); font-weight: 600; color: var(--text-soft); }
+.cart-gst .switch small { font-weight: 500; color: var(--text-dim); }
+.cart-gst .amt { color: var(--text-dim); font-weight: 500; }
+.cart-gst.is-on .amt { color: var(--text); font-weight: 700; }
+
+.pay-breakdown {
+  display: grid;
+  gap: 4px;
+  margin: var(--s-3) 0 0;
+  padding-top: var(--s-3);
+  border-top: 1px dashed var(--line-strong);
+  text-align: left;
+  font-size: var(--fs-sm);
+}
+.pay-breakdown div { display: flex; justify-content: space-between; gap: var(--s-3); }
+.pay-breakdown dt { color: var(--text-dim); }
+.pay-breakdown dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.pay-breakdown .is-discount dd { color: var(--ok-text); }
+.pay-breakdown .is-gst dd { color: var(--brand-700); }
+.pay-breakdown .is-off dd { color: var(--text-dim); font-weight: 500; }
+.pay-breakdown .is-total { padding-top: 4px; border-top: 1px solid var(--line); }
+.pay-breakdown .is-total dt, .pay-breakdown .is-total dd { color: var(--text); font-weight: 800; }
+
+.pay-gst {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.pay-gst > svg { margin-top: 12px; color: var(--text-dim); }
+.pay-gst.is-on { border-color: var(--accent-line); background: var(--accent-soft); }
+.pay-gst.is-on > svg { color: var(--brand-700); }
+.pay-gst .switch .txt { font-weight: 600; }
+.pay-gst-text { display: grid; gap: 2px; min-width: 0; }
+.pay-gst-amt { margin-top: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pay-gst.is-on .pay-gst-amt { color: var(--brand-700); }
+
+/* A loan (udhaar): whose account, what is paid now, and what is left owing. */
+.pay-loan {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding: var(--s-4);
+  border: 1px solid color-mix(in srgb, var(--warn-500) 40%, transparent);
+  border-radius: var(--r-lg);
+  background: var(--warn-100);
+}
+.pay-loan header { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+.pay-loan header strong { display: inline-flex; align-items: center; gap: 6px; color: var(--warn-text); }
+.pay-loan header .link-button { font-size: var(--fs-xs); font-weight: 600; color: var(--brand-600); }
+.pay-loan .pay-discount-open { margin-bottom: 0; background: var(--surface); }
+.pay-loan-new { display: grid; gap: var(--s-3); padding: var(--s-3); border-radius: var(--r-md); background: var(--surface); }
+.pay-loan-who { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--s-2); font-size: var(--fs-sm); }
+.pay-loan-who .t-dim { margin-left: auto; }
+.pay-loan-sum { margin-top: 0; padding: var(--s-3); border: 0; border-radius: var(--r-md); background: var(--surface); }
 
 /* The owner's and Admin's picker for one person's figures. */
 .staff-picker { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--text-dim); }
