@@ -21,7 +21,8 @@ import { col } from '../db/mongo.js';
 import type { PlatformRole, User } from '../db/types.js';
 import { bad, conflict, missing } from '../core/errors.js';
 import { logActivity } from '../core/trails.js';
-import { clearRateLimit, isEmail, isPkPhone, nowIso, sanitiseText, toStr, uid } from '../core/util.js';
+import { isEmail, isPkPhone, nowIso, sanitiseText, toStr, uid } from '../core/util.js';
+import { clear } from '../security/throttle.js';
 import { platformRoute, type SignedInCtx } from '../http/router.js';
 import { env } from '../config/env.js';
 import { PLATFORM_PERMISSIONS, PLATFORM_ROLE_TEMPLATES, normalisePlatformPermissions } from '../domain/platform.js';
@@ -204,7 +205,7 @@ platformRoute('POST', '/api/v1/platform/team/:id/reset-password', 'owner', async
     $set: { password_hash: await hashPassword(password), password_changed_at: at, must_change_password: 1, failed_attempts: 0, locked_until: null, updated_at: at }
   });
   await revokeAllSessions(member.id, { reason: 'password-reset' });
-  clearRateLimit(`login:${member.email.toLowerCase()}`);
+  await clear(`login:${member.email.toLowerCase()}`);
   await logActivity(trail(ctx), { action: 'platform.team-password-reset', entity: 'user', entityId: member.id, severity: 'danger', summary: `Password reset for ${member.full_name}` });
   return { ok: true, message: `${member.full_name} must choose a new password when they next sign in.` };
 });

@@ -20,8 +20,9 @@ import type { Pharmacy, Registration, User } from '../db/types.js';
 import { bad, conflict, HttpError, missing, tooMany } from '../core/errors.js';
 import { auditLog, logActivity, notify, securityEvent, verifyAuditChain } from '../core/trails.js';
 import {
-  isEmail, isPkPhone, maskEmail, nowIso, plusHours, randomUUID, rateLimit, rateLimitStatus, sanitiseText, sha256, slugify, toInt, toStr, uid
+  isEmail, isPkPhone, maskEmail, nowIso, plusHours, randomUUID, sanitiseText, sha256, slugify, toInt, toStr, uid
 } from '../core/util.js';
+import { hit, peek } from '../security/throttle.js';
 import { accountRoute, publicRoute, route } from '../http/router.js';
 import type { Ctx } from '../http/context.js';
 import { deviceCookie, refreshCookie } from '../http/cookies.js';
@@ -29,7 +30,7 @@ import { loadAuthUser } from '../http/authenticate.js';
 import { hashPassword, passwordProblem, passwordStrength, PASSWORD_MIN_LENGTH } from '../security/password.js';
 import { secret } from '../security/crypto.js';
 import { issueCode, pendingCode, PURPOSES, verifyCode } from '../security/otp.js';
-import { generateRecoveryCodes, generateSecret, normaliseRecoveryCode, otpauthUrl, verifyTotp } from '../security/totp.js';
+import { generateRecoveryCodes, generateSecret, normaliseRecoveryCode, otpauthUrl, consumeTotp } from '../security/totp.js';
 import { createSession, listSessions, revokeAllSessions, revokeDeviceSessions, revokeSession, signAccessToken } from '../security/sessions.js';
 import { approximate, deviceLimits, listDevices, publicDevice, registerDevice, renameDevice, revokeDevice } from '../security/devices.js';
 import { isDevMailbox, mailHealth, readDevOutbox, sendMail, templates } from '../services/mailer.js';
@@ -80,7 +81,7 @@ publicRoute('GET', '/api/v1/public/plans', async () => ({
 }));
 
 publicRoute('GET', '/api/v1/public/referral/:code', async (ctx) => {
-  const limit = rateLimit(`ref:${ctx.ip}`, 30, 60_000);
+  const limit = await hit(`ref:${ctx.ip}`, 30, 60_000);
   if (!limit.ok) tooMany('Too many referral checks. Please wait a moment.', limit.retryAfter);
   return validateCode(ctx.params.code);
 });
@@ -175,7 +176,7 @@ async function createPharmacyAccount(ctx: Ctx, draft: Registration) {
 }
 
 publicRoute('POST', '/api/v1/register/start', async (ctx) => {
-  const limit = rateLimitStatus(`reg:${ctx.ip}`, env.REGISTER_MAX_PER_IP);
+  const limit = await peek(`reg:${ctx.ip}`, env.REGISTER_MAX_PER_IP);
   if (!limit.ok) tooMany('Too many registrations have been started from this connection. Please try again later.', limit.retryAfter);
 
   const firstName = sanitiseText(ctx.body.firstName, 60);
@@ -204,7 +205,7 @@ publicRoute('POST', '/api/v1/register/start', async (ctx) => {
     referral_code: referral || null, ip: ctx.ip, user_agent: ctx.userAgent.slice(0, 200), status: 'in_progress', pharmacy_id: null,
     expires_at: plusHours(REG_HOURS), created_at: at, updated_at: at
   });
-  rateLimit(`reg:${ctx.ip}`, env.REGISTER_MAX_PER_IP, 3_600_000);
+  await hit(`reg:${ctx.ip}`, env.REGISTER_MAX_PER_IP, 3_600_000);
 
   if (referral) {
     const claim = await claimReferral({ code: referral, email, ip: ctx.ip });
@@ -239,7 +240,7 @@ publicRoute('POST', '/api/v1/register/verify-email', async (ctx) => {
   const draft = await loadDraft(ctx);
   if (!draft) return bad('That registration has expired. Please start again.');
   if (draft.email_verified) bad('That address is already confirmed. Please sign in.');
-  const limit = rateLimit(`otp:${draft.email}`, 12, 15 * 60_000);
+  const limit = await hit(`otp:${draft.email}`, 12, 15 * 60_000);
   if (!limit.ok) tooMany('Too many attempts. Please wait a few minutes.', limit.retryAfter);
 
   const result = await verifyCode({ purpose: PURPOSES.EMAIL_VERIFY, email: draft.email ?? '', code: toStr(ctx.body.code, 12) });
@@ -264,7 +265,7 @@ publicRoute('POST', '/api/v1/register/resend', async (ctx) => {
   const draft = await loadDraft(ctx);
   if (!draft) return bad('That registration has expired. Please start again.');
   if (draft.email_verified) return { ok: true };
-  const limit = rateLimit(`resend:${draft.email}`, 3, 10 * 60_000);
+  const limit = await hit(`resend:${draft.email}`, 3, 10 * 60_000);
   if (!limit.ok) tooMany(`Please wait ${Math.ceil(limit.retryAfter / 60)} minute(s) before asking for another code.`, limit.retryAfter);
   const issued = await issueCode({ purpose: PURPOSES.EMAIL_VERIFY, email: draft.email ?? '', ip: ctx.ip });
   if (issued.throttled || !issued.code) tooMany('Too many codes have been sent to that address. Please try again in an hour.');
@@ -291,7 +292,7 @@ publicRoute('POST', '/api/v1/auth/forgot-password', async (ctx) => {
   const email = toStr(ctx.body.email, 160).toLowerCase();
   const same = { ok: true, message: 'If that address has a KSF account, a reset code is on its way to it.' };
   if (!isEmail(email)) return same;
-  const limit = rateLimit(`forgot:${ctx.ip}`, 10, 15 * 60_000);
+  const limit = await hit(`forgot:${ctx.ip}`, 10, 15 * 60_000);
   if (!limit.ok) tooMany('Too many reset requests. Please wait a few minutes.', limit.retryAfter);
 
   const user = await col.users().findOne({ email });
@@ -311,7 +312,7 @@ publicRoute('POST', '/api/v1/auth/forgot-password', async (ctx) => {
 publicRoute('POST', '/api/v1/auth/reset-password', async (ctx) => {
   const email = toStr(ctx.body.email, 160).toLowerCase();
   const password = String(ctx.body.password || '');
-  const limit = rateLimit(`reset:${email}`, 12, 15 * 60_000);
+  const limit = await hit(`reset:${email}`, 12, 15 * 60_000);
   if (!limit.ok) tooMany('Too many attempts. Please wait a few minutes.', limit.retryAfter);
 
   const user = await col.users().findOne({ email });
@@ -409,7 +410,7 @@ accountRoute('POST', '/api/v1/account/2fa/enable', async (ctx) => {
   ctx.requireRecentVerification();
   const user = await col.users().findOne({ _id: ctx.user.id }, { projection: { totp_secret: 1 } });
   if (!user?.totp_secret) bad('Start the setup again — there is no key waiting to be confirmed.');
-  if (!verifyTotp(user!.totp_secret, toStr(ctx.body.code, 10))) {
+  if (await consumeTotp(ctx.user.id, user!.totp_secret, toStr(ctx.body.code, 10)) !== 'accepted') {
     await securityEvent({ pharmacyId: ctx.pharmacyId, userId: ctx.user.id, type: '2fa.enable-failed', severity: 'warn', outcome: 'failure', ip: ctx.ip });
     bad('That code is not correct. Check the time on your phone and try the next one.', 'code');
   }

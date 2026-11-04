@@ -58,6 +58,8 @@ export interface User extends Base {
   status: 'active' | 'suspended' | 'archived'; failed_attempts: number; locked_until: When | null;
   last_login_at: When | null; email_verified_at: When | null;
   totp_secret: string | null; totp_enabled: Flag; totp_confirmed_at: When | null; recovery_generated_at: When | null;
+  /** The last authenticator time step accepted, so a code works once (security/totp.ts). */
+  totp_last_step?: number | null;
   is_owner: Flag; theme: string | null; avatar_tone?: string;
   created_at: When; updated_at: When;
 }
@@ -310,6 +312,12 @@ export interface Registration extends Base {
   verified_at: When | null; referral_code: string | null; ip: string | null; user_agent: string;
   status: string; pharmacy_id: Id | null; expires_at: When; created_at: When; updated_at: When;
 }
+
+/** A shared rate-limit counter (security/throttle.ts); removed by a TTL index once expired. */
+export interface RateCounter { _id: string; count: number; expires_at: Date }
+
+/** A two-step sign-in or device-release ticket, stored by the hash of its token. */
+export interface AuthTicket { _id: string; kind: string; user_id: Id; attempts: number; expires_at: Date }
 
 export interface VerificationCode extends Base {
   purpose: string; email: string; user_id: Id | null; pharmacy_id: Id | null; reference_id: string | null;

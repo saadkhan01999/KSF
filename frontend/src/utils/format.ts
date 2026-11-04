@@ -223,7 +223,7 @@ export function downloadCsv(filename: string, rows: Record<string, unknown>[]): 
   ].join('\r\n');
 
   // The BOM makes Excel on a Pakistani Windows install read UTF-8 correctly.
-  const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -250,7 +250,10 @@ export function downloadCsv(filename: string, rows: Record<string, unknown>[]): 
 export function internalPath(value: string | null | undefined, fallback = '/dashboard'): string {
   const text = String(value ?? '').trim();
   if (!text.startsWith('/')) return fallback;
-  /* A second slash or a backslash after the first turns it into another host. */
-  if (/^\/[/\\]/.test(text)) return fallback;
+  /* Browsers drop tabs and line breaks from an address, so "/<tab>/evil" is
+     "//evil"; and a second slash or a backslash after the first turns it into
+     another host. */
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(text) || /^\/[/\\]/.test(text)) return fallback;
   return text;
 }
