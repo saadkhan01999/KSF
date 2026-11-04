@@ -17,7 +17,8 @@ import { col, tx, s } from '../db/mongo.js';
 import type { Branch, Role, User } from '../db/types.js';
 import { bad, forbid, missing } from '../core/errors.js';
 import { auditLog, logActivity, notify, securityEvent } from '../core/trails.js';
-import { clearRateLimit, contains, isCnic, isEmail, isPkPhone, nowIso, slugify, toInt, toStr, uid } from '../core/util.js';
+import { contains, isCnic, isEmail, isPkPhone, nowIso, slugify, toInt, toStr, uid } from '../core/util.js';
+import { clear } from '../security/throttle.js';
 import { PERMISSIONS, PERMISSION_KEYS, PHARMACY_ADMIN_ROLE, SYSTEM_ROLES } from '../domain/permissions.js';
 import { hashPassword, passwordProblem } from '../security/password.js';
 import { approximate, deviceLimits, listDevices, publicDevice, revokeDevice } from '../security/devices.js';
@@ -202,7 +203,7 @@ route('POST', '/api/v1/staff/:id/reset-password', 'staff.manage', async (ctx) =>
   });
   /* A reset password must not leave old sessions alive on other machines. */
   await revokeAllSessions(target.id, { reason: 'password-reset' });
-  clearRateLimit(`login:${target.email.toLowerCase()}`);
+  await clear(`login:${target.email.toLowerCase()}`);
   await logActivity(ctx, { action: 'staff.password-reset', entity: 'user', entityId: target.id, severity: 'danger', summary: `Password reset for ${target.full_name} by ${ctx.user.full_name}` });
   return { ok: true };
 });
@@ -211,7 +212,7 @@ route('POST', '/api/v1/staff/:id/unlock', 'staff.manage', async (ctx) => {
   const target = await staffTarget(ctx);
   await col.users().updateOne({ _id: target.id }, { $set: { failed_attempts: 0, locked_until: null, updated_at: nowIso() } });
   /* And the in-memory sign-in throttle for their address. */
-  clearRateLimit(`login:${target.email.toLowerCase()}`);
+  await clear(`login:${target.email.toLowerCase()}`);
   await logActivity(ctx, { action: 'staff.unlocked', entity: 'user', entityId: target.id, severity: 'warn', summary: `${target.full_name} unlocked` });
   return { ok: true };
 });

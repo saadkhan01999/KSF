@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.6.4** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.7.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -110,9 +110,12 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
 | `npm run build` | Type-checks and compiles the API to `backend/dist`, builds the website to `frontend/dist` |
 | `npm start` | Runs the compiled API, which also serves the built website |
 | `npm run typecheck` | TypeScript, both projects |
+| `npm run lint` | ESLint over the whole repository (no errors; warnings capped) |
 | `npm test` | Unit tests and every API suite (see [Testing](#testing)) |
 | `npm run test:unit` | The unit tests alone — no database needed |
 | `npm run test:api` | The API suites alone, against a real MongoDB |
+| `npm run test:coverage` | Every suite with backend coverage, failing under 85% lines, 65% branches or 80% functions |
+| `npm run api:inventory` | Regenerates `docs/API_INVENTORY.md` from the route table (`-- --check` only compares) |
 | `npm run db:check` | Connects, and reports version, transactions, collections, plans and the Super Admin |
 | `npm run db:backup` | Writes a compressed, checksummed backup to `.data/backups` and verifies it reads back |
 | `npm run db:verify -- <file>` | Verifies a backup file |
@@ -183,14 +186,18 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
 | Refresh token | JWT signed with a separate secret, in an HttpOnly + SameSite=Strict cookie scoped to `/api/v1/auth`, **rotated on every use**; only the hash of its one-time id is stored. Replaying an old one ends the session |
 | Sessions | Server-side record per sign-in: idle timeout, absolute lifetime, revocable from the Security Centre, ended on password change |
 | Step-up | Sensitive actions (suspending a pharmacy, confirming or refunding a subscription payment, rolling back an import, two-step and device changes) require the password again within 10 minutes |
-| Two-step sign-in | TOTP authenticator apps, with one-time recovery codes |
+| Two-step sign-in | TOTP authenticator apps, with one-time recovery codes; each authenticator code is accepted once (RFC 6238 §5.2) |
 | Devices | Per-person device limits; new devices are announced by e-mail |
 | Permissions | Checked on the server for every request; a role can never be given more than its maker holds; a pharmacy's people never see another pharmacy's records (`tests/access.test.mjs` proves it for every route and every built-in role) |
 | Plan features | A feature the pharmacy's plan does not include is refused with `402 feature_locked`, on the server — the screen showing a lock is a courtesy |
-| Brute force | Per-account lock-out, per-IP limits on sign-in and sign-up, write throttling |
+| Brute force | Per-account lock-out, per-IP limits on sign-in and sign-up, limits on codes and password resets, write throttling. The account-protecting counters and the two-step tickets are kept in MongoDB (`security/throttle.ts`), so every server instance — every Vercel function — sees the same counts; tickets are stored by their hash |
+| Request checks | Before any handler: no MongoDB operator keys (`$ne`, `$where`) or prototype keys (`__proto__`) anywhere in a body, bodies up to 2 MB (12 MB for the two file imports), an unreadable body answered with a 4xx (`http/safety.ts`) |
+| Redirects | Only to this application's own origin — never a look-alike such as `https://<app>.evil.com`, a `//host` or a path with a tab in it |
 | Headers | Helmet: strict CSP (`script-src 'self'`, `form-action` limited to the payment pages), HSTS in production, frame denial; the camera is allowed for KSF's own pages only (`Permissions-Policy: camera=(self)`), for scanning at the till |
 | Card payments | Cards are typed only on Stripe's hosted Checkout; no card number reaches KSF |
 | Webhooks | Stripe: the `Stripe-Signature` HMAC-SHA256 over the raw body, within five minutes, each event applied once. Others: HMAC-SHA256 over the raw body. Amounts are checked against what the server asked for |
+
+How to report a vulnerability, the controls in more detail and the risks that remain: `SECURITY.md`.
 
 ---
 
@@ -770,11 +777,22 @@ npm test
 | `tests/directory.test.mjs` | The starter set, searching by name, other name, brand or category, verification and its reset when the words change, drafts and archived entries kept from pharmacies, imports, and that only the team members whose role includes it can change it |
 | `tests/access.test.mjs` | Every role: refused without the permission, every built-in role's screens, the platform kept apart, and no pharmacy reading another's records |
 | `tests/platform-accounts.test.mjs` | KSF's own books to the paisa (subscriptions, refunds, other income, expenses), the ledger and downloads, finance roles only, one slip number per pharmacy, and the payment-methods check |
+| `tests/security.test.mjs` | The request checks; forged, expired, tampered and misused tokens; security headers, CORS and sign-ins from other sites; shared sign-in counters; two-step sign-in on shared tickets with a code accepted once; sign-out, password reset, sign-out everywhere and recovery codes; and **every registered route fed hostile input** (wrong types, huge strings, odd ids and queries) without a single server error or stack trace |
 | `tests/scanning.test.mjs` | Scanning: a barcode with or without its leading zero, the GS1 DataMatrix on a pack, a GS1 Digital Link QR, an unknown barcode saved on its medicine (and nothing else changed), a cashier who can scan but not change the catalogue, no two medicines sharing a barcode; and a new medicine filled in from its barcode — from another pharmacy (never its price, stock or shelf; the first pharmacy's details stand), from the open product databases (a stand-in, asked once per barcode) and from the medicine directory |
 
 The API suites run against a real MongoDB in a throwaway database
 (`ksf_test_<random>`) that is dropped afterwards. Point them at a server with
 `TEST_MONGODB_URI`; `tests/README.md` has the details.
+
+Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
+- a clean `npm ci`, the type check, lint and the API inventory check;
+- every suite against a MongoDB 7 replica set, with the coverage thresholds;
+- the production build, then a smoke test of the built server;
+- the Docker image build;
+- `npm audit` on the production dependencies.
+
+Dependabot proposes dependency updates weekly. How to work on the project:
+`CONTRIBUTING.md`.
 
 ---
 
@@ -835,7 +853,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.6.4 · Server 2.6.4 — up to date", or
+System) compares the two: "Website 2.7.0 · Server 2.7.0 — up to date", or
 what to do when they differ (on Vercel both deploy together from `main`:
 Vercel › Deployments).
 
@@ -847,6 +865,10 @@ Vercel › Deployments).
 |---|---|
 | `DATABASE_SETUP.md` | Setting up MongoDB (Atlas or local), first start, backups |
 | `CHANGELOG.md` | What changed in each release |
+| `SECURITY.md` | Reporting a vulnerability, the security controls, the risks that remain |
+| `CONTRIBUTING.md` | Setting up, the checks to run, tests and pull requests |
+| `QUALITY_AUDIT.md` | The quality and security audit of 2.7.0: findings, fixes and evidence |
+| `docs/API_INVENTORY.md` | Every endpoint, who may call it and which tests cover it (generated) |
 | `docs/ARCHITECTURE.md` | Modules, collections, sign-in flow, transactions |
 | `docs/ENVIRONMENT.md` | Every setting in `.env` |
 | `docs/BACKUP_AND_RESTORE.md` | Backups, restores, Atlas snapshots |

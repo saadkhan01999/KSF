@@ -99,7 +99,6 @@ export function gs1Of(code: string): Gs1Code | null {
 export function canonicalBarcode(code: string): string {
   const gs1 = gs1Of(code);
   if (gs1) return gs1.gtin.startsWith('000000') ? gs1.gtin.slice(6) : gs1.gtin.startsWith('0') ? gs1.gtin.slice(1) : gs1.gtin;
-  // eslint-disable-next-line no-control-regex
   return code.replace(/[\s\u0000-\u001f]/g, '');
 }
 
@@ -110,7 +109,6 @@ export function canonicalBarcode(code: string): string {
  * zeros. Each candidate is an exact match or not a match at all.
  */
 export function barcodeVariants(code: string): string[] {
-  // eslint-disable-next-line no-control-regex
   const digits = gs1Of(code)?.gtin ?? code.replace(/[\s\u0000-\u001f]/g, '');
   const variants = new Set([digits]);
   if (/^\d+$/.test(digits)) {

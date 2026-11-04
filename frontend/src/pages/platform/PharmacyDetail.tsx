@@ -376,7 +376,9 @@ function EditModal({ open, detail, onClose, onSaved }: { open: boolean; detail: 
     deviceLimitMobile: detail.data.device_limit_mobile === null ? '' : String(detail.data.device_limit_mobile)
   });
   const [form, setForm] = useState(blank);
-  useEffect(() => { if (open) setForm(blank()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open]);
+  /* Refilled when the dialog opens, not on every re-render while someone types. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) setForm(blank()); }, [open]);
   const set = (key: keyof ReturnType<typeof blank>) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((f) => ({ ...f, [key]: event.target.value }));
 
   const save = () => run(

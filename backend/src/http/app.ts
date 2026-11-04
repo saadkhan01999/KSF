@@ -25,6 +25,7 @@ import { planRequired, requireFeature, workingState } from '../services/subscrip
 import { authenticate } from './authenticate.js';
 import type { Ctx, HandlerResult } from './context.js';
 import { routes, type RouteDef } from './router.js';
+import { bodyLimitFor, isSafeRedirect, unsafeKey } from './safety.js';
 
 const WRITE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
@@ -148,8 +149,7 @@ async function handle(def: RouteDef, req: Request, res: Response): Promise<void>
     /* Only to this application: an open redirect on a payment return URL is
        how a paying customer gets sent somewhere else entirely. */
     const target = String(result.__redirect);
-    const safe = target.startsWith(env.PUBLIC_APP_URL) || /^\/[^/\\]/.test(target);
-    if (!safe) { sendJson(res, 400, { message: 'Refused to redirect away from this application.' }); return; }
+    if (!isSafeRedirect(target, env.PUBLIC_APP_URL)) { sendJson(res, 400, { message: 'Refused to redirect away from this application.' }); return; }
     res.location(target);
     sendJson(res, 303, { ok: true, redirect: target });
     return;
@@ -226,8 +226,18 @@ export function createApp(): express.Express {
     (req as Request & { rawBody?: string }).rawBody = buffer.toString('utf8');
   };
   app.use(cookieParser());
-  app.use(express.json({ limit: '12mb', verify: keepRaw }));
+  const parsers = {
+    '12mb': express.json({ limit: '12mb', verify: keepRaw }),
+    '2mb': express.json({ limit: '2mb', verify: keepRaw })
+  };
+  app.use((req, res, next) => parsers[bodyLimitFor(req.path)](req, res, next));
   app.use(express.urlencoded({ extended: false, limit: '1mb', verify: keepRaw }));
+  /* No operator keys ($gt, $where) and no prototype keys (__proto__) in a body. */
+  app.use((req, res, next) => {
+    const key = req.body && typeof req.body === 'object' ? unsafeKey(req.body) : null;
+    if (key) { sendJson(res, 400, { code: 'invalid_field', message: `The request carried a field name that is not allowed: ${key.slice(0, 40)}` }); return; }
+    next();
+  });
 
   app.get('/api/v1/health', (_req, res) => {
     sendJson(res, 200, {
@@ -278,6 +288,11 @@ export function createApp(): express.Express {
     const parse = error as { type?: string; status?: number };
     if (parse?.type === 'entity.parse.failed') { sendJson(res, 400, { message: 'The request body was not valid JSON.' }); return; }
     if (parse?.type === 'entity.too.large') { sendJson(res, 413, { message: 'That request is too large.' }); return; }
+    /* Anything else the body reader turned down (an unknown charset or encoding, an aborted upload) is the request's fault, not a server failure. */
+    const reader = error as { status?: number; expose?: boolean };
+    if (reader?.expose && typeof reader.status === 'number' && reader.status >= 400 && reader.status < 500) {
+      sendJson(res, reader.status, { message: 'The request could not be read.' }); return;
+    }
     const correlationId = randomUUID().slice(0, 8);
     console.error(`[KSF ${correlationId}] ${req.method} ${req.originalUrl}`, IS_PROD ? (error as Error)?.message : error);
     sendJson(res, 500, { message: 'Something went wrong on the server. Please try again.', correlationId });

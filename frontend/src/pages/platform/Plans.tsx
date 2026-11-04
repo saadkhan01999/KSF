@@ -102,7 +102,9 @@ function PlanEditor({ open, plan, features, onClose, onSaved }: {
     status: plan?.status ?? 'active'
   });
   const [form, setForm] = useState(blank);
-  useEffect(() => { if (open) setForm(blank()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, plan]);
+  /* Refilled when the dialog opens or another plan is chosen, not on every re-render while someone types. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) setForm(blank()); }, [open, plan]);
   const text = (key: keyof ReturnType<typeof blank>) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
   const toggle = (key: string, on: boolean) => setForm((current) => ({ ...current, features: on ? [...current.features, key] : current.features.filter((item) => item !== key) }));

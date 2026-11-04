@@ -57,6 +57,8 @@ const INDEXES: Record<string, IndexDescription[]> = {
   messages: [{ key: { conversation_id: 1, created_at: 1 } }],
   registrations: [{ key: { token_hash: 1 }, unique: true }, { key: { email: 1 } }],
   verification_codes: [{ key: { purpose: 1, email: 1, created_at: -1 } }],
+  rate_limits: [{ key: { expires_at: 1 }, expireAfterSeconds: 0 }],
+  auth_tickets: [{ key: { expires_at: 1 }, expireAfterSeconds: 0 }],
   recovery_codes: [{ key: { user_id: 1 } }],
   subscription_plans: [{ key: { key: 1 }, unique: true }],
   subscriptions: [{ key: { pharmacy_id: 1, status: 1 } }, { key: { renewal_at: 1 } }],

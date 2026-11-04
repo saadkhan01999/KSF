@@ -268,7 +268,7 @@ anyone could then register an address they do not own. Do **not** set
 **3. Deploy.** Deployments › Redeploy after changing any setting.
 
 **4. Check.** `https://ksf-x86j.vercel.app/api/v1/health` answers
-`{"ok":true,…,"version":"2.6.4"}`. If a setting is missing it names it
+`{"ok":true,…,"version":"2.7.0"}`. If a setting is missing it names it
 instead. Then sign in as the Super Admin. Step by step, with every setting:
 `VERCEL_DEPLOYMENT.txt`.
 

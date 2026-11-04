@@ -69,7 +69,7 @@ export const contains = (value: string): RegExp => new RegExp(escapeRegex(value)
 export const sanitiseText = (value: unknown, max = 4000): string => String(value ?? '')
   // eslint-disable-next-line no-control-regex
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
-  .replace(/[​-‏‪-‮⁠-⁯﻿]/g, '')
+  .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '')
   .replace(/\r\n/g, '\n')
   .replace(/\n{4,}/g, '\n\n\n')
   .trim()

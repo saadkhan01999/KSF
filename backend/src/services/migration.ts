@@ -827,7 +827,7 @@ export async function rollbackJob(input: { jobId: string; pharmacyId: string }) 
     for (const item of items) {
       if (item.resolution === 'merge') { kept += 1; continue; }
       const targetId = item.target_id!;
-      let gone = 0;
+      let gone: number;
       if (job.category === 'sale_items') {
         gone = (await col.sales().updateOne({ pharmacy_id: input.pharmacyId, 'items.id': targetId }, { $pull: { items: { id: targetId } } }, s())).modifiedCount;
       } else {

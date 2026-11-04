@@ -1,7 +1,7 @@
 {
   "name": "ksf-pharmacy",
   "private": true,
-  "version": "2.6.4",
+  "version": "2.7.0",
   "type": "module",
   "description": "KSF Pharmacy Management System — multi-pharmacy SaaS for Pakistan. React + TypeScript client, Express + TypeScript API, MongoDB.",
   "workspaces": [
@@ -14,6 +14,7 @@
     "dev:web": "vite --config frontend/vite.config.ts",
     "build": "npm run build -w backend && npm run build -w frontend",
     "start": "node backend/dist/server.js",
+    "lint": "eslint . --max-warnings=27",
     "typecheck": "npm run typecheck -w backend && npm run typecheck -w frontend",
     "db:check": "npm run db:check -w backend",
     "db:backup": "npm run db:backup -w backend",
@@ -23,14 +24,23 @@
     "secrets": "npm run secrets -w backend --",
     "seed:demo": "npm run seed:demo -w backend --",
     "university:copy": "node scripts/university-copy.mjs",
-    "test": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/unit.test.mjs tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/plans.test.mjs tests/directory.test.mjs tests/access.test.mjs tests/platform-accounts.test.mjs tests/scanning.test.mjs",
+    "api:inventory": "node --import tsx scripts/api-inventory.mjs",
+    "test": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/unit.test.mjs tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/plans.test.mjs tests/directory.test.mjs tests/access.test.mjs tests/platform-accounts.test.mjs tests/scanning.test.mjs tests/security.test.mjs",
+    "test:coverage": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 --experimental-test-coverage --test-coverage-include='backend/src/**' --test-coverage-exclude='backend/src/cli/**' --test-coverage-lines=85 --test-coverage-branches=65 --test-coverage-functions=80 tests/*.test.mjs",
     "test:unit": "node --import tsx --import ./tests/setup.mjs --test tests/unit.test.mjs",
-    "test:api": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/plans.test.mjs tests/directory.test.mjs tests/access.test.mjs tests/platform-accounts.test.mjs tests/scanning.test.mjs"
+    "test:api": "node --import tsx --import ./tests/setup.mjs --test --test-concurrency=1 tests/api.test.mjs tests/accounting.test.mjs tests/live.test.mjs tests/stripe.test.mjs tests/plans.test.mjs tests/directory.test.mjs tests/access.test.mjs tests/platform-accounts.test.mjs tests/scanning.test.mjs tests/security.test.mjs"
   },
   "engines": {
     "node": ">=20.11.0"
   },
   "allowScripts": {
     "esbuild@0.25.12": true
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "typescript-eslint": "^8.72.1"
   }
 }

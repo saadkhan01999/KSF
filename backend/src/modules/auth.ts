@@ -20,16 +20,14 @@ import { col } from '../db/mongo.js';
 import type { User } from '../db/types.js';
 import { bad, HttpError, unauthorised } from '../core/errors.js';
 import { auditLog, logActivity, securityEvent } from '../core/trails.js';
-import {
-  clearRateLimit, isEmail, nowIso, plusMinutes, rateLimit, rateLimitStatus, randomUUID, sha256, toStr
-} from '../core/util.js';
+import { isEmail, nowIso, plusMinutes, randomUUID, sha256, toStr } from '../core/util.js';
+import { clear, countAttempt, dropTicket, hit, issueTicket, peek, readTicket } from '../security/throttle.js';
 import { accountRoute, publicRoute, type SignedInCtx } from '../http/router.js';
 import type { AuthUser, Ctx } from '../http/context.js';
 import { loadAuthUser } from '../http/authenticate.js';
 import { clearRefreshCookie, deviceCookie, refreshCookie } from '../http/cookies.js';
 import { hashPassword, passwordProblem, verifyPassword } from '../security/password.js';
-import { normaliseRecoveryCode, verifyTotp } from '../security/totp.js';
-import { secret } from '../security/crypto.js';
+import { consumeTotp, normaliseRecoveryCode, REUSED_CODE_MESSAGE } from '../security/totp.js';
 import {
   createSession, elevateSession, isElevated, revokeAllSessions, revokeSession, rotateRefreshToken, signAccessToken
 } from '../security/sessions.js';
@@ -41,26 +39,9 @@ import { subscriptionState } from '../services/subscriptions.js';
 import { refreshStockAlerts } from './shared.js';
 import { DEFAULT_THEME, THEME_KEYS } from '../domain/permissions.js';
 
-/* ------------------------------------------------- short-lived tickets
-   The second half of a two-step sign-in, and permission to tidy devices when
-   the limit is reached. They live minutes, in memory, and are useless after
-   use; a restart simply asks the person to sign in again. */
-interface Ticket { kind: string; userId: string; expiresAt: number; attempts: number }
-const tickets = new Map<string, Ticket>();
-
-function issueTicket(kind: string, userId: string, minutes = 5): string {
-  const token = secret(24);
-  tickets.set(token, { kind, userId, expiresAt: Date.now() + minutes * 60_000, attempts: 0 });
-  if (tickets.size > 500) for (const [key, value] of tickets) if (value.expiresAt < Date.now()) tickets.delete(key);
-  return token;
-}
-
-function readTicket(token: unknown, kind: string): Ticket | null {
-  const ticket = tickets.get(String(token || ''));
-  if (!ticket) return null;
-  if (ticket.expiresAt < Date.now() || ticket.kind !== kind) { tickets.delete(String(token)); return null; }
-  return ticket;
-}
+/* Two-step sign-in and device-release tickets live in the database
+   (security/throttle.ts), so any server instance can finish a sign-in that
+   another one started. */
 
 /* --------------------------------------------------------- what we send */
 export async function publicUser(user: AuthUser, permissions: Set<string>, extra: { supportMode?: boolean; pharmacyId?: string | null } = {}) {
@@ -112,7 +93,7 @@ async function completeSignIn(ctx: Ctx, user: User, method: string) {
     undefined, 'device_limit');
     error.details = {
       limit: registration.limit, category: registration.category, devices: registration.devices,
-      releaseTicket: issueTicket('device-release', user.id, 10)
+      releaseTicket: await issueTicket('device-release', user.id, 10)
     };
     throw error;
   }
@@ -121,7 +102,7 @@ async function completeSignIn(ctx: Ctx, user: User, method: string) {
   const access = signAccessToken(session, user.pharmacy_id);
 
   await col.users().updateOne({ _id: user.id }, { $set: { failed_attempts: 0, locked_until: null, last_login_at: nowIso() } });
-  clearRateLimit(`login:${user.email.toLowerCase()}`);
+  await clear(`login:${user.email.toLowerCase()}`);
 
   const trailCtx = { pharmacyId: user.pharmacy_id, user: { id: user.id, full_name: user.full_name, role_name: loaded.user.role_name }, ip: ctx.ip, userAgent: ctx.userAgent };
   await logActivity(trailCtx, { action: 'auth.login', entity: 'user', entityId: user.id, summary: `${user.full_name} signed in` });
@@ -156,22 +137,24 @@ publicRoute('POST', '/api/v1/auth/login', async (ctx) => {
   const password = String(ctx.body.password || '');
   if (!email || !password) bad('Enter your email address and password.');
 
-  const perEmail = rateLimitStatus(`login:${email}`, env.LOGIN_MAX_ATTEMPTS * 3);
-  const perIp = rateLimitStatus(`login-ip:${ctx.ip}`, env.LOGIN_MAX_PER_IP);
+  const [perEmail, perIp] = await Promise.all([
+    peek(`login:${email}`, env.LOGIN_MAX_ATTEMPTS * 3),
+    peek(`login-ip:${ctx.ip}`, env.LOGIN_MAX_PER_IP)
+  ]);
   if (!perEmail.ok || !perIp.ok) {
     await securityEvent({ emailHint: email, type: 'auth.throttled', severity: 'warn', outcome: 'blocked', ip: ctx.ip, userAgent: ctx.userAgent });
     const error = new HttpError(429, `Too many attempts. Please wait ${Math.ceil((perEmail.retryAfter || perIp.retryAfter) / 60)} minute(s) and try again.`);
     error.retryAfter = perEmail.retryAfter || perIp.retryAfter;
     throw error;
   }
-  const countFailure = () => {
-    rateLimit(`login:${email}`, env.LOGIN_MAX_ATTEMPTS * 3, env.LOGIN_LOCK_MINUTES * 60_000);
-    rateLimit(`login-ip:${ctx.ip}`, env.LOGIN_MAX_PER_IP, 15 * 60_000);
-  };
+  const countFailure = () => Promise.all([
+    hit(`login:${email}`, env.LOGIN_MAX_ATTEMPTS * 3, env.LOGIN_LOCK_MINUTES * 60_000),
+    hit(`login-ip:${ctx.ip}`, env.LOGIN_MAX_PER_IP, 15 * 60_000)
+  ]);
 
   const user = await col.users().findOne({ email });
   if (!user) {
-    countFailure();
+    await countFailure();
     await recordAttempt(email, ctx.ip, false);
     await verifyPassword(password, '');
     await securityEvent({ emailHint: email, type: 'auth.failed', severity: 'warn', outcome: 'failure', ip: ctx.ip, userAgent: ctx.userAgent, detail: 'no such account' });
@@ -180,7 +163,7 @@ publicRoute('POST', '/api/v1/auth/login', async (ctx) => {
   const account = user!;
 
   if (account.locked_until && new Date(account.locked_until).getTime() > Date.now()) {
-    countFailure();
+    await countFailure();
     await recordAttempt(email, ctx.ip, false);
     await securityEvent({ pharmacyId: account.pharmacy_id, userId: account.id, emailHint: email, type: 'auth.locked', severity: 'warn', outcome: 'blocked', ip: ctx.ip, userAgent: ctx.userAgent });
     const minutes = Math.ceil((new Date(account.locked_until).getTime() - Date.now()) / 60_000);
@@ -188,7 +171,7 @@ publicRoute('POST', '/api/v1/auth/login', async (ctx) => {
   }
 
   if (account.status !== 'active') {
-    countFailure();
+    await countFailure();
     await recordAttempt(email, ctx.ip, false);
     await securityEvent({ pharmacyId: account.pharmacy_id, userId: account.id, emailHint: email, type: 'auth.suspended', severity: 'warn', outcome: 'blocked', ip: ctx.ip, userAgent: ctx.userAgent });
     throw new HttpError(403, account.is_platform_staff
@@ -198,7 +181,7 @@ publicRoute('POST', '/api/v1/auth/login', async (ctx) => {
 
   const check = await verifyPassword(password, account.password_hash);
   if (!check.ok) {
-    countFailure();
+    await countFailure();
     await recordAttempt(email, ctx.ip, false);
     const attempts = (account.failed_attempts || 0) + 1;
     const lockUntil = attempts >= env.LOGIN_MAX_ATTEMPTS ? plusMinutes(env.LOGIN_LOCK_MINUTES) : null;
@@ -231,28 +214,30 @@ publicRoute('POST', '/api/v1/auth/login', async (ctx) => {
 
   if (account.totp_enabled && account.totp_secret) {
     await securityEvent({ pharmacyId: account.pharmacy_id, userId: account.id, emailHint: email, type: 'auth.2fa-challenge', outcome: 'pending', ip: ctx.ip, userAgent: ctx.userAgent });
-    return { twoFactorRequired: true, challenge: issueTicket('two-factor', account.id, 5), message: 'Enter the six-digit code from your authenticator app.' };
+    return { twoFactorRequired: true, challenge: await issueTicket('two-factor', account.id, 5), message: 'Enter the six-digit code from your authenticator app.' };
   }
 
   return completeSignIn(ctx, account, 'password');
 });
 
 publicRoute('POST', '/api/v1/auth/two-factor', async (ctx) => {
-  const ticket = readTicket(ctx.body.challenge, 'two-factor');
+  const ticket = await readTicket(ctx.body.challenge, 'two-factor');
   if (!ticket) unauthorised('That verification has expired. Please sign in again.');
-  ticket!.attempts += 1;
-  if (ticket!.attempts > 5) {
-    tickets.delete(String(ctx.body.challenge));
+  if (await countAttempt(ctx.body.challenge) > 5) {
+    await dropTicket(ctx.body.challenge);
     throw new HttpError(429, 'Too many incorrect codes. Please sign in again.');
   }
   const user = await col.users().findOne({ _id: ticket!.userId });
-  if (!user) { tickets.delete(String(ctx.body.challenge)); unauthorised('Please sign in again.'); }
+  if (!user) { await dropTicket(ctx.body.challenge); unauthorised('Please sign in again.'); }
 
   let method: string | null = null;
   const code = toStr(ctx.body.code, 20);
   const recovery = toStr(ctx.body.recoveryCode, 32);
-  if (code && verifyTotp(user!.totp_secret, code)) {
+  const answer = code ? await consumeTotp(user!.id, user!.totp_secret, code) : 'wrong';
+  if (answer === 'accepted') {
     method = 'authenticator app';
+  } else if (answer === 'reused') {
+    unauthorised(REUSED_CODE_MESSAGE, 'invalid_code');
   } else if (recovery) {
     const match = await col.recoveryCodes().findOneAndUpdate(
       { user_id: user!.id, code_hash: sha256(normaliseRecoveryCode(recovery)), used_at: null },
@@ -268,21 +253,20 @@ publicRoute('POST', '/api/v1/auth/two-factor', async (ctx) => {
     await securityEvent({ pharmacyId: user!.pharmacy_id, userId: user!.id, emailHint: user!.email, type: 'auth.2fa-failed', severity: 'warn', outcome: 'failure', ip: ctx.ip, userAgent: ctx.userAgent });
     unauthorised('That code is not correct. Check your authenticator app and try again.', 'invalid_code');
   }
-  tickets.delete(String(ctx.body.challenge));
+  await dropTicket(ctx.body.challenge);
   return completeSignIn(ctx, user!, `password and ${method}`);
 });
 
 /** Remove a device while the limit is blocking sign-in (password asked again). */
 publicRoute('POST', '/api/v1/auth/device-release', async (ctx) => {
-  const ticket = readTicket(ctx.body.ticket, 'device-release');
+  const ticket = await readTicket(ctx.body.ticket, 'device-release');
   if (!ticket) unauthorised('That request has expired. Please sign in again.');
   const user = await col.users().findOne({ _id: ticket!.userId });
   if (!user) unauthorised('Please sign in again.');
 
   const check = await verifyPassword(String(ctx.body.password || ''), user!.password_hash);
   if (!check.ok) {
-    ticket!.attempts += 1;
-    if (ticket!.attempts > 3) tickets.delete(String(ctx.body.ticket));
+    if (await countAttempt(ctx.body.ticket) > 3) await dropTicket(ctx.body.ticket);
     unauthorised('That password is not correct.', 'invalid_credentials');
   }
   const device = await revokeDevice({ deviceId: toStr(ctx.body.deviceId, 60), userId: user!.id, revokedBy: user!.id, reason: 'released to make room for a new device' });
@@ -366,10 +350,13 @@ accountRoute('GET', '/api/v1/auth/session', async (ctx) => ({
 /** Step-up: confirm it is really you before a security change. */
 accountRoute('POST', '/api/v1/auth/verify-identity', async (ctx) => {
   const check = await verifyPassword(String(ctx.body.password || ''), ctx.user.password_hash);
-  const codeOk = ctx.user.totp_enabled && ctx.user.totp_secret ? verifyTotp(ctx.user.totp_secret, toStr(ctx.body.code, 10)) : true;
-  if (!check.ok || !codeOk) {
+  const needsCode = Boolean(ctx.user.totp_enabled && ctx.user.totp_secret);
+  /* The code is only spent once the password is right. */
+  const answer = check.ok && needsCode ? await consumeTotp(ctx.user.id, ctx.user.totp_secret, toStr(ctx.body.code, 10)) : 'accepted';
+  if (!check.ok || answer !== 'accepted') {
     await securityEvent({ pharmacyId: ctx.pharmacyId, userId: ctx.user.id, type: 'auth.step-up-failed', severity: 'warn', outcome: 'failure', ip: ctx.ip, userAgent: ctx.userAgent });
-    throw new HttpError(400, check.ok ? 'That authenticator code is not correct.' : 'That password is not correct.', check.ok ? 'code' : 'password');
+    const message = !check.ok ? 'That password is not correct.' : answer === 'reused' ? REUSED_CODE_MESSAGE : 'That authenticator code is not correct.';
+    throw new HttpError(400, message, check.ok ? 'code' : 'password');
   }
   await elevateSession(ctx.session.id);
   await securityEvent({ pharmacyId: ctx.pharmacyId, userId: ctx.user.id, type: 'auth.step-up', ip: ctx.ip, userAgent: ctx.userAgent });

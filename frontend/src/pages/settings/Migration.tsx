@@ -227,7 +227,7 @@ export function Migration() {
 
   /* ------------------------------------------------------------- render -- */
 
-  const fields = upload?.fields ?? [];
+  const fields = useMemo(() => upload?.fields ?? [], [upload]);
   const missingRequired = useMemo(
     () => fields.filter((field) => field.required && !mapping[field.key]),
     [fields, mapping]

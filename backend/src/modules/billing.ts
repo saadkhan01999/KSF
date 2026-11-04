@@ -17,6 +17,7 @@ import { col } from '../db/mongo.js';
 import { bad, missing, tooMany } from '../core/errors.js';
 import { auditLog, logActivity, notify, securityEvent } from '../core/trails.js';
 import { nowIso, rateLimit, toStr } from '../core/util.js';
+import { hit } from '../security/throttle.js';
 import { publicRoute, route } from '../http/router.js';
 import type { Ctx } from '../http/context.js';
 import {
@@ -149,7 +150,7 @@ route('POST', '/api/v1/billing/checkout', 'settings.write', async (ctx) => {
 /* A pharmacy that registered without a referral code, entering one now: the
    referral price applies from its next payment. */
 route('POST', '/api/v1/billing/referral', 'settings.write', async (ctx) => {
-  const limit = rateLimit(`refcode:${ctx.pharmacyId}`, 10, 3_600_000);
+  const limit = await hit(`refcode:${ctx.pharmacyId}`, 10, 3_600_000);
   if (!limit.ok) tooMany('Too many codes tried. Please wait a while before trying another.', limit.retryAfter);
   const code = toStr(ctx.body.code, 32).toUpperCase();
   if (!code) bad('Enter the referral code.', 'code');

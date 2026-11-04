@@ -173,6 +173,8 @@ export const col = {
 
   registrations: c<T.Registration>('registrations'),
   verificationCodes: c<T.VerificationCode>('verification_codes'),
+  rateLimits: c<T.RateCounter>('rate_limits'),
+  authTickets: c<T.AuthTicket>('auth_tickets'),
   recoveryCodes: c<T.RecoveryCode>('recovery_codes'),
 
   plans: c<T.Plan>('subscription_plans'),

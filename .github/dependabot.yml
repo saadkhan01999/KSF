@@ -1,0 +1,18 @@
+# Weekly update pull requests for npm (all workspaces, one lockfile) and for
+# the GitHub Actions the workflows use. Patch and minor updates arrive
+# grouped; a major version comes on its own, so it can be read and tested.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -5,6 +5,7 @@
    ========================================================================== */
 
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { col } from '../db/mongo.js';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 export const TOTP_STEP_SECONDS = 30;
@@ -61,20 +62,43 @@ export const totpNow = (secret: string, at = Date.now()): string =>
   totpAt(secret, Math.floor(at / 1000 / TOTP_STEP_SECONDS));
 
 /** One step either side covers a phone clock thirty seconds out. */
-export function verifyTotp(secret: string | null | undefined, token: unknown, { window = 1, at = Date.now() } = {}): boolean {
-  if (!secret) return false;
+/** The time step a code belongs to (within the allowed drift), or null when it matches none. */
+export function totpStep(secret: string | null | undefined, token: unknown, { window = 1, at = Date.now() } = {}): number | null {
+  if (!secret) return null;
   const digits = String(token || '').replace(/\D/g, '');
-  if (digits.length !== TOTP_DIGITS) return false;
+  if (digits.length !== TOTP_DIGITS) return null;
   const counter = Math.floor(at / 1000 / TOTP_STEP_SECONDS);
   const supplied = Buffer.from(digits, 'utf8');
-  let matched = false;
+  let matched: number | null = null;
   /* Every candidate is compared, so a near miss is not answered faster. */
   for (let drift = -window; drift <= window; drift += 1) {
     const candidate = Buffer.from(totpAt(secret, counter + drift), 'utf8');
-    if (candidate.length === supplied.length && timingSafeEqual(candidate, supplied)) matched = true;
+    if (candidate.length === supplied.length && timingSafeEqual(candidate, supplied)) matched = counter + drift;
   }
   return matched;
 }
+
+export const verifyTotp = (secret: string | null | undefined, token: unknown, options: { window?: number; at?: number } = {}): boolean =>
+  totpStep(secret, token, options) !== null;
+
+/**
+ * Accept a code once (RFC 6238 §5.2). A code stays valid for its 30 seconds
+ * plus the drift allowed either side, so one seen over a shoulder or on a
+ * shared screen could otherwise sign in a second time. The step is recorded
+ * with a single conditional update, so two requests racing with the same
+ * code cannot both succeed.
+ */
+export async function consumeTotp(userId: string, secret: string | null | undefined, token: unknown): Promise<'accepted' | 'wrong' | 'reused'> {
+  const step = totpStep(secret, token);
+  if (step === null) return 'wrong';
+  const used = await col.users().updateOne(
+    { _id: userId, $or: [{ totp_last_step: { $exists: false } }, { totp_last_step: null }, { totp_last_step: { $lt: step } }] },
+    { $set: { totp_last_step: step } }
+  );
+  return used.modifiedCount === 1 ? 'accepted' : 'reused';
+}
+
+export const REUSED_CODE_MESSAGE = 'That code has already been used. Wait for the next one in your authenticator app.';
 
 export const otpauthUrl = ({ issuer, account, secret }: { issuer: string; account: string; secret: string }): string =>
   `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(account)}`

@@ -77,7 +77,8 @@ export default function Pos() {
     can('prescriptions.read') ? '/prescriptions?status=verified&size=60' : null
   );
 
-  const medicines = catalogue?.data ?? [];
+  /* The same array until the catalogue reloads, so the callbacks built on it stay stable. */
+  const medicines = useMemo(() => catalogue?.data ?? [], [catalogue]);
   const customer = customers?.data.find((c) => c.id === customerId) ?? null;
   const prescription = verifiedRx?.data.find((r) => r.id === prescriptionId) ?? null;
 

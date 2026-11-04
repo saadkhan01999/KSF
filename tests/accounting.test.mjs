@@ -17,14 +17,13 @@ const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
 describe('accounts', { skip }, () => {
   let server;
   let owner;
-  let pharmacyId;
   let cashier;
   let manager;
   const state = {};
 
   before(async () => {
     server = await startServer();
-    ({ client: owner, pharmacyId } = await registerPharmacy(server.base, 'Hina', 'hina@accounts.test'));
+    ({ client: owner } = await registerPharmacy(server.base, 'Hina', 'hina@accounts.test'));
     cashier = await addStaff(server.base, owner, { name: 'Usman Cashier', email: 'usman@accounts.test', roleKey: 'cashier' });
     manager = await addStaff(server.base, owner, { name: 'Sara Regional', email: 'sara@accounts.test', roleKey: 'regional-manager' });
   });

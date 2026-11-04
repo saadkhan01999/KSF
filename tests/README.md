@@ -1,9 +1,10 @@
 # Tests
 
 ```bash
-npm test            # everything
-npm run test:unit   # pure logic — no database needed
-npm run test:api    # every API suite over HTTP — needs MongoDB
+npm test                # everything
+npm run test:unit       # pure logic — no database needed
+npm run test:api        # every API suite over HTTP — needs MongoDB
+npm run test:coverage   # everything, with backend coverage and its thresholds
 ```
 
 | File | What it proves |
@@ -18,6 +19,7 @@ npm run test:api    # every API suite over HTTP — needs MongoDB
 | `access.test.mjs` | Every route in the route table: anonymous callers turned away, each pharmacy role refused what it does not hold, every built-in role's screens, the platform console per team role, support mode, and no pharmacy reading or changing another's records |
 | `platform-accounts.test.mjs` | KSF's own books: one slip number per pharmacy, subscriptions less refunds plus other income against expenses to the rupee, the ledger and its filters, the downloads, finance roles only (a read-only role can read, not write), deletions in the activity log, and the payment-methods check naming missing settings, never their values |
 | `scanning.test.mjs` | Barcode scanning: a barcode with or without its leading zero, the GS1 DataMatrix on a pack (product, expiry, batch, serial), a GS1 Digital Link QR, an unknown barcode answered with the barcode to save, saving it on a medicine without changing anything else, a cashier who can scan but not edit, no two medicines sharing a barcode; and a new medicine filled in from its barcode — from another pharmacy's pack details (never its price, stock or shelf, and the first pharmacy's details stand), from the open product databases (answered by a stand-in, asked once per barcode, never for other QR text) and from the medicine directory |
+| `security.test.mjs` | Security: operator and prototype keys refused before any handler, unreadable bodies answered with a 4xx, redirects kept inside the app; forged (`alg: none`, another secret), expired, tampered, wrong-audience and refresh-as-access tokens refused; security headers, CORS and cross-site sign-ins; failed sign-ins counted in the database and cleared on success; two-step sign-in on hashed, shared tickets, a code accepted once and five tries at most; sign-out ending the session, password reset needing the e-mailed code and signing every session out, sign-out everywhere, recovery codes used once, two-step turned off only after the password again; and **every route in the route table** fed wrong types, oversized strings, array bodies, odd ids and odd query strings by someone allowed to call it — never a 5xx and never a stack trace |
 | `setup.mjs` | The configuration every test run uses. Tests never read `.env` |
 | `support/server.mjs` | Starts the API inside the test process on a free port and drops its database afterwards |
 
@@ -26,3 +28,17 @@ always in a fresh database called `ksf_test_<random>`, which is dropped when the
 so it never touches the data the pharmacies use. Without any MongoDB it is skipped and says why.
 
 Transactions need a replica set: MongoDB Atlas (any tier) or a local `mongod --replSet rs0`.
+
+## Coverage
+
+`npm run test:coverage` measures `backend/src` (the command-line tools in
+`backend/src/cli` aside) with Node's built-in coverage and fails under 85%
+of lines, 65% of branches or 80% of functions. Raise the thresholds as
+coverage grows; never lower them to make a run pass. CI runs this command.
+
+## When a route is added
+
+`tests/access.test.mjs` and `tests/security.test.mjs` pick it up from the
+route table by themselves. Then run `npm run api:inventory` so
+`docs/API_INVENTORY.md` lists it — `npm test` fails until it does — and add
+a functional test for what it does.

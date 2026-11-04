@@ -235,7 +235,7 @@ export async function setProviderRenewal(subscription: Pick<Subscription, 'id' |
   try {
     await adapter.setRenewal(subscription.provider_subscription_id, renew, immediately);
   } catch (error) {
-    throw new Error(`${adapter.label} could not be told to ${renew ? 'resume' : 'stop'} renewing: ${(error as Error).message}`);
+    throw new Error(`${adapter.label} could not be told to ${renew ? 'resume' : 'stop'} renewing: ${(error as Error).message}`, { cause: error });
   }
   if (immediately) {
     await col.subscriptions().updateOne({ _id: subscription.id }, { $set: { provider_subscription_id: null, updated_at: nowIso() } });

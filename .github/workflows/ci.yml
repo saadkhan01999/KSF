@@ -1,0 +1,114 @@
+# Every push to main and every pull request: install exactly what the lockfile
+# says, type-check, lint, run every test against a real MongoDB replica set
+# with coverage thresholds, build, start the built server and ask it for its
+# health, and audit the production dependencies. Any failing step fails the run.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Type-check, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TEST_MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (lockfile only)
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: API inventory is current
+        run: npm run api:inventory -- --check
+
+      # Transactions need a replica set, so a one-member set is started and initiated.
+      - name: Start MongoDB 7 (replica set)
+        run: |
+          docker run -d --name mongo -p 27017:27017 mongo:7 --replSet rs0 --bind_ip_all
+          for attempt in $(seq 1 30); do
+            docker exec mongo mongosh --quiet --eval "db.adminCommand('ping').ok" >/dev/null 2>&1 && break
+            sleep 1
+          done
+          docker exec mongo mongosh --quiet --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: '127.0.0.1:27017' }] })"
+          for attempt in $(seq 1 30); do
+            [ "$(docker exec mongo mongosh --quiet --eval 'db.hello().isWritablePrimary')" = "true" ] && break
+            sleep 1
+          done
+
+      - name: Tests with coverage thresholds
+        run: npm run test:coverage
+
+      - name: Production build
+        run: npm run build
+
+      - name: Smoke test the built server
+        env:
+          NODE_ENV: production
+          PORT: '8080'
+          MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          MONGODB_DB: ksf_ci_smoke
+          JWT_ACCESS_SECRET: ci-only-access-secret-0123456789abcdefghijklmnop
+          JWT_REFRESH_SECRET: ci-only-refresh-secret-0123456789abcdefghijklmnop
+          PUBLIC_APP_URL: http://127.0.0.1:8080
+          MAIL_TRANSPORT: none
+        run: |
+          node backend/dist/server.js > smoke.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/api/v1/health > health.json && break
+            sleep 1
+          done
+          cat smoke.log
+          grep -q '"ok":true' health.json
+          curl -sf -o /dev/null http://127.0.0.1:8080/
+          curl -sf -o /dev/null http://127.0.0.1:8080/settings
+
+  docker:
+    name: Production image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # The Hostinger set-up (deploy/docker/Dockerfile): it must build from a clean checkout and run as its own user.
+      - name: Build the image
+        run: docker build -f deploy/docker/Dockerfile -t ksf:ci .
+      - name: Runs as a non-root user, with a health check
+        run: |
+          test "$(docker image inspect ksf:ci --format '{{.Config.User}}')" = "ksf"
+          test -n "$(docker image inspect ksf:ci --format '{{if .Config.Healthcheck}}yes{{end}}')"
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # High and critical advisories in what ships fail the run; the rest are
+      # listed in QUALITY_AUDIT.md with what they mean for KSF.
+      - name: npm audit (production dependencies)
+        run: npm audit --omit=dev --audit-level=high

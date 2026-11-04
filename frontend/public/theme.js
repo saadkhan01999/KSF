@@ -14,7 +14,7 @@
   function preference() {
     try {
       return localStorage.getItem(STORE) || 'system';
-    } catch (error) {
+    } catch {
       /* Private mode, or storage disabled by policy. Follow the device. */
       return 'system';
     }
@@ -39,7 +39,7 @@
   try {
     var brand = localStorage.getItem('ksf-brand');
     root.setAttribute('data-brand', BRANDS.indexOf(brand) >= 0 ? brand : 'ksf-green');
-  } catch (error) {
+  } catch {
     root.setAttribute('data-brand', 'ksf-green');
   }
 
