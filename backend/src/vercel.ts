@@ -10,7 +10,9 @@
 
    Housekeeping is started by Vercel Cron through /api/v1/cron/maintenance
    (modules/cron.ts), since nothing runs between requests. On a VPS
-   (Hostinger) or Docker, server.ts is the entry point instead.
+   (Hostinger) or Docker, server.ts is the entry point instead; when Vercel
+   itself picks server.js (its Express detection does, for a project rooted
+   at backend/ or the backend service), server.js hands every request here.
    ========================================================================== */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -21,7 +23,8 @@ import './modules/index.js';
 import { createApp } from './http/app.js';
 import { startLiveFeed } from './services/live.js';
 
-const app = createApp();
+/* Made on the first request, so importing this file (server.js does) costs nothing. */
+let app: ReturnType<typeof createApp> | null = null;
 let starting: Promise<void> | null = null;
 
 /** Connect and check the database, once per instance; tried again after a failure. */
@@ -72,5 +75,6 @@ export default async function handle(req: IncomingMessage, res: ServerResponse):
     ]);
     return;
   }
+  app ??= createApp();
   app(req as Parameters<typeof app>[0], res as Parameters<typeof app>[1]);
 }

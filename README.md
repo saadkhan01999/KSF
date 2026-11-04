@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.6.2** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.6.3** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -832,7 +832,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.6.2 · Server 2.6.2 — up to date", or
+System) compares the two: "Website 2.6.3 · Server 2.6.3 — up to date", or
 what to do when they differ (on Vercel both deploy together from `main`:
 Vercel › Deployments).
 
