@@ -46,7 +46,7 @@ export function detectFormat(buffer: Buffer, fileName = ''): { ok: true; kind: '
   if (buffer.includes(0)) return { ok: false, reason: 'That file contains binary data and cannot be read as text.' };
   const text = buffer.toString('utf8');
   if (text.includes('�')) return { ok: false, reason: 'That file is not valid UTF-8 text. Re-save it as CSV UTF-8 from Excel.' };
-  const head = text.replace(/^﻿/, '').trimStart();
+  const head = text.replace(/^\uFEFF/, '').trimStart();
   if (head.startsWith('{') || head.startsWith('[')) return { ok: true, kind: 'json' };
   if (extension === 'json') return { ok: false, reason: 'That file is named .json but does not contain JSON.' };
   return { ok: true, kind: 'csv' };
@@ -76,7 +76,7 @@ export function detectDelimiter(text: string): string {
 }
 
 export function parseCsv(text: string, delimiter: string | null = null): string[][] {
-  const source = String(text).replace(/^﻿/, '');
+  const source = String(text).replace(/^\uFEFF/, '');
   const sep = delimiter ?? detectDelimiter(source);
   const rows: string[][] = [];
   let row: string[] = [];
@@ -205,7 +205,7 @@ export function parseXlsx(buffer: Buffer): { ok: true; rows: string[][]; sheet: 
 /* ---------------------------------------------------------------- JSON */
 export function parseJsonRows(text: string): { ok: true; columns: string[]; rows: string[][] } | Failure {
   let parsed: any;
-  try { parsed = JSON.parse(String(text).replace(/^﻿/, '')); } catch (error) { return { ok: false, reason: `That JSON could not be read: ${(error as Error).message}` }; }
+  try { parsed = JSON.parse(String(text).replace(/^\uFEFF/, '')); } catch (error) { return { ok: false, reason: `That JSON could not be read: ${(error as Error).message}` }; }
   const list = Array.isArray(parsed) ? parsed : parsed?.data ?? parsed?.items ?? parsed?.records ?? parsed?.rows;
   if (!Array.isArray(list)) return { ok: false, reason: 'The JSON must be an array of records, or an object with a data, items or records array inside it.' };
   if (!list.length) return { ok: false, reason: 'That file has no records in it.' };
@@ -226,8 +226,8 @@ export function readTable(buffer: Buffer, fileName: string): Table | Failure {
   const format = detectFormat(buffer, fileName);
   if (!format.ok) return format;
 
-  let columns: string[] = [];
-  let matrix: string[][] = [];
+  let columns: string[];
+  let matrix: string[][];
   if (format.kind === 'xlsx') {
     const sheet = parseXlsx(buffer);
     if (!sheet.ok) return sheet;
@@ -243,7 +243,7 @@ export function readTable(buffer: Buffer, fileName: string): Table | Failure {
     [columns, ...matrix] = parsed;
   }
 
-  const headers = columns.map((name, index) => String(name ?? '').replace(/^﻿/, '').trim() || `Column ${index + 1}`);
+  const headers = columns.map((name, index) => String(name ?? '').replace(/^\uFEFF/, '').trim() || `Column ${index + 1}`);
   /* Duplicate headers are made unique so a mapping can address them. */
   const seen = new Map<string, number>();
   const unique = headers.map((name) => {

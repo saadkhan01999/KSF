@@ -34,6 +34,8 @@ export function useApiData<T>(path: string | null, deps: unknown[] = []) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
 
+  /* The caller names what should trigger a reload; `load` changes with the path. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void load(); }, deps.length ? [...deps, load] : [load]);
 
   return { data, loading, error, reload: load, setData };

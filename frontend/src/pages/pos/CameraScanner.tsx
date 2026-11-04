@@ -76,6 +76,8 @@ export function CameraScanner({ open, onClose, onCode }: { open: boolean; onClos
     if (!open) return undefined;
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) { setState('insecure'); return undefined; }
     setState('starting');
+    /* The element this effect started on, so the cleanup clears that one. */
+    const element = video.current;
     let stopped = false;
     let stream: MediaStream | null = null;
     let stopDecoding = () => {};
@@ -132,7 +134,7 @@ export function CameraScanner({ open, onClose, onCode }: { open: boolean; onClos
       stopped = true;
       stopDecoding();
       stream?.getTracks().forEach((track) => track.stop());
-      if (video.current) video.current.srcObject = null;
+      if (element) element.srcObject = null;
       track.current = null;
       setTorch(null);
       setZoom(null);

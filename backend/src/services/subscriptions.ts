@@ -20,7 +20,6 @@
       changes nothing by itself: the plan starts when its payment clears.
    ========================================================================== */
 
-import { env } from '../config/env.js';
 import { col, tx, s } from '../db/mongo.js';
 import type { Plan, Subscription, SubscriptionPayment, Trial } from '../db/types.js';
 import { FEATURES, TRIAL_PLAN_KEY } from '../domain/plans.js';
