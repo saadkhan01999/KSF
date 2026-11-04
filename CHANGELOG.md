@@ -3,6 +3,30 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.8.1] — 2026-11-04
+
+The loan (udhaar) could not be seen at the till.
+
+### Till
+- **Every payment method is a button:** Cash, **Loan (udhaar)**, Card,
+  Easypaisa, JazzCash and Bank transfer, in that order. The method used to
+  be a drop-down list that showed only "Cash" until it was opened, so the
+  loan right after Cash was out of sight. The loan button is amber, like
+  the loan section it opens.
+
+### Updates
+- **A tab left open across a release says so.** A browser keeps the
+  screens it loaded until the page is reloaded. A till opened before 2.8.0
+  kept the old payment window: it still listed no loan without a customer
+  chosen, while the new server already sent each medicine's GST rate.
+  - Every API answer now names the server's version (`X-KSF-Version`;
+    `/api/v1/health` already made it public).
+  - When the server is newer than the page, a line across the top says
+    "KSF 2.8.1 is ready" with **Reload now**. It never reloads by itself,
+    because a sale may be half rung up.
+- Test: the version header on every API answer, exposed to the app's own
+  origin only.
+
 ## [2.8.0] — 2026-11-04
 
 GST and loans (udhaar) at the till. GST is now the cashier's choice on each

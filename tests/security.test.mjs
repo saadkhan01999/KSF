@@ -11,6 +11,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import jwt from 'jsonwebtoken';
 import { Client, SUPER_ADMIN, TEST_PASSWORD, codeFor, registerPharmacy, startServer } from './support/server.mjs';
 
@@ -142,6 +143,18 @@ describe('security over HTTP', { skip }, () => {
     assert.equal(reply.headers.get('x-content-type-options'), 'nosniff');
     assert.equal(reply.headers.get('referrer-policy'), 'same-origin');
     assert.equal(reply.headers.get('x-powered-by'), null);
+  });
+
+  it('names its version on every API answer, readable by its own web origin only', async () => {
+    const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    /* An open tab compares it with its own and offers to reload (components/UpdateBanner.tsx). */
+    for (const path of ['/api/v1/health', '/api/v1/public/plans', '/api/v1/auth/session', '/api/v1/no-such-route']) {
+      assert.equal((await raw(path)).headers.get('x-ksf-version'), version, path);
+    }
+    const own = await raw('/api/v1/health', { headers: { Origin: 'http://localhost:5180' } });
+    assert.equal(own.headers.get('access-control-expose-headers'), 'X-KSF-Version');
+    const other = await raw('/api/v1/health', { headers: { Origin: 'https://evil.example' } });
+    assert.equal(other.headers.get('access-control-expose-headers'), null);
   });
 
   it('shares credentials only with its own origins, and takes sign-ins from no other site', async () => {
