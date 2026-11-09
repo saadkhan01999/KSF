@@ -9,6 +9,13 @@
    discounts by loading a URL. Every pharmacy gets the 15-day free trial,
    referred or not.
 
+   The pharmacy that shared the link earns too: REFERRAL_REWARD_DAYS (15)
+   more days of full access for every pharmacy that registers through it,
+   claimed with one button under Subscription plans › Referrals. A referral
+   earns its days once — when it is honoured, the same moment the referral
+   price is — and a claim marks them, inside one transaction with the
+   extension, so a double click or a second tab cannot claim twice.
+
    Abuse protection, in order: the code must be active and not used up; no
    self-referral; one referral per account ever; one referral per address
    per code (unique index); a daily cap per referrer; a daily cap per signup
@@ -17,11 +24,15 @@
    ========================================================================== */
 
 import { env } from '../config/env.js';
-import { col } from '../db/mongo.js';
-import type { ReferralCode } from '../db/types.js';
+import { col, s, tx } from '../db/mongo.js';
+import type { Referral, ReferralCode } from '../db/types.js';
+import { HttpError } from '../core/errors.js';
 import { maskEmail, nowIso, randomUUID, toStr } from '../core/util.js';
 import { shortReference } from '../security/crypto.js';
-import { hasReferralPricing, listPlans, trialLength, trialPlan } from './subscriptions.js';
+import { addAccessDays, hasReferralPricing, listPlans, trialLength, trialPlan } from './subscriptions.js';
+
+/** Days a pharmacy earns for each pharmacy that registers through its link. */
+export const rewardDays = (): number => env.REFERRAL_REWARD_DAYS;
 
 export const referralLink = (code: string): string => `${env.PUBLIC_APP_URL}/register?ref=${code}`;
 
@@ -70,7 +81,7 @@ export async function validateCode(rawCode: unknown): Promise<{
 }
 
 /** Attach a referral to a registration under way. Nothing is credited yet. */
-export async function claimReferral(input: { code: string; email: string; ip: string | null }): Promise<{ ok: boolean; referralId?: string; reason?: string; review?: boolean }> {
+export async function claimReferral(input: { code: string; email: string; ip: string | null; name?: string | null }): Promise<{ ok: boolean; referralId?: string; reason?: string; review?: boolean }> {
   const check = await validateCode(input.code);
   if (!check.valid || !check.code) return { ok: false, reason: check.reason };
   const address = String(input.email || '').toLowerCase();
@@ -101,7 +112,8 @@ export async function claimReferral(input: { code: string; email: string; ip: st
     _id: id, id, code: check.code, referral_code_id: row.id, referrer_pharmacy_id: row.pharmacy_id, referrer_user_id: row.user_id,
     referred_pharmacy_id: null, referred_user_id: null, referred_email: address, trial_id: null,
     status: review ? 'review' : 'pending', reject_reason: null, signup_ip: input.ip ?? null, registered_at: at,
-    verified_at: null, converted_at: null, created_at: at, updated_at: at
+    verified_at: null, converted_at: null, created_at: at, updated_at: at,
+    referred_name: toStr(input.name, 120) || null, reward_days: null, reward_claimed_at: null, reward_claimed_by: null
   });
   await col.referralCodes().updateOne({ _id: row.id }, { $inc: { uses: 1 }, $set: { updated_at: at } });
   return { ok: true, referralId: id, review };
@@ -129,6 +141,15 @@ export async function completeReferral(input: { referralId: string; pharmacyId: 
     $set: { referred_pharmacy_id: input.pharmacyId, referred_user_id: input.userId, status: 'converted', verified_at: at, converted_at: at, updated_at: at }
   });
   await col.referralCodes().updateOne({ code: referral.code }, { $inc: { successful: 1 }, $set: { updated_at: at } });
+  /* The pharmacy that shared the link has days waiting. */
+  if (referral.referrer_pharmacy_id && rewardDays() > 0) {
+    const { notify } = await import('../core/trails.js');
+    await notify(referral.referrer_pharmacy_id, {
+      type: 'billing', severity: 'info', title: `${rewardDays()} referral days are ready to claim`,
+      body: `${referral.referred_name ?? 'A pharmacy you invited'} has registered through your link. Claim the days under Subscription plans › Referrals.`,
+      link: '/subscription-plans?tab=referrals'
+    }).catch(() => undefined);
+  }
   return { ok: true };
 }
 
@@ -146,22 +167,90 @@ export async function applyReferralCode(input: { code: string; pharmacyId: strin
   return completeReferral({ referralId: claimed.referralId, pharmacyId: input.pharmacyId, userId: input.userId });
 }
 
-/** The referral panel under Settings › Billing and Subscription. */
+/* What a referral row looks like to the pharmacy that shared the link:
+   "Registered — Ready to claim", "Invited — Awaiting registration". */
+function referralStage(row: { status: string; reward_claimed_at?: string | null; reward_days?: number | null }) {
+  if (row.status === 'converted') {
+    return row.reward_claimed_at
+      ? { registration: 'Registered', extension: 'claimed', extensionLabel: `Claimed +${row.reward_days ?? 0} days` }
+      : rewardDays() > 0
+        ? { registration: 'Registered', extension: 'ready', extensionLabel: 'Ready to claim' }
+        : { registration: 'Registered', extension: 'none', extensionLabel: '—' };
+  }
+  if (row.status === 'review') return { registration: 'Being checked', extension: 'review', extensionLabel: 'Waiting for the KSF check' };
+  if (row.status === 'rejected') return { registration: 'Not accepted', extension: 'none', extensionLabel: '—' };
+  return { registration: 'Invited', extension: 'waiting', extensionLabel: 'Awaiting registration' };
+}
+
+/** The referral panel: Subscription plans › Referrals, and Settings › Billing and Subscription. */
 export async function referralSummary(pharmacyId: string, userId: string | null = null) {
   const row = await codeFor(pharmacyId, userId);
-  const rows = await col.referrals().aggregate([
-    { $match: { referrer_pharmacy_id: pharmacyId } }, { $sort: { created_at: -1 } }, { $limit: 50 },
-    { $lookup: { from: 'pharmacies', localField: 'referred_pharmacy_id', foreignField: '_id', as: 'pharmacy' } },
-    { $set: { pharmacy_name: { $first: '$pharmacy.name' } } }
-  ]).toArray();
+  const [rows, [totals]] = await Promise.all([
+    col.referrals().aggregate<Referral & { pharmacy_name?: string }>([
+      { $match: { referrer_pharmacy_id: pharmacyId } }, { $sort: { created_at: -1 } }, { $limit: 50 },
+      { $lookup: { from: 'pharmacies', localField: 'referred_pharmacy_id', foreignField: '_id', as: 'pharmacy' } },
+      { $set: { pharmacy_name: { $first: '$pharmacy.name' } } }
+    ]).toArray(),
+    col.referrals().aggregate<{ invitations: number; completed: number; ready: number; claimedDays: number }>([
+      { $match: { referrer_pharmacy_id: pharmacyId, status: { $ne: 'rejected' } } },
+      {
+        $group: {
+          _id: null, invitations: { $sum: 1 },
+          completed: { $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] } },
+          ready: { $sum: { $cond: [{ $and: [{ $eq: ['$status', 'converted'] }, { $not: [{ $ifNull: ['$reward_claimed_at', false] }] }] }, 1, 0] } },
+          claimedDays: { $sum: { $cond: [{ $ifNull: ['$reward_claimed_at', false] }, { $ifNull: ['$reward_days', 0] }, 0] } }
+        }
+      }
+    ]).toArray()
+  ]);
   const counts: Record<string, number> = {};
   for (const item of rows) counts[item.status] = (counts[item.status] ?? 0) + 1;
+  const perReferral = rewardDays();
   return {
     code: row.code, link: referralLink(row.code), trialDays: await trialDays(), prices: await referralPrices(), uses: row.uses, successful: row.successful,
     maxUses: row.max_uses, counts,
+    /* The Referrals tab: invitations, completed registrations and the days they earned. */
+    rewards: {
+      daysPerReferral: perReferral,
+      invitations: totals?.invitations ?? 0,
+      completed: totals?.completed ?? 0,
+      readyCount: perReferral > 0 ? totals?.ready ?? 0 : 0,
+      readyDays: perReferral > 0 ? (totals?.ready ?? 0) * perReferral : 0,
+      claimedDays: totals?.claimedDays ?? 0
+    },
     referrals: rows.map((item) => ({
-      id: item.id, email: maskEmail(item.referred_email), pharmacyName: item.pharmacy_name ?? null, status: item.status,
-      registeredAt: item.registered_at, convertedAt: item.converted_at
+      id: item.id, email: maskEmail(item.referred_email), pharmacyName: item.pharmacy_name ?? null, name: item.referred_name ?? null,
+      status: item.status, registeredAt: item.registered_at, convertedAt: item.converted_at,
+      rewardDays: item.reward_days ?? null, rewardClaimedAt: item.reward_claimed_at ?? null,
+      ...referralStage(item)
     }))
   };
+}
+
+/**
+ * Claim every referral day waiting for this pharmacy: each registration that
+ * was honoured and not yet claimed adds REFERRAL_REWARD_DAYS to the end of
+ * the trial or plan. The rows are marked first, conditionally, in the same
+ * transaction as the extension — two claims at once cannot both succeed.
+ */
+export async function claimReferralDays(input: { pharmacyId: string; userId: string }): Promise<{ days: number; referrals: number; endsAt: string; restarted: boolean }> {
+  const perReferral = rewardDays();
+  if (perReferral <= 0) throw new HttpError(400, 'Referral days are switched off on this installation.');
+  return tx(async () => {
+    const ready = await col.referrals().find(
+      { referrer_pharmacy_id: input.pharmacyId, status: 'converted', $or: [{ reward_claimed_at: null }, { reward_claimed_at: { $exists: false } }] },
+      { projection: { _id: 1 }, ...s() }
+    ).toArray();
+    if (!ready.length) throw new HttpError(409, 'There are no referral days to claim yet. They are ready once a pharmacy you invited registers and confirms its e-mail.', undefined, 'nothing_to_claim');
+    const at = nowIso();
+    const ids = ready.map((row) => row._id);
+    const marked = await col.referrals().updateMany(
+      { _id: { $in: ids }, $or: [{ reward_claimed_at: null }, { reward_claimed_at: { $exists: false } }] },
+      { $set: { reward_days: perReferral, reward_claimed_at: at, reward_claimed_by: input.userId, updated_at: at } }, s()
+    );
+    if (marked.modifiedCount !== ids.length) throw new HttpError(409, 'These days were claimed a moment ago. Refresh to see the new end date.', undefined, 'already_claimed');
+    const days = perReferral * ids.length;
+    const extended = await addAccessDays({ pharmacyId: input.pharmacyId, days, source: 'referral-reward' });
+    return { days, referrals: ids.length, ...extended };
+  });
 }

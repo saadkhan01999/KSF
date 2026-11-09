@@ -208,7 +208,7 @@ publicRoute('POST', '/api/v1/register/start', async (ctx) => {
   await hit(`reg:${ctx.ip}`, env.REGISTER_MAX_PER_IP, 3_600_000);
 
   if (referral) {
-    const claim = await claimReferral({ code: referral, email, ip: ctx.ip });
+    const claim = await claimReferral({ code: referral, email, ip: ctx.ip, name: `${firstName} ${lastName}` });
     await col.registrations().updateOne({ _id: id }, claim.ok
       ? { $set: { payload: { ...base, referralId: claim.referralId! } } }
       : { $set: { referral_code: null, payload: { ...base, referralProblem: claim.reason ?? '' } } });

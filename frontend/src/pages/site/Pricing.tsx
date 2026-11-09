@@ -101,7 +101,7 @@ export default function Pricing() {
             <span className="eyebrow">The free trial</span>
             <h2>{trialDays} days of everything, without a card</h2>
             <p>
-              Every new pharmacy starts on the Starter plan: complete account access, every
+              Every new pharmacy starts on the Demo plan: complete account access, every
               feature and unlimited data for {trialDays} days. There is no card to enter, so there
               is nothing to cancel and nothing that can quietly start charging you.
             </p>
@@ -230,7 +230,7 @@ export default function Pricing() {
 
       <SiteCta
         title={`Start free for ${trialDays} days`}
-        body="No card to enter. Bring your catalogue across, serve a week or two of customers, and choose Monthly or Yearly when you are sure."
+        body="No card to enter. Bring your catalogue across, serve a week or two of customers, and choose Pro or Diamond Annual when you are sure."
       />
     </SitePage>
   );

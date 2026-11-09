@@ -186,6 +186,9 @@ export const col = {
   referralCodes: c<T.ReferralCode>('referral_codes'),
   referrals: c<T.Referral>('referrals'),
   trials: c<T.Trial>('trials'),
+  siteVisits: c<T.SiteVisit>('site_visits'),
+  sitePages: c<T.SitePageDay>('site_pages'),
+  activeDays: c<T.ActiveDay>('active_days'),
 
   migrationJobs: c<T.MigrationJob>('migration_jobs'),
   migrationItems: c<T.MigrationItem>('migration_items'),

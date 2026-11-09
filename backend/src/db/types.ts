@@ -402,12 +402,26 @@ export interface Referral extends Base {
   referred_pharmacy_id: Id | null; referred_user_id: Id | null; referred_email: string; trial_id: Id | null;
   status: string; reject_reason: string | null; signup_ip: string | null; registered_at: When | null;
   verified_at: When | null; converted_at: When | null; created_at: When; updated_at: When;
+  /** The person who started registering with the code, shown to the referrer while they have not finished. */
+  referred_name?: string | null;
+  /** Days of access the referrer claimed for this registration, and when (Subscription wallet › Referrals). */
+  reward_days?: number | null; reward_claimed_at?: When | null; reward_claimed_by?: Id | null;
 }
 
 export interface Trial extends Base {
   pharmacy_id: Id; subscription_id: Id | null; plan_key: string; source: string; referral_id: Id | null;
   days: number; started_at: When; expires_at: When; ended_at: When | null; status: string; created_at: When; updated_at: When;
+  /** Days added to this trial by referrals the pharmacy claimed. */
+  bonus_days?: number;
 }
+
+/* ------------------------------------------------- website visits and use */
+/** One visitor on one day: a keyed hash of a random number the browser keeps. No address, no cookie. */
+export interface SiteVisit { _id: string; day: string; visitor: string; path: string; referrer: string | null; created_at: When; expires_at: Date }
+/** How often one public page was opened on one day. */
+export interface SitePageDay { _id: string; day: string; path: string; views: number; expires_at: Date }
+/** Somebody signed in used KSF on this day: what "active users" counts. */
+export interface ActiveDay { _id: string; day: string; user_id: Id; pharmacy_id: Id | null; created_at: When; expires_at: Date }
 
 /* ----------------------------------------------------------- data import */
 export interface MigrationJob extends Base {

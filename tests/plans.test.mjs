@@ -2,7 +2,7 @@
 
    Every pharmacy starts on the 15-day free trial with every feature. A
    pharmacy that came through a referral pays Rs 1,300 a month on Monthly,
-   everyone else Rs 1,500; Monthly runs for three months at most; Yearly is
+   everyone else Rs 1,400; Monthly runs for three months at most; Yearly is
    Rs 12,000. When the trial or a plan ends, the pharmacy's records can still
    be read but not changed until it pays, and nothing is ever deleted. An
    installation from before the price sheet moves to it once, without
@@ -75,7 +75,7 @@ describe('the price sheet: Starter, Monthly and Yearly', { skip }, () => {
     assert.equal(starter.pricePaisa, 0);
     assert.equal(starter.isTrial, true);
     assert.equal(starter.trialDays, 15);
-    assert.equal(monthly.pricePaisa, 150_000);
+    assert.equal(monthly.pricePaisa, 140_000);
     assert.equal(monthly.referralPricePaisa, 130_000);
     assert.equal(monthly.maxCycles, 3);
     assert.equal(monthly.period, 'month');
@@ -100,9 +100,9 @@ describe('the price sheet: Starter, Monthly and Yearly', { skip }, () => {
     assert.equal(offer(billing, 'starter').available, false);
 
     const mine = await referrer.client.get('/api/v1/billing');
-    assert.equal(offer(mine, 'monthly').yourPricePaisa, 150_000);
+    assert.equal(offer(mine, 'monthly').yourPricePaisa, 140_000);
     assert.equal(mine.referrals.successful, 1);
-    assert.deepEqual(mine.referrals.prices.map((row) => [row.plan, row.pricePaisa, row.listPricePaisa]), [['monthly', 130_000, 150_000]]);
+    assert.deepEqual(mine.referrals.prices.map((row) => [row.plan, row.pricePaisa, row.listPricePaisa]), [['monthly', 130_000, 140_000]]);
   });
 
   it('takes a referral code after registering, but never the pharmacy’s own, and only once', async () => {
@@ -115,7 +115,7 @@ describe('the price sheet: Starter, Monthly and Yearly', { skip }, () => {
     assert.equal((await direct.client.call('POST', '/api/v1/billing/referral', { code })).status, 400);
     /* Back to the list price for the rest of these tests. */
     await mongo.col.referrals().updateMany({ referred_pharmacy_id: direct.pharmacyId }, { $set: { status: 'rejected' } });
-    assert.equal(offer(await direct.client.get('/api/v1/billing'), 'monthly').yourPricePaisa, 150_000);
+    assert.equal(offer(await direct.client.get('/api/v1/billing'), 'monthly').yourPricePaisa, 140_000);
   });
 
   it('charges the referral price at checkout whatever the browser sends, and keeps the trial days', async () => {
@@ -129,7 +129,7 @@ describe('the price sheet: Starter, Monthly and Yearly', { skip }, () => {
     assert.ok(state.daysLeft >= 15 + 28, `the month starts where the trial ends: ${state.daysLeft} day(s) left`);
     const [invoice] = (await referred.client.get('/api/v1/billing')).payments;
     assert.equal(invoice.amount_paisa, 130_000);
-    assert.equal(invoice.plan_name, 'Monthly');
+    assert.equal(invoice.plan_name, 'Pro');
   });
 
   it('refuses changes after the free trial ends, but never reading, and says why', async () => {
@@ -144,7 +144,7 @@ describe('the price sheet: Starter, Monthly and Yearly', { skip }, () => {
     const refused = await direct.client.call('POST', '/api/v1/categories', { name: 'After the trial' });
     assert.equal(refused.status, 402);
     assert.equal(refused.body.code, 'plan_required');
-    assert.match(refused.body.message, /free trial has ended.*Monthly or Yearly/);
+    assert.match(refused.body.message, /free trial has ended.*Pro or Diamond Annual/);
     await direct.client.get('/api/v1/medicines');
     await direct.client.get('/api/v1/billing');
     /* The way to a plan stays open. */
@@ -199,9 +199,9 @@ describe('the price sheet: Starter, Monthly and Yearly', { skip }, () => {
     assert.equal(state.status, 'trial');
     assert.equal(state.trial.daysLeft, 20);
     /* A payment recorded by hand on a trial must say which plan it is for. */
-    const unnamed = await admin.call('POST', `/api/v1/platform/pharmacies/${late.pharmacyId}/payments`, { amountPaisa: 150_000, reference: 'CASH-1' });
+    const unnamed = await admin.call('POST', `/api/v1/platform/pharmacies/${late.pharmacyId}/payments`, { amountPaisa: 140_000, reference: 'CASH-1' });
     assert.equal(unnamed.status, 400);
-    await admin.post(`/api/v1/platform/pharmacies/${late.pharmacyId}/payments`, { amountPaisa: 150_000, reference: 'CASH-1', planKey: 'monthly' }, 201);
+    await admin.post(`/api/v1/platform/pharmacies/${late.pharmacyId}/payments`, { amountPaisa: 140_000, reference: 'CASH-1', planKey: 'monthly' }, 201);
     assert.equal((await late.client.get('/api/v1/billing/entitlements')).plan, 'monthly');
   });
 
@@ -240,7 +240,7 @@ describe('the price sheet: Starter, Monthly and Yearly', { skip }, () => {
     assert.equal(basic.status, 'retired');
     assert.equal(basic.is_default, 0);
     const monthly = await mongo.col.plans().findOne({ key: 'monthly' });
-    assert.deepEqual([monthly.price_paisa, monthly.referral_price_paisa, monthly.max_cycles], [150_000, 130_000, 3]);
+    assert.deepEqual([monthly.price_paisa, monthly.referral_price_paisa, monthly.max_cycles], [140_000, 130_000, 3]);
     const state = await old.client.get('/api/v1/billing/entitlements');
     assert.equal(state.plan, 'starter');
     assert.equal(state.status, 'trial');
@@ -252,5 +252,28 @@ describe('the price sheet: Starter, Monthly and Yearly', { skip }, () => {
     assert.deepEqual(await adoptPriceSheet(), { trials: 0 });
     const plans = await new Client(server.base).get('/api/v1/public/plans');
     assert.deepEqual(plans.data.map((plan) => plan.key), ['starter', 'monthly', 'yearly']);
+  });
+
+  it('renames Starter, Monthly and Yearly to Demo, Pro (Rs 1,400) and Diamond Annual once, leaving what the Super Admin changed', async () => {
+    const { adoptWalletPlans } = await import('../backend/src/db/bootstrap.ts');
+    /* An installation from 2.8: the old names and the old Monthly price — except a Yearly the Super Admin renamed. */
+    await mongo.col.plans().updateOne({ key: 'starter' }, { $set: { name: 'Starter' } });
+    await mongo.col.plans().updateOne({ key: 'monthly' }, { $set: { name: 'Monthly', price_paisa: 150_000 } });
+    await mongo.col.plans().updateOne({ key: 'yearly' }, { $set: { name: 'Gold Year' } });
+    await mongo.col.counters().deleteOne({ _id: 'plans:wallet-2026-11' });
+
+    assert.ok(await adoptWalletPlans() >= 3);
+    const plans = await new Client(server.base).get('/api/v1/public/plans');
+    assert.deepEqual(plans.data.map((plan) => [plan.key, plan.name]), [['starter', 'Demo'], ['monthly', 'Pro'], ['yearly', 'Gold Year']]);
+    assert.equal(plans.data[1].pricePaisa, 140_000);
+    assert.equal(plans.data[1].description, 'Keep your pharmacy running with full access on a monthly subscription.');
+
+    /* Once only: a later change by the Super Admin is never put back. */
+    await mongo.col.plans().updateOne({ key: 'monthly' }, { $set: { name: 'Pro Plus', price_paisa: 160_000 } });
+    assert.equal(await adoptWalletPlans(), 0);
+    const after = await mongo.col.plans().findOne({ key: 'monthly' });
+    assert.deepEqual([after.name, after.price_paisa], ['Pro Plus', 160_000]);
+    await mongo.col.plans().updateOne({ key: 'monthly' }, { $set: { name: 'Pro', price_paisa: 140_000 } });
+    await mongo.col.plans().updateOne({ key: 'yearly' }, { $set: { name: 'Diamond Annual' } });
   });
 });

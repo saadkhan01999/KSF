@@ -382,8 +382,8 @@ export default function Landing() {
                 from its first payment, once it confirms its e-mail address.
               </p>
               <p className="referral-fineprint">
-                Everybody starts with the {trialDays}-day free trial. When it ends you choose Monthly
-                or Yearly, and every medicine, batch, sale and prescription is exactly where it
+                Everybody starts with the {trialDays}-day free trial. When it ends you choose Pro
+                or Diamond Annual, and every medicine, batch, sale and prescription is exactly where it
                 was. Nothing is deleted when a trial or a plan ends — not then, and not later.
               </p>
             </div>

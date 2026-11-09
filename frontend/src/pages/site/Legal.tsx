@@ -208,6 +208,15 @@ function Privacy({ business }: { business: Business }) {
         issued and stored in a cookie, not by measuring your browser's fonts or graphics. Clearing
         your cookies looks like a new device, which is the honest outcome.
       </p>
+      <p>
+        The public website (not the application you sign in to) counts its own visitors, so we know
+        how many people read it. Your browser keeps a random number in its own storage — not a cookie —
+        and sends it with the address of the page you opened and the name of the website that linked
+        you here, if any, to this installation and nowhere else.
+        The server keeps only a scrambled form of that number for about a year, with no IP address,
+        and counts each browser once a day. If your browser asks sites not to track it (Do Not Track
+        or Global Privacy Control), nothing is sent at all.
+      </p>
 
       <h2 id="cookies">Cookies</h2>
       <p>
@@ -287,15 +296,15 @@ function Terms({ business }: { business: Business }) {
         A licence to use KSF for your pharmacy, for the period you have paid for, with the features
         of the plan you chose. Prices are shown on the <Link to="/pricing">pricing page</Link>, in
         rupees, inclusive of the taxes stated there. Every plan includes every feature; the
-        first fifteen days, on the Starter plan, are free.
+        first fifteen days, on the Demo plan, are free.
       </p>
 
       <h2 id="billing">Billing, renewal and what happens if you stop paying</h2>
       <ul className="legal-list">
         <li>
           A paid plan is billed for the cycle you choose, monthly or yearly, in advance. The
-          Monthly plan is a starter plan and can be paid for up to three months; after that the
-          Yearly plan carries on.
+          Pro plan can be paid for month by month for up to three months; after that the
+          Diamond Annual plan carries on.
         </li>
         <li>
           <b>A subscription renews automatically</b> at the end of each cycle, at the price then

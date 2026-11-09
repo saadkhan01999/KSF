@@ -95,7 +95,7 @@ export function SiteHeader() {
  */
 export function SiteCta({
   title = 'Bring your pharmacy onto KSF',
-  body = 'Fifteen days of the full system, free — then Monthly or Yearly, with full access on both. Your data is yours either way.',
+  body = 'Fifteen days of the full system, free — then Pro or Diamond Annual, with full access on both. Your data is yours either way.',
   primary = 'Start free trial',
   secondary = 'Sign in'
 }: {

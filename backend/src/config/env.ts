@@ -114,6 +114,9 @@ const schema = z.object({
   REFERRAL_MAX_USES: int(100, 1),
   REFERRAL_MAX_PER_DAY: int(10, 1),
   REFERRAL_MAX_PER_IP_PER_DAY: int(3, 1),
+  /* Days of full access a pharmacy earns for each pharmacy that registers
+     through its link (Subscription wallet › Referrals). 0 turns it off. */
+  REFERRAL_REWARD_DAYS: int(15, 0),
   REGISTER_MAX_PER_IP: int(20, 1),
 
   /* -------------------------------------------------------------- edition */
@@ -151,6 +154,8 @@ const schema = z.object({
   BUSINESS_WHATSAPP: z.string().default(''),
   SUPPORT_EMAIL: z.string().default(''),
   SALES_EMAIL: z.string().default(''),
+  /* The number a pharmacy calls about the annual plan and custom pricing. */
+  SALES_PHONE: z.string().default('+92 371 3999656'),
   BUSINESS_WEBSITE: z.string().default(''),
   BUSINESS_NTN: z.string().default(''),
   BUSINESS_STRN: z.string().default(''),
@@ -285,6 +290,7 @@ export const BUSINESS = {
   whatsapp: env.BUSINESS_WHATSAPP,
   supportEmail: env.SUPPORT_EMAIL,
   salesEmail: env.SALES_EMAIL,
+  salesPhone: env.SALES_PHONE || env.BUSINESS_PHONE,
   website: env.BUSINESS_WEBSITE,
   ntn: env.BUSINESS_NTN,
   strn: env.BUSINESS_STRN,

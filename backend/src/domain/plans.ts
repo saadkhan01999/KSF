@@ -6,16 +6,20 @@
    whatever it signed up to. These are the plans a brand-new platform starts
    with; they are inserted once and never overwritten.
 
-   Three plans, from the owner's price sheet (November 2026):
+   Three plans, from the owner's Subscription wallet design (2.9.0; until
+   2.8 they were called Starter, Monthly and Yearly, Monthly at Rs 1,500):
 
-     Starter   the free trial: 15 days of everything, once per account
-     Monthly   Rs 1,500 a month, or Rs 1,300 for a pharmacy that came through
-               a referral — a beginner's plan, for up to three months
-     Yearly    Rs 12,000 a year, about Rs 1,000 a month
+     Demo            the free trial: 15 days of everything, once per account
+     Pro             Rs 1,400 a month, or the referral price for a pharmacy
+                     that came through a referral, for up to three months
+     Diamond Annual  Rs 12,000 a year, about Rs 1,000 a month
+
+   Beside them, the Standard Referral: every pharmacy that registers through
+   a pharmacy's link earns it 15 more days (services/referrals.ts).
 
    Every plan has every feature and no limit on the records a pharmacy keeps.
    When the trial (or a paid plan) ends, nothing is deleted: the pharmacy is
-   asked to choose Monthly or Yearly, and until it does its records can be
+   asked to choose Pro or Diamond Annual, and until it does its records can be
    read but not changed.
    ========================================================================== */
 
@@ -61,20 +65,20 @@ const DEVICES = { desktop: 3, mobile: 3 };
 
 export const PLAN_SEED: PlanSeed[] = [
   {
-    key: 'starter', name: 'Starter', tagline: 'Free trial — 15 days of the full system',
-    description: 'Complete account access, every feature and unlimited data for 15 days. No card is asked for. When it ends, choose Monthly or Yearly — nothing you entered is lost.',
+    key: 'starter', name: 'Demo', tagline: 'Free trial — 15 days of the full system',
+    description: 'Start billing, add medicines and use every feature from day one.',
     period: 'trial', periodDays: 15, pricePaisa: 0, discount: 0, trialDays: 15, graceDays: 0, ...DEVICES, ...UNLIMITED,
     features: EVERYTHING, autoRenew: 0, isDefault: 1, isFree: 1, sort: 1, referralPricePaisa: null, maxCycles: 0, isTrial: 1
   },
   {
-    key: 'monthly', name: 'Monthly', tagline: '3-month starter plan, for beginners',
-    description: 'Every feature and unlimited data, paid month by month for up to three months. Rs 1,300 a month with a referral, Rs 1,500 without one.',
-    period: 'month', periodDays: 30, pricePaisa: 150000, discount: 0, trialDays: 0, graceDays: 7, ...DEVICES, ...UNLIMITED,
+    key: 'monthly', name: 'Pro', tagline: 'Full access, month by month',
+    description: 'Keep your pharmacy running with full access on a monthly subscription.',
+    period: 'month', periodDays: 30, pricePaisa: 140000, discount: 0, trialDays: 0, graceDays: 7, ...DEVICES, ...UNLIMITED,
     features: EVERYTHING, autoRenew: 1, isDefault: 0, isFree: 0, sort: 2, referralPricePaisa: 130000, maxCycles: 3, isTrial: 0
   },
   {
-    key: 'yearly', name: 'Yearly', tagline: 'Best value — about Rs 1,000 a month',
-    description: 'Every feature, unlimited data and 24/7 access all year round, for one payment. Saves Rs 6,000 against twelve months on Monthly.',
+    key: 'yearly', name: 'Diamond Annual', tagline: 'Best value — about Rs 1,000 a month',
+    description: 'Every feature, unlimited data and full access all year round, billed once a year.',
     period: 'year', periodDays: 365, pricePaisa: 1200000, discount: 33.3, trialDays: 0, graceDays: 14, ...DEVICES, ...UNLIMITED,
     features: EVERYTHING, autoRenew: 1, isDefault: 0, isFree: 0, sort: 3, referralPricePaisa: null, maxCycles: 0, isTrial: 0
   }
@@ -85,3 +89,17 @@ export const TRIAL_PLAN_KEY = 'starter';
 
 /** The plans of earlier releases, retired when an installation moves to these three. */
 export const RETIRED_PLAN_KEYS = ['basic', 'weekly', 'annual'];
+
+/**
+ * The 2.9.0 renaming, applied once to an installation that already had the
+ * plans: each name, wording and price moves only while it is still the old
+ * default, so whatever the Super Admin changed by hand stays as they set it.
+ */
+export const WALLET_RENAMES: ReadonlyArray<{ key: string; from: { name: string; pricePaisa?: number }; to: { name: string; tagline: string; description: string; pricePaisa?: number } }> = [
+  { key: 'starter', from: { name: 'Starter' }, to: { name: 'Demo', tagline: 'Free trial — 15 days of the full system', description: 'Start billing, add medicines and use every feature from day one.' } },
+  {
+    key: 'monthly', from: { name: 'Monthly', pricePaisa: 150000 },
+    to: { name: 'Pro', tagline: 'Full access, month by month', description: 'Keep your pharmacy running with full access on a monthly subscription.', pricePaisa: 140000 }
+  },
+  { key: 'yearly', from: { name: 'Yearly' }, to: { name: 'Diamond Annual', tagline: 'Best value — about Rs 1,000 a month', description: 'Every feature, unlimited data and full access all year round, billed once a year.' } }
+];

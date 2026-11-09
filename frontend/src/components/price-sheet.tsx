@@ -101,13 +101,13 @@ export function SheetPlanCard({ plan, plans, action, current, note }: {
         {tone === 'monthly' && plan.maxCycles > 0 && (
           <p className="sheet-box">
             <strong>Plan duration: {months(plan.maxCycles)}</strong>
-            <span>Starter plan, paid month by month</span>
+            <span>Paid month by month</span>
           </p>
         )}
         {saving && (
           <p className="sheet-box is-saving">
             <Tag size={18} aria-hidden="true" />
-            <span className="sheet-saving"><strong>Save {rupees(saving.savedPaisa)} vs. Monthly</strong><span>(≈ {saving.percent}% discount)</span></span>
+            <span className="sheet-saving"><strong>Save {rupees(saving.savedPaisa)} vs. Pro monthly</strong><span>(≈ {saving.percent}% discount)</span></span>
           </p>
         )}
 

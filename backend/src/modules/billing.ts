@@ -12,7 +12,7 @@
    ========================================================================== */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { env } from '../config/env.js';
+import { BUSINESS, env } from '../config/env.js';
 import { col } from '../db/mongo.js';
 import { bad, missing, tooMany } from '../core/errors.js';
 import { auditLog, logActivity, notify, securityEvent } from '../core/trails.js';
@@ -27,7 +27,7 @@ import {
   adapterFor, attemptsFor, availableProviders, confirmReturn, createAttempt, defaultProviderKey, listProviders, providerPortal, receiveEvent,
   refundsFor, setProviderRenewal, settleFromProvider
 } from '../services/payments/index.js';
-import { applyReferralCode, referralSummary } from '../services/referrals.js';
+import { applyReferralCode, claimReferralDays, referralSummary } from '../services/referrals.js';
 
 const rupees = (paisa: number): string => `Rs ${(paisa / 100).toLocaleString('en-PK')}`;
 
@@ -54,7 +54,9 @@ route('GET', '/api/v1/billing', 'settings.read', async (ctx) => {
     subscription, plans, payments, referrals, canManage: ctx.can('settings.write'),
     providers: availableProviders().map(({ key, label, mode, note, methods }) => ({ key, label, mode, note, methods })),
     defaultProvider: defaultProviderKey(),
-    card: renewer ? { provider: renewer.label, canChange: !!renewer.portal } : null
+    card: renewer ? { provider: renewer.label, canChange: !!renewer.portal } : null,
+    /* Who to call about the annual plan or a price of your own. */
+    sales: { phone: BUSINESS.salesPhone || null, whatsapp: BUSINESS.whatsapp || BUSINESS.salesPhone || null, email: BUSINESS.salesEmail || BUSINESS.supportEmail || null }
   };
 });
 
@@ -158,6 +160,25 @@ route('POST', '/api/v1/billing/referral', 'settings.write', async (ctx) => {
   if (!result.ok) bad(result.reason ?? 'That code could not be used.', 'code');
   await auditLog(ctx, { action: 'billing.referral-applied', entity: 'pharmacy', entityId: ctx.pharmacyId, summary: `Referral code ${code} applied` });
   return { plans: await offersFor(ctx.pharmacyId), message: 'Referral code applied. The referral price is used from your next payment.' };
+});
+
+/* The days earned by pharmacies that registered through this pharmacy's
+   link, added to the end of its trial or plan in one go. */
+route('POST', '/api/v1/billing/referral-rewards/claim', 'settings.write', async (ctx) => {
+  const before = await subscriptionState(ctx.pharmacyId);
+  const claimed = await claimReferralDays({ pharmacyId: ctx.pharmacyId, userId: ctx.user.id });
+  const after = await subscriptionState(ctx.pharmacyId);
+  const endsOn = claimed.endsAt.slice(0, 10);
+  const summary = `${claimed.days} referral day(s) claimed for ${claimed.referrals} registration(s); access now runs to ${endsOn}`;
+  await logActivity(ctx, { action: 'billing.referral-days-claimed', entity: 'subscription', entityId: after?.subscriptionId, summary });
+  await auditLog(ctx, {
+    action: 'billing.referral-days-claimed', entity: 'subscription', entityId: after?.subscriptionId, summary,
+    before: { periodEnd: before?.periodEnd, daysLeft: before?.daysLeft }, after: { periodEnd: after?.periodEnd, daysLeft: after?.daysLeft }
+  });
+  return {
+    subscription: after, referrals: await referralSummary(ctx.pharmacyId, ctx.user.id), claimed,
+    message: `${claimed.days} days added. Full access now runs until ${endsOn}.`
+  };
 });
 
 /* The provider's own page for changing the card (Stripe's billing portal). */

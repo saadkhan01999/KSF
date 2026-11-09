@@ -15,6 +15,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { env, IS_PROD, isAllowedOrigin, originAllowed, STATIC_FOLDER, VERSION } from '../config/env.js';
+import { noteActiveDay } from '../services/insights.js';
 import { describeDatabase, supportsTransactions } from '../db/mongo.js';
 import { HttpError } from '../core/errors.js';
 import { nowIso, rateLimit } from '../core/util.js';
@@ -105,6 +106,8 @@ async function handle(def: RouteDef, req: Request, res: Response): Promise<void>
       supportMode: auth.supportMode, isPlatformAdmin: auth.isPlatformAdmin, isPlatformStaff: auth.isPlatformStaff,
       platformPermissions: auth.platformPermissions
     });
+    /* Who used KSF today, for the platform's "active users" (once per person per day). */
+    noteActiveDay(auth.user.id, auth.supportMode || auth.isPlatformAdmin || auth.isPlatformStaff ? null : auth.pharmacyId);
 
     if (def.access === 'platform') {
       if (!ctx.isPlatformAdmin && !ctx.isPlatformStaff) throw new HttpError(403, 'Only the KSF platform team can do this.');

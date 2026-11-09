@@ -83,7 +83,7 @@ export default function Accounts() {
               ))
               : (
                 <MenuItem icon={<Lock size={16} />} disabled>
-                  Downloads come with the Weekly, Monthly and Annual plans
+                  Downloads come with a paid plan — see Subscription plans
                 </MenuItem>
               ))}
           </Menu>

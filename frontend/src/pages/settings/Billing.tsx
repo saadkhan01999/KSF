@@ -1,6 +1,10 @@
 /* ==========================================================================
    Settings › Billing and Subscription
    --------------------------------------------------------------------------
+   Plans and referrals have their own screen, Subscription plans (pages/
+   subscription); this one keeps the details: the payment history and its
+   receipts, automatic renewal, the card, cancelling and a referral code.
+
    The plan, what it costs this pharmacy, until when, what has been paid, and
    the referral code — laid out like the price sheet: Starter (the free
    trial), Monthly and Yearly.
@@ -15,35 +19,19 @@
 
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CreditCard, Gift, ArrowUpRight, RefreshCw, Receipt, FileText, Lock, Sparkles, Ticket } from 'lucide-react';
+import { CreditCard, Gift, ArrowUpRight, RefreshCw, Receipt, FileText, Sparkles, Ticket } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useApiData, useAction, useLiveRefresh } from '../../hooks/useApi';
 import { api } from '../../services/api';
 import {
-  Button, Card, Modal, ConfirmDialog, Alert, CardSkeleton, EmptyState, Switch, Badge, TextInput
+  Button, Card, ConfirmDialog, Alert, CardSkeleton, EmptyState, Switch, Badge, TextInput
 } from '../../components/ui';
 import { StatusNote, DetailRow, SubscriptionBadge, CopyField } from '../../components/account-ui';
 import { FullAccessStrip, SheetPlanCard } from '../../components/price-sheet';
 import { InvoiceDialog } from '../../components/invoice';
+import { CheckoutDialogs } from '../../components/checkout';
 import { rupees, date, dateTime } from '../../utils/format';
-import type { BillingOverview, CheckoutReply, PlanOffer } from '../../types';
-
-/** Send the browser to the provider's own page: a link, or a signed form it posts. */
-function goToProvider(redirect: NonNullable<CheckoutReply['redirect']>): void {
-  if (redirect.method === 'GET') { window.location.assign(redirect.url); return; }
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = redirect.url;
-  for (const [name, value] of Object.entries(redirect.fields)) {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = name;
-    input.value = value;
-    form.appendChild(input);
-  }
-  document.body.appendChild(form);
-  form.submit();
-}
+import type { BillingOverview, PlanOffer } from '../../types';
 
 /* What the provider's return said, in words. The plan itself follows the
    live feed: it turns active when the provider confirms, not before. */
@@ -63,10 +51,8 @@ export function Billing() {
   useLiveRefresh(reload);
 
   const [cancelOpen, setCancelOpen] = useState(false);
-  /* The plan being paid for, and how. */
+  /* The plan being paid for: CheckoutDialogs asks how, and takes it from there. */
   const [paying, setPaying] = useState<string | null>(null);
-  const [provider, setProvider] = useState('');
-  const [checkout, setCheckout] = useState<CheckoutReply | null>(null);
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
   const [code, setCode] = useState('');
 
@@ -94,7 +80,7 @@ export function Billing() {
   /* Choose a plan, then straight on to how to pay for it. */
   const startPlan = async (offer: PlanOffer) => {
     if (!(await choosePlan(offer.key))) return;
-    if (!offer.isFree) { setProvider(data?.defaultProvider ?? ''); setPaying(offer.key); }
+    if (!offer.isFree) setPaying(offer.key);
   };
 
   useEffect(() => {
@@ -103,14 +89,6 @@ export function Billing() {
     if (offer && offer.available !== false) void startPlan(offer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselected, !!data]);
-
-  const startCheckout = async (planKey: string, providerKey: string) => {
-    const reply = await run(() => api.post<CheckoutReply>('/billing/checkout', { planKey, provider: providerKey }));
-    if (!reply) return;
-    setPaying(null);
-    if (reply.redirect) goToProvider(reply.redirect);
-    else setCheckout(reply);
-  };
 
   const openCardPage = async () => {
     const reply = await run(() => api.post<{ url: string }>('/billing/portal'));
@@ -141,7 +119,6 @@ export function Billing() {
 
   const { subscription, plans, payments, referrals, canManage } = data;
   const currentPlan = plans.find((plan) => plan.key === subscription.plan);
-  const payingPlan = plans.find((plan) => plan.key === paying);
   const onTrial = subscription.status === 'trial';
   const paid = !!currentPlan && !currentPlan.isFree && !subscription.locked;
   /* A server from before 2.6 sends no referral prices and no availability:
@@ -165,7 +142,7 @@ export function Billing() {
       >
         {subscription.locked && (
           <Alert tone="warn" title={subscription.isTrial || subscription.plan === 'none' ? 'Your free trial has ended' : `Your ${subscription.planName} plan has ended`}>
-            Choose Monthly or Yearly below to carry on. Every record is safe and can still be viewed — nothing has been deleted,
+            Choose Pro or Diamond Annual below to carry on. Every record is safe and can still be viewed — nothing has been deleted,
             and everything opens again the moment the payment clears.
           </Alert>
         )}
@@ -224,7 +201,7 @@ export function Billing() {
 
         {onTrial && (
           <StatusNote tone="ok" icon={<Gift size={17} />} title="Your free trial is running — every feature, unlimited data">
-            {subscription.daysLeft ?? 0} day(s) left, until {date(subscription.periodEnd ?? null)}. Choose Monthly or Yearly whenever
+            {subscription.daysLeft ?? 0} day(s) left, until {date(subscription.periodEnd ?? null)}. Choose Pro or Diamond Annual whenever
             you are ready: the plan starts where the trial ends, so no free day is lost, and nothing is charged until you pay.
           </StatusNote>
         )}
@@ -238,7 +215,7 @@ export function Billing() {
             />
             <p className="card-note">
               {subscription.cycles && subscription.cycles.used >= subscription.cycles.max
-                ? `${subscription.planName} runs for ${subscription.cycles.max} months and this is the last one, so it does not renew. Choose Yearly to carry on.`
+                ? `${subscription.planName} runs for ${subscription.cycles.max} months and this is the last one, so it does not renew. Choose Diamond Annual to carry on.`
                 : 'With this off, the plan runs to the end of the period you have paid for; after that you choose a plan again. Nothing is deleted either way.'}
             </p>
           </div>
@@ -247,7 +224,7 @@ export function Billing() {
         {canManage && (
           <div className="card-actions">
             {subscription.pendingPlan && (
-              <Button variant="primary" icon={<CreditCard size={15} />} onClick={() => { setProvider(data.defaultProvider); setPaying(subscription.pendingPlan!.key); }}>
+              <Button variant="primary" icon={<CreditCard size={15} />} onClick={() => setPaying(subscription.pendingPlan!.key)}>
                 Pay for {subscription.pendingPlan.name}
               </Button>
             )}
@@ -266,7 +243,7 @@ export function Billing() {
       {/* ---------------------------- the plans ---------------------------- */}
       <Card
         title={subscription.locked ? 'Choose your plan' : 'The plans'}
-        subtitle={subscription.referralPricing ? 'Your pharmacy came through a referral, so Monthly is at the referral price' : 'Every plan has every feature and no limit on your records'}
+        subtitle={subscription.referralPricing ? 'Your pharmacy came through a referral, so Pro is at the referral price' : 'Every plan has every feature and no limit on your records'}
         icon={<Sparkles size={18} />}
         className="span-2"
       >
@@ -429,72 +406,7 @@ export function Billing() {
 
       {/* ================================ modals =========================== */}
 
-      <Modal
-        open={!!payingPlan}
-        onClose={() => setPaying(null)}
-        icon={<Lock />}
-        title={payingPlan ? `Pay for ${payingPlan.name}` : 'Pay'}
-        subtitle={payingPlan ? `${rupees(payingPlan.yourPricePaisa ?? payingPlan.pricePaisa)} per ${payingPlan.period}${payingPlan.referralApplied ? ' (referral price)' : ''}${payingPlan.autoRenew ? ', renewing automatically until you stop it' : ''}${payingPlan.maxCycles > 0 ? `, for up to ${payingPlan.cyclesLeft ?? payingPlan.maxCycles} month(s)` : ''}` : ''}
-        footer={(
-          <>
-            <Button variant="ghost" onClick={() => setPaying(null)}>Not now</Button>
-            <Button
-              variant="primary" icon={<Lock size={15} />} loading={busy} disabled={!provider || !payingPlan}
-              onClick={() => { if (payingPlan) void startCheckout(payingPlan.key, provider); }}
-            >
-              Continue to payment
-            </Button>
-          </>
-        )}
-      >
-        {data.providers.length === 0 ? (
-          <StatusNote tone="warn" title="Online payment is not set up yet">
-            This installation cannot take payments online yet. The KSF team can record a payment for you — contact support
-            with your subscription reference.
-          </StatusNote>
-        ) : (
-          <div className="pay-options" role="radiogroup" aria-label="How to pay">
-            {data.providers.map((option) => (
-              <label key={option.key} className={`pay-option ${provider === option.key ? 'is-on' : ''}`}>
-                <input type="radio" name="provider" value={option.key} checked={provider === option.key} onChange={() => setProvider(option.key)} />
-                <span>
-                  <strong>{option.label}</strong>
-                  {option.mode === 'test' || option.mode === 'sandbox' ? <Badge tone="warn" dot={false}>Test mode</Badge> : null}
-                  <small>{option.note}</small>
-                </span>
-              </label>
-            ))}
-          </div>
-        )}
-        <p className="card-note">
-          You pay on the provider&apos;s own secure page; card details never reach KSF. The plan turns active the moment the
-          provider confirms the payment to our server, and this screen updates by itself.
-        </p>
-      </Modal>
-
-      <Modal
-        open={!!checkout}
-        onClose={() => setCheckout(null)}
-        title="Complete the payment"
-        subtitle={checkout ? `${checkout.plan.name} — ${rupees(checkout.amountPaisa)}` : ''}
-        footer={<Button variant="primary" onClick={() => { setCheckout(null); void reload(true); }}>Done</Button>}
-      >
-        {checkout && (
-          <>
-            <CopyField label="Payment reference" value={checkout.reference} hint="Put this on the transfer. Without it the payment cannot be matched to your pharmacy." />
-            {checkout.instructions && (
-              <dl className="detail-list">
-                {(['bank', 'accountTitle', 'accountNumber', 'iban', 'branch', 'raastId'] as const).map((key) => (
-                  checkout.instructions?.[key]
-                    ? <DetailRow key={key} label={{ bank: 'Bank', accountTitle: 'Account title', accountNumber: 'Account number', iban: 'IBAN', branch: 'Branch', raastId: 'Raast ID' }[key]}>{String(checkout.instructions[key])}</DetailRow>
-                    : null
-                ))}
-              </dl>
-            )}
-            <StatusNote tone="info">{checkout.note}</StatusNote>
-          </>
-        )}
-      </Modal>
+      <CheckoutDialogs data={data} planKey={paying} onClose={() => setPaying(null)} onDone={() => { void reload(true); }} />
 
       <InvoiceDialog paymentId={invoiceId} onClose={() => setInvoiceId(null)} />
 

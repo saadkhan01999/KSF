@@ -32,7 +32,7 @@ export const FAQ: Question[] = [
   },
   {
     q: 'Do I have to pay to start?',
-    a: 'No. Every pharmacy starts on the Starter plan: fifteen days free, with complete access, every feature and unlimited data. No card is asked for. When the fifteen days are up you choose Monthly or Yearly — and the days you had left are never lost when you pay early.'
+    a: 'No. Every pharmacy starts on the Demo plan: fifteen days free, with complete access, every feature and unlimited data. No card is asked for. When the fifteen days are up you choose Pro or Diamond Annual — and the days you had left are never lost when you pay early.'
   },
   {
     q: 'Can I move my existing records into KSF?',
@@ -165,7 +165,7 @@ export const FEATURE_SECTIONS = [
 export const TRIAL_POINTS: string[] = [
   'It starts when you confirm your e-mail address, with complete access, every feature and unlimited data.',
   'No card is asked for, and nothing is charged when the trial ends.',
-  'Choose Monthly or Yearly whenever you are ready: the plan starts where the trial ends, so no free day is lost.',
+  'Choose Pro or Diamond Annual whenever you are ready: the plan starts where the trial ends, so no free day is lost.',
   'One trial per account, ever — it cannot be restarted by registering again.',
   'When it ends, every medicine, batch, sale and prescription stays exactly where it is. Choose a plan and carry on.'
 ];
@@ -185,7 +185,7 @@ export const RENEWAL_POINTS: string[] = [
 export const SUBSCRIPTION_TERMS: { title: string; body: string }[] = [
   {
     title: 'Every plan is the whole system',
-    body: 'Starter, Monthly and Yearly all include every feature and unlimited records. The plans differ in how long they run and what they cost — never in what your pharmacy can do.'
+    body: 'Demo, Pro and Diamond Annual all include every feature and unlimited records. The plans differ in how long they run and what they cost — never in what your pharmacy can do.'
   },
   {
     title: 'Monthly is a starter plan',

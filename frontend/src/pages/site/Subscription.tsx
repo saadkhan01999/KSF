@@ -15,7 +15,7 @@ const LIFECYCLE = [
   {
     icon: <CreditCard size={16} />,
     title: 'You start free, then choose a plan',
-    body: 'Every pharmacy starts on the 15-day free trial with everything. Choosing Monthly or Yearly changes nothing yet: the trial carries on, and the plan starts where it ends — no free day is lost.'
+    body: 'Every pharmacy starts on the 15-day free trial with everything. Choosing Pro or Diamond Annual changes nothing yet: the trial carries on, and the plan starts where it ends — no free day is lost.'
   },
   {
     icon: <ShieldCheck size={16} />,
@@ -25,7 +25,7 @@ const LIFECYCLE = [
   {
     icon: <RefreshCw size={16} />,
     title: 'It renews on its own',
-    body: 'On the day the period ends, if auto-renewal is on. Monthly stops by itself after its third month, so you can move to Yearly. Each renewal is recorded with its own reference, and a delivery arriving twice extends the period exactly once.'
+    body: 'On the day the period ends, if auto-renewal is on. Pro stops by itself after its third month, so you can move to Diamond Annual. Each renewal is recorded with its own reference, and a delivery arriving twice extends the period exactly once.'
   },
   {
     icon: <Clock size={16} />,

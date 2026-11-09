@@ -15,7 +15,8 @@ import {
   ShieldCheck, Bell, ScrollText, Settings, LogOut, Menu as MenuIcon, X, Search,
   PanelLeftClose, PanelLeftOpen, Sun, Moon, Monitor, KeyRound, User, Palette,
   Store, Plus, MessagesSquare, ChevronsUpDown, LifeBuoy, ChevronDown, CreditCard, Scale,
-  Building2, Gauge, BadgeDollarSign, Layers, HeartHandshake, ArrowLeftCircle, UsersRound, Landmark, BookOpen
+  Building2, Gauge, BadgeDollarSign, Layers, HeartHandshake, ArrowLeftCircle, UsersRound, Landmark, BookOpen,
+  Globe, UserRoundPlus, Share2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BrandLogo, BrandMark } from './Brand';
@@ -49,6 +50,7 @@ const NAV: NavGroup[] = [
       { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard />, permission: 'dashboard.view' },
       { to: '/pos', label: 'New Sale (Till)', icon: <ShoppingCart />, permission: 'pos.operate' },
       { to: '/sales', label: 'Sales History', icon: <ReceiptText />, permission: 'sales.read' },
+      { to: '/subscription-plans', label: 'Subscription plans', icon: <CreditCard />, permission: 'settings.read' },
       { to: '/messages', label: 'Messages', icon: <MessagesSquare />, permission: 'messages.read', badge: 'messagesUnread', badgeTone: 'alert' },
       { to: '/prescriptions', label: 'Prescriptions', icon: <Stethoscope />, permission: 'prescriptions.read', badge: 'prescriptionsPending', badgeTone: 'alert' },
       { to: '/customers', label: 'Customers', icon: <Users />, permission: 'customers.read' }
@@ -98,10 +100,25 @@ const THEME_CHOICES: { value: 'light' | 'dark' | 'system'; label: string; icon: 
    member sees only what their team role includes. */
 const PLATFORM_NAV: NavGroup[] = [
   {
-    label: 'Platform',
+    label: 'Workspace',
     items: [
-      { to: '/platform', label: 'Overview', icon: <Gauge />, permission: 'platform.overview' },
+      { to: '/platform', label: 'Platform overview', icon: <Gauge />, permission: 'platform.overview' },
+      { to: '/platform/traffic', label: 'Website traffic', icon: <Globe />, permission: 'platform.overview' },
+      { to: '/platform/registrations', label: 'Registrations', icon: <UserRoundPlus />, permission: 'platform.pharmacies.view' }
+    ]
+  },
+  {
+    label: 'Management',
+    items: [
+      { to: '/platform/users', label: 'Users', icon: <Users />, permission: 'platform.pharmacies.view' },
       { to: '/platform/pharmacies', label: 'Pharmacies', icon: <Building2 />, permission: 'platform.pharmacies.view' },
+      { to: '/platform/referrals', label: 'Referrals', icon: <Share2 />, permission: 'platform.pharmacies.view' },
+      { to: '/platform/subscriptions', label: 'Subscriptions', icon: <CreditCard />, permission: 'platform.pharmacies.view' }
+    ]
+  },
+  {
+    label: 'Service',
+    items: [
       { to: '/platform/support', label: 'Support desk', icon: <LifeBuoy />, permission: 'platform.support', badge: 'supportOpen', badgeTone: 'alert' },
       { to: '/platform/help', label: 'People who need help', icon: <HeartHandshake />, permission: 'platform.help' },
       { to: '/platform/directory', label: 'Medicine directory', icon: <BookOpen /> }
@@ -134,6 +151,7 @@ const PLATFORM_NAV: NavGroup[] = [
 const PLATFORM_MOBILE_NAV: NavEntry[] = [
   { to: '/platform', label: 'Overview', icon: <Gauge />, permission: 'platform.overview' },
   { to: '/platform/pharmacies', label: 'Pharmacies', icon: <Building2 />, permission: 'platform.pharmacies.view' },
+  { to: '/platform/subscriptions', label: 'Plans', icon: <CreditCard />, permission: 'platform.pharmacies.view' },
   { to: '/platform/support', label: 'Support', icon: <LifeBuoy />, permission: 'platform.support' },
   { to: '/platform/income', label: 'Income', icon: <BadgeDollarSign />, permission: 'platform.finance.view' },
   { to: '/platform/help', label: 'Help', icon: <HeartHandshake />, permission: 'platform.help' },
@@ -173,13 +191,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
   /* A phone has room in the top bar for the word, not the sentence: cut to
      "Sea", the sentence read as a broken field. */
   const narrow = useMediaQuery('(max-width: 479px)');
-  /* The trial or the plan has ended: every screen but Billing, the person's
-     own account, notifications and support shows the plan choice instead.
+  /* The trial or the plan has ended: every screen but Subscription plans,
+     Billing, the person's own account, notifications and support shows the
+     plan choice instead — Subscription plans stays open so a pharmacy can
+     pay, or claim the referral days that open it again.
      The platform team in support mode sees the pharmacy as it is. */
   const tab = new URLSearchParams(location.search).get('tab');
   const showGate = !isPlatform && !user?.supportMode && !!subscription?.locked && !(
     (location.pathname === '/settings' && (tab === 'billing' || tab === 'appearance'))
-    || ['/account', '/notifications', '/support'].some((path) => location.pathname.startsWith(path))
+    || ['/account', '/notifications', '/support', '/subscription-plans'].some((path) => location.pathname.startsWith(path))
   );
   /* The isolated university copy says so, so it is never mistaken for the live service. */
   const { edition } = useBusiness();
