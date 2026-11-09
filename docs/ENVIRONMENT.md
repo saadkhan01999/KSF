@@ -121,6 +121,7 @@ the new parameters.
 | `REFERRAL_MAX_USES` | `100` | Lifetime uses of one code |
 | `REFERRAL_MAX_PER_DAY` | `10` | Uses of one code per day |
 | `REFERRAL_MAX_PER_IP_PER_DAY` | `3` | Referral sign-ups from one IP per day |
+| `REFERRAL_REWARD_DAYS` | `15` | Days of access a pharmacy earns, and claims under Subscription plans › Referrals, for each pharmacy that registers through its link (0 turns it off) |
 | `REGISTER_MAX_PER_IP` | `20` | Sign-up attempts per IP per hour |
 
 The free trial's length (15 days) and the referral price (Rs 1,300 a month on
@@ -175,6 +176,10 @@ optional; anything left empty is simply not shown.
 `BUSINESS_COUNTRY`, `BUSINESS_PHONE`, `BUSINESS_WHATSAPP`, `SUPPORT_EMAIL`,
 `SALES_EMAIL`, `BUSINESS_WEBSITE`, `SUPPORT_HOURS`, `BUSINESS_NTN`,
 `BUSINESS_STRN`.
+
+`SALES_PHONE` (default `+92 371 3999656`) is the number the Subscription plans
+screen gives for the Diamond Annual plan and custom pricing, with a call and a
+WhatsApp button. Empty falls back to `BUSINESS_PHONE`.
 
 ## Development and tests only
 

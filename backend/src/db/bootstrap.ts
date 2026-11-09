@@ -12,7 +12,7 @@ import type { IndexDescription } from 'mongodb';
 import { env } from '../config/env.js';
 import { col, db } from './mongo.js';
 import type { Plan, User } from './types.js';
-import { PLAN_SEED, RETIRED_PLAN_KEYS, TRIAL_PLAN_KEY, type PlanSeed } from '../domain/plans.js';
+import { PLAN_SEED, RETIRED_PLAN_KEYS, TRIAL_PLAN_KEY, WALLET_RENAMES, type PlanSeed } from '../domain/plans.js';
 import { PERMISSION_KEYS, PHARMACY_ADMIN_ROLE, ROLE_GRANTS_BY_RELEASE } from '../domain/permissions.js';
 import { starterFields } from '../domain/medicine-directory.js';
 import { hashPassword, passwordProblem } from '../security/password.js';
@@ -72,8 +72,12 @@ const INDEXES: Record<string, IndexDescription[]> = {
   payment_refunds: [{ key: { payment_id: 1 } }],
   webhook_events: [{ key: { provider: 1, event_id: 1 }, unique: true }],
   referral_codes: [{ key: { code: 1 }, unique: true }, { key: { pharmacy_id: 1 } }],
-  referrals: [{ key: { code: 1, referred_email: 1 }, unique: true }, { key: { referrer_pharmacy_id: 1, status: 1 } }],
+  referrals: [{ key: { code: 1, referred_email: 1 }, unique: true }, { key: { referrer_pharmacy_id: 1, status: 1 } }, { key: { referred_pharmacy_id: 1 } }, { key: { created_at: -1 } }],
   trials: [{ key: { pharmacy_id: 1, status: 1 } }],
+  /* Website visitors and daily use, kept about 13 months for the platform overview. */
+  site_visits: [{ key: { day: 1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
+  site_pages: [{ key: { day: 1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
+  active_days: [{ key: { day: 1 } }, { key: { expires_at: 1 }, expireAfterSeconds: 0 }],
   migration_jobs: [{ key: { pharmacy_id: 1, created_at: -1 } }],
   migration_items: [{ key: { job_id: 1, row_number: 1 } }, { key: { job_id: 1, status: 1 } }],
   mail_deliveries: [
@@ -159,6 +163,32 @@ export async function adoptPriceSheet(): Promise<{ trials: number }> {
 }
 
 /**
+ * 2.9.0: Starter, Monthly and Yearly become Demo, Pro (Rs 1,400) and
+ * Diamond Annual — once, and only where the Super Admin has not already
+ * renamed or repriced a plan. A pharmacy already paying keeps its own price
+ * until it chooses again (subscriptions carry their own price).
+ */
+export async function adoptWalletPlans(): Promise<number> {
+  const marker = await col.counters().updateOne(
+    { _id: 'plans:wallet-2026-11' }, { $setOnInsert: { pharmacy_id: 'platform', name: 'wallet-plans', value: 1 } }, { upsert: true }
+  );
+  if (!marker.upsertedCount) return 0;
+  let changed = 0;
+  const at = nowIso();
+  for (const rename of WALLET_RENAMES) {
+    const named = await col.plans().updateOne(
+      { key: rename.key, name: rename.from.name },
+      { $set: { name: rename.to.name, tagline: rename.to.tagline, description: rename.to.description, updated_at: at } }
+    );
+    changed += named.modifiedCount;
+    if (rename.from.pricePaisa !== undefined && rename.to.pricePaisa !== undefined) {
+      changed += (await col.plans().updateOne({ key: rename.key, price_paisa: rename.from.pricePaisa }, { $set: { price_paisa: rename.to.pricePaisa, updated_at: at } })).modifiedCount;
+    }
+  }
+  return changed;
+}
+
+/**
  * Bring the built-in roles of pharmacies created before a release up to it.
  * The Admin holds every permission by definition, so it gets any new one on
  * every start. Other built-in roles get what a release added to them once —
@@ -238,6 +268,7 @@ export async function bootstrap({ silent = false } = {}): Promise<void> {
   await ensureIndexes();
   const plans = await ensurePlans();
   const sheet = await adoptPriceSheet();
+  await adoptWalletPlans();
   const roles = await syncSystemRoles();
   const directory = await ensureMedicineDirectory();
   const admin = await ensureSuperAdmin();

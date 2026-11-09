@@ -18,6 +18,8 @@ import './styles/calculator.css';
 import './styles/support.css';
 import './styles/accounts.css';
 import './styles/directory.css';
+import './styles/wallet.css';
+import './styles/insights.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -41,7 +41,7 @@ const POINTS: AuthPoint[] = [
   {
     icon: <Gift />,
     title: 'Fifteen days free, everything included',
-    body: 'No card is asked for. Complete access, every feature, unlimited data — then choose Monthly or Yearly.'
+    body: 'No card is asked for. Complete access, every feature, unlimited data — then choose Pro or Diamond Annual.'
   }
 ];
 
@@ -335,7 +335,7 @@ export default function Register() {
             <StatusNote tone="ok" icon={<Gift size={17} />} title="Your free trial is running">
               {created.trial.daysLeft} days of the full system — every feature, unlimited data — until{' '}
               {new Date(created.trial.expiresAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' })}.
-              Choose Monthly or Yearly under Settings › Billing whenever you are ready; every
+              Choose Pro or Diamond Annual under Subscription plans whenever you are ready; every
               record stays exactly where it is.
             </StatusNote>
           )}

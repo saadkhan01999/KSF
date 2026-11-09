@@ -1,40 +1,150 @@
-/* The platform at a glance: every pharmacy combined — what they sell, what
-   they pay, who signed up and who is waiting for an answer. */
+/* The platform at a glance.
+
+   On top, the owner's design: website visitors, active users, new
+   registrations, pharmacies, referrals and paid subscriptions for the period
+   chosen; the website traffic day by day; the subscription mix; and the
+   newest pharmacies. Below it, the business: income, sales across every
+   pharmacy, and who is waiting for an answer. */
 
 import { useNavigate } from 'react-router-dom';
 import {
-  Building2, Wallet, TrendingUp, LifeBuoy, Users, Receipt, ArrowRight, CreditCard, Sparkles, RefreshCw
+  Building2, Wallet, TrendingUp, LifeBuoy, Users, Receipt, ArrowRight, CreditCard, Sparkles, RefreshCw,
+  Globe, UserRoundCheck, UserRoundPlus, Store, Share2, WalletCards, Layers
 } from 'lucide-react';
 import { useApiData, useLiveRefresh } from '../../hooks/useApi';
 import { Button, Card, StatCard, BarChart, DonutChart, StatusBadge, EmptyState, CardSkeleton, Badge } from '../../components/ui';
 import { rupees, rupeesShort, number, monthLabel, ago, date } from '../../utils/format';
-import type { PlatformOverview } from '../../types/platform';
+import type { PlatformInsights, PlatformOverview } from '../../types/platform';
 import { VersionCheck } from '../../components/VersionCheck';
+import { KpiStrip, MixBar, RangeMenu, TrafficChart, dayLabel, rangeQuery, useRange } from '../../components/insights-ui';
+import { Crumbs } from '../subscription/wallet-ui';
+import { PlanBadge, initials } from './insights-shared';
 
 const change = (now: number, before: number): number | null => (before > 0 ? Math.round(((now - before) / before) * 1000) / 10 : null);
 
 export default function Overview() {
-  const navigate = useNavigate();
+  const [range, setRange] = useRange('30');
+  const insights = useApiData<PlatformInsights>(`/platform/insights?${rangeQuery(range)}`, [range.from, range.to]);
   const { data, loading, reload } = useApiData<PlatformOverview>('/platform/overview');
   useLiveRefresh(reload);
-
-  if (loading && !data) return <><div className="page-head"><h1>Platform overview</h1></div><CardSkeleton count={8} /></>;
-  if (!data) return null;
-  const { pharmacies, income, sales, support, subscriptions } = data;
+  useLiveRefresh(insights.reload);
 
   return (
     <>
+      <Crumbs trail={[{ label: 'Super admin', to: '/platform' }, { label: 'Overview' }]} separator="›" />
       <div className="page-head">
         <div>
           <h1>Platform overview</h1>
-          <p className="sub">Every pharmacy on KSF together: their trade, your income, and who needs you.</p>
+          <p className="sub">Website activity and pharmacy subscriptions</p>
         </div>
         <div className="actions">
-          <Button variant="outline" icon={<RefreshCw size={17} />} onClick={() => { void reload(); }}>Refresh</Button>
+          <span className="insight-live" title="Counted from the live database">Live data</span>
+          <RangeMenu value={range} onChange={setRange} />
+        </div>
+      </div>
+
+      <GrowthOverview data={insights.data} loading={insights.loading} />
+
+      <h2 className="insight-section-title">Income, sales and support</h2>
+      {loading && !data && <CardSkeleton count={8} />}
+      {data && <BusinessOverview data={data} onRefresh={() => { void reload(); void insights.reload(); }} />}
+    </>
+  );
+}
+
+/* ----------------------------------------------- the owner's design, on top */
+
+function GrowthOverview({ data, loading }: { data: PlatformInsights | null; loading: boolean }) {
+  const navigate = useNavigate();
+  if (loading && !data) return <CardSkeleton count={4} />;
+  if (!data) return <EmptyState title="The figures could not be loaded" message="Try again in a moment." />;
+  const { kpis, mix } = data;
+  const last = data.traffic.at(-1);
+  return (
+    <>
+      <KpiStrip
+        label="The platform in this period"
+        items={[
+          { key: 'visitors', icon: <Globe />, label: 'Website visitors', value: kpis.visitors, hint: 'Unique visitors', onClick: () => navigate('/platform/traffic') },
+          { key: 'active', icon: <UserRoundCheck />, label: 'Active users', value: kpis.activeUsers, hint: 'Signed-in users', onClick: () => navigate('/platform/users') },
+          { key: 'registrations', icon: <UserRoundPlus />, label: 'New registrations', value: kpis.registrations, hint: 'New accounts', onClick: () => navigate('/platform/registrations') },
+          { key: 'pharmacies', icon: <Store />, label: 'Pharmacies', value: kpis.pharmacies, hint: 'Total workspaces', onClick: () => navigate('/platform/pharmacies') },
+          { key: 'referrals', icon: <Share2 />, label: 'Referrals', value: kpis.referrals, hint: 'Registered via invite', onClick: () => navigate('/platform/referrals') },
+          { key: 'paid', icon: <WalletCards />, label: 'Paid subscriptions', value: kpis.paidSubscriptions, hint: 'Current paid plans', onClick: () => navigate('/platform/subscriptions') }
+        ]}
+      />
+
+      <div className="insight-grid">
+        <section className="insight-card" aria-labelledby="traffic-title">
+          <div className="insight-card-head">
+            <div><h2 id="traffic-title">Website traffic</h2><p>Unique visitors per day</p></div>
+            <span className="insight-key">Visitors</span>
+          </div>
+          <TrafficChart data={data.traffic.map((row) => ({ day: row.day, value: row.visitors }))} />
+          {last && <p className="insight-foot"><strong>{number(last.visitors)} visitor{last.visitors === 1 ? '' : 's'}</strong> on {dayLabel(last.day)}</p>}
+        </section>
+
+        <section className="insight-card" aria-labelledby="mix-title">
+          <div className="insight-card-head">
+            <div><h2 id="mix-title">Subscription mix</h2></div>
+            <Layers size={20} className="t-dim" aria-hidden="true" />
+          </div>
+          <p className="mix-total">{number(mix.total)}<small>active plans</small></p>
+          <MixBar items={mix.items} total={mix.total} />
+          <p className="insight-foot">{number(mix.paid)} paid subscription{mix.paid === 1 ? '' : 's'} · {number(mix.trialOrReferral)} trial or referral plan{mix.trialOrReferral === 1 ? '' : 's'}</p>
+        </section>
+      </div>
+
+      <section className="card" aria-labelledby="recent-title">
+        <div className="insight-table-head">
+          <div><h2 id="recent-title">Recent pharmacy registrations</h2><p>Latest workspaces created on KSF</p></div>
+          <span>{data.recent.length} latest registration{data.recent.length === 1 ? '' : 's'}</span>
+        </div>
+        {data.recent.length === 0
+          ? <EmptyState title="No pharmacies yet" message="When a pharmacy registers from the website it appears here." />
+          : (
+            <div className="table-scroll">
+              <table className="tbl responsive">
+                <thead>
+                  <tr><th scope="col">Pharmacy</th><th scope="col">City</th><th scope="col">Current plan</th><th scope="col">Signup source</th><th scope="col">Registered on</th></tr>
+                </thead>
+                <tbody>
+                  {data.recent.map((row) => (
+                    <tr key={row.id} onClick={() => navigate(`/platform/pharmacies/${row.id}`)} style={{ cursor: 'pointer' }}>
+                      <td className="cell-title"><span className="insight-name"><span className="insight-avatar" aria-hidden="true">{initials(row.name)}</span>{row.name}</span></td>
+                      <td data-label="City">{row.city ?? '—'}</td>
+                      <td data-label="Current plan"><PlanBadge plan={row.plan} /></td>
+                      <td data-label="Signup source">{row.source}</td>
+                      <td data-label="Registered on">{date(row.registeredAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+      </section>
+      <div className="insight-notes">
+        <span>Visitor and signup counts cover the selected period (Pakistan time).</span>
+        <span>Plan and pharmacy totals as of {date(data.asOf)}</span>
+      </div>
+    </>
+  );
+}
+
+/* ------------------------------------------- the business, as it was before */
+
+function BusinessOverview({ data, onRefresh }: { data: PlatformOverview; onRefresh: () => void }) {
+  const navigate = useNavigate();
+  const { pharmacies, income, sales, support, subscriptions } = data;
+  return (
+    <>
+      <div className="row-tight mb-4" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <VersionCheck />
+        <div className="row-tight" style={{ gap: 8 }}>
+          <Button variant="outline" icon={<RefreshCw size={17} />} onClick={onRefresh}>Refresh</Button>
           <Button variant="primary" icon={<Building2 size={18} />} onClick={() => navigate('/platform/pharmacies')}>All pharmacies</Button>
         </div>
       </div>
-      <VersionCheck />
 
       <div className="grid grid-4 mb-5">
         <StatCard

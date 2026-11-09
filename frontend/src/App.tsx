@@ -16,6 +16,7 @@ import { Toaster, PageLoader, EmptyState, Button } from './components/ui';
 import { StepUpDialog } from './components/account-ui';
 import { useViewMode } from './hooks/useParallax';
 import { useHomeRoute } from './hooks/useHomeRoute';
+import { useSiteVisits } from './services/visits';
 
 /* Public pages. Each is its own chunk, so a signed-in cashier at a till
    never downloads the marketing site. */
@@ -54,9 +55,16 @@ const Activity = lazy(() => import('./pages/Activity'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
 const Support = lazy(() => import('./pages/Support'));
 const Account = lazy(() => import('./pages/Account'));
+const Wallet = lazy(() => import('./pages/subscription/Wallet'));
+const PlanReview = lazy(() => import('./pages/subscription/PlanReview'));
 
 /* The platform console. Its own chunks: a pharmacy never downloads them. */
 const PlatformOverview = lazy(() => import('./pages/platform/Overview'));
+const WebsiteTraffic = lazy(() => import('./pages/platform/growth/Traffic'));
+const Registrations = lazy(() => import('./pages/platform/growth/Registrations'));
+const PlatformUsers = lazy(() => import('./pages/platform/growth/Users'));
+const PlatformReferrals = lazy(() => import('./pages/platform/growth/Referrals'));
+const PlatformSubscriptions = lazy(() => import('./pages/platform/growth/Subscriptions'));
 const Pharmacies = lazy(() => import('./pages/platform/Pharmacies'));
 const PharmacyDetail = lazy(() => import('./pages/platform/PharmacyDetail'));
 const SupportDesk = lazy(() => import('./pages/platform/SupportDesk'));
@@ -107,6 +115,11 @@ function Protected() {
         {isPlatform ? (
           <Routes location={location}>
             <Route path="/platform" element={<Guard permission="platform.overview"><PlatformOverview /></Guard>} />
+            <Route path="/platform/traffic" element={<Guard permission="platform.overview"><WebsiteTraffic /></Guard>} />
+            <Route path="/platform/registrations" element={<Guard permission="platform.pharmacies.view"><Registrations /></Guard>} />
+            <Route path="/platform/users" element={<Guard permission="platform.pharmacies.view"><PlatformUsers /></Guard>} />
+            <Route path="/platform/referrals" element={<Guard permission="platform.pharmacies.view"><PlatformReferrals /></Guard>} />
+            <Route path="/platform/subscriptions" element={<Guard permission="platform.pharmacies.view"><PlatformSubscriptions /></Guard>} />
             <Route path="/platform/pharmacies" element={<Guard permission="platform.pharmacies.view"><Pharmacies /></Guard>} />
             <Route path="/platform/pharmacies/:id" element={<Guard permission="platform.pharmacies.view"><PharmacyDetail /></Guard>} />
             <Route path="/platform/support" element={<Guard permission="platform.support"><SupportDesk /></Guard>} />
@@ -130,7 +143,10 @@ function Protected() {
           {/* Somebody who is already signed in has no use for these. */}
           <Route path="/register" element={<Navigate to={home} replace />} />
           <Route path="/forgot-password" element={<Navigate to="/settings?tab=centre" replace />} />
-          <Route path="/subscription" element={<Navigate to="/settings?tab=billing" replace />} />
+          <Route path="/subscription" element={<Navigate to="/subscription-plans" replace />} />
+          <Route path="/subscription-plans" element={<Guard permission="settings.read"><Wallet /></Guard>} />
+          <Route path="/subscription-plans/pro" element={<Guard permission="settings.read"><PlanReview kind="pro" /></Guard>} />
+          <Route path="/subscription-plans/annual" element={<Guard permission="settings.read"><PlanReview kind="annual" /></Guard>} />
           <Route path="/setup" element={<Setup />} />
           <Route path="/dashboard" element={<Guard permission="dashboard.view"><Dashboard /></Guard>} />
           <Route path="/pos" element={<Guard permission="pos.operate"><Pos /></Guard>} />
@@ -182,6 +198,8 @@ function NotFound({ home }: { home: string }) {
 /** Everything a signed-out visitor can reach. */
 function Public() {
   useViewMode('site');
+  /* Website traffic: each page of the public website, counted without cookies. */
+  useSiteVisits();
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>

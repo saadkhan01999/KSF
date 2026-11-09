@@ -246,6 +246,8 @@ export async function subscriptionState(pharmacyId: string | null) {
     referralPricing,
     trial: trial ? {
       id: trial.id, source: trial.source, days: trial.days, startedAt: trial.started_at, expiresAt: trial.expires_at,
+      /* Days added by referrals it claimed: a trial with any counts as Standard Referral. */
+      bonusDays: trial.bonus_days ?? 0,
       daysLeft: Math.max(0, Math.ceil((new Date(trial.expires_at).getTime() - Date.now()) / 86_400_000))
     } : null
   };
@@ -290,7 +292,7 @@ export async function requireFeature(pharmacyId: string, featureKey: string): Pr
 export function planRequired(afterTrial = false): HttpError {
   const error = new HttpError(
     402,
-    `${afterTrial ? 'Your free trial has ended.' : 'Your plan has ended.'} Choose the Monthly or Yearly plan under Settings › Billing to carry on — every record is safe and can still be viewed.`,
+    `${afterTrial ? 'Your free trial has ended.' : 'Your plan has ended.'} Choose the Pro or Diamond Annual plan under Subscription plans to carry on — every record is safe and can still be viewed.`,
     undefined,
     'plan_required'
   );
@@ -372,6 +374,43 @@ export async function startTrial(input: {
     await col.trials().insertOne(trial, s());
     return { ok: true, trial, subscription };
   });
+}
+
+/**
+ * Add days of full access — a referral's reward, claimed under Subscription
+ * plans › Referrals. They go on the end of whatever is running: the trial,
+ * or the paid period (and its renewal date with it, so a plan never renews
+ * early). A pharmacy whose trial or plan has already ended gets the days
+ * from today, as a trial, so the reward is never lost on a locked account.
+ * Runs inside the caller's transaction when there is one.
+ */
+export async function addAccessDays(input: { pharmacyId: string; days: number; source: string }): Promise<{ endsAt: string; restarted: boolean }> {
+  const days = Math.max(0, Math.floor(input.days));
+  if (!days) throw new HttpError(400, 'There are no days to add.');
+  const subscription = await currentSubscription(input.pharmacyId);
+  if (!subscription || !isEntitled(subscription)) {
+    const started = await startTrial({ pharmacyId: input.pharmacyId, days, source: input.source, again: true });
+    if (!started.ok || !started.trial) throw new HttpError(409, started.reason ?? 'The days could not be added.');
+    await col.trials().updateOne({ _id: started.trial.id }, { $set: { bonus_days: days } }, s());
+    return { endsAt: started.trial.expires_at, restarted: true };
+  }
+  const shift = (when: string | null): string | null => (when ? new Date(new Date(when).getTime() + days * 86_400_000).toISOString() : when);
+  const at = nowIso();
+  const endsAt = shift(subscription.current_period_end)!;
+  await col.subscriptions().updateOne({ _id: subscription.id }, {
+    $set: {
+      current_period_end: endsAt, renewal_at: shift(subscription.renewal_at),
+      ...(subscription.status === STATUSES.GRACE && subscription.grace_until ? { grace_until: shift(subscription.grace_until) } : {}),
+      updated_at: at
+    }
+  }, s());
+  const trial = await col.trials().findOne({ pharmacy_id: input.pharmacyId, status: 'active' }, { sort: { created_at: -1 }, ...s() });
+  if (trial && subscription.status === STATUSES.TRIAL) {
+    await col.trials().updateOne({ _id: trial.id }, {
+      $set: { expires_at: shift(trial.expires_at)!, updated_at: at }, $inc: { days, bonus_days: days }
+    }, s());
+  }
+  return { endsAt, restarted: false };
 }
 
 /**
@@ -746,7 +785,7 @@ async function sendRenewalNotices(summary: { remindersSent: number; dunningSent:
     const sent = await noticeOnce({
       key: `ending-${stage}:${subscription.id}:${on}`, pharmacyId: subscription.pharmacy_id, template: 'planEnding',
       severity: 'info', title: trial ? `Your free trial ends ${stage === 1 ? 'tomorrow' : `in ${daysLeft} days`}` : `Your ${planName} plan ends ${stage === 1 ? 'tomorrow' : `on ${on}`}`,
-      body: 'Choose Monthly or Yearly under Settings › Billing to carry on without a break. Nothing you have entered is lost either way.',
+      body: 'Choose Pro or Diamond Annual under Subscription plans to carry on without a break. Nothing you have entered is lost either way.',
       ...templates.planEnding({ name: contact.full_name, pharmacy: contact.pharmacy_name, what: trial ? 'free trial' : `${planName} plan`, on, days: daysLeft, choices: await choiceLines(subscription.pharmacy_id) })
     });
     if (sent) summary.endingSent += 1;
@@ -807,7 +846,7 @@ export async function runSubscriptionMaintenance() {
     await expire(subscription.id);
     await notify(subscription.pharmacy_id, {
       type: 'billing', severity: 'warn', title: 'Your free trial has ended',
-      body: 'Choose the Monthly or Yearly plan to carry on. Every medicine, batch, sale and prescription is exactly where you left it, and can still be viewed.',
+      body: 'Choose the Pro or Diamond Annual plan to carry on. Every medicine, batch, sale and prescription is exactly where you left it, and can still be viewed.',
       link: '/settings?tab=billing'
     });
     summary.trialsEnded += 1;
@@ -834,7 +873,7 @@ export async function runSubscriptionMaintenance() {
     if (subscription.status !== STATUSES.PAYMENT_PENDING) {
       await notify(subscription.pharmacy_id, {
         type: 'billing', severity: 'warn', title: `Your ${plan?.name ?? ''} plan has ended`.replace('  ', ' '),
-        body: 'Choose the Monthly or Yearly plan to carry on. Your data has not been touched — every record is still here and can still be viewed.',
+        body: 'Choose the Pro or Diamond Annual plan to carry on. Your data has not been touched — every record is still here and can still be viewed.',
         link: '/settings?tab=billing'
       });
     }

@@ -156,8 +156,8 @@ export default function Roles() {
       {can('roles.manage') && !customAllowed && (
         <div className="mb-5">
           <Alert tone="info" title="Your own roles come with a paid plan">
-            The five built-in roles work on every plan. Creating, changing and duplicating roles comes with the Weekly,
-            Monthly and Annual plans — see Settings › Billing.
+            The five built-in roles work on every plan. Creating, changing and duplicating roles comes with a paid
+            plan — see Subscription plans.
           </Alert>
         </div>
       )}

@@ -1,0 +1,168 @@
+/* ==========================================================================
+   Subscription plans — the Subscription wallet and its review pages
+   ========================================================================== */
+
+/* "Workspace / Subscription plans" */
+.crumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--s-2); font-size: var(--fs-sm); color: var(--text-dim); }
+.crumbs a { color: var(--text-dim); text-decoration: none; }
+.crumbs a:hover { color: var(--brand-600); text-decoration: underline; }
+.crumbs-sep { margin-right: 6px; opacity: .7; }
+
+.wallet-head { margin-bottom: var(--s-3); }
+.wallet-back {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: var(--s-4); padding: 0;
+  font-weight: 600; color: var(--brand-700); background: none; border: 0; cursor: pointer;
+}
+.wallet-back:hover { text-decoration: underline; }
+
+/* The two tabs, underlined like the design. */
+.wallet-tabs { display: flex; gap: var(--s-6); margin-bottom: var(--s-5); border-bottom: 1px solid var(--line); overflow-x: auto; }
+.wallet-tabs button {
+  position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 10px 2px 12px;
+  font-size: var(--fs-base); font-weight: 600; color: var(--text-soft); background: none; border: 0; cursor: pointer; white-space: nowrap;
+}
+.wallet-tabs button::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: transparent; }
+.wallet-tabs button.is-on { color: var(--brand-700); }
+.wallet-tabs button.is-on::after { background: var(--brand-600); }
+.wallet-tabs button:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-sm); }
+.wallet-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold-500); }
+
+/* Current plan · cost · medicines · access, in one strip. */
+.wallet-strip {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: var(--s-6);
+  border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface-2);
+}
+.wallet-strip > div { display: grid; gap: 6px; padding: var(--s-4) var(--s-5); min-width: 0; }
+.wallet-strip > div + div { border-left: 1px solid var(--line); }
+.wallet-strip span { font-size: var(--fs-sm); color: var(--text-dim); }
+.wallet-strip strong { font-size: var(--fs-lg); font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+.wallet-strip strong small { font-size: var(--fs-sm); font-weight: 500; color: var(--text-dim); }
+
+.wallet-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin: 0 0 var(--s-4); flex-wrap: wrap; }
+.wallet-section-head h2 { margin: 0; font-size: var(--fs-xl); }
+.wallet-section-head span { font-size: var(--fs-sm); color: var(--text-dim); }
+
+/* The plan cards: Demo, Standard Referral, Pro. */
+.wallet-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); }
+.wallet-plan, .wallet-card {
+  display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-5);
+  border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-xs, none);
+}
+.wallet-plan h3, .wallet-card h3 { margin: var(--s-2) 0 0; font-size: var(--fs-xl); font-weight: 600; }
+.wallet-plan.is-featured { border-color: var(--accent-line); background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); }
+.wallet-plan .btn { margin-top: auto; min-height: 46px; }
+.wallet-plan-current[disabled] { opacity: 1; color: var(--text-soft); background: var(--surface-2); border-color: var(--line); }
+.wallet-plan-icon {
+  display: inline-grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: var(--r-md);
+}
+.wallet-plan-icon.is-mint { color: var(--brand-700); background: var(--accent-soft); }
+.wallet-plan-icon.is-gold { color: var(--gold-text); background: var(--gold-100); }
+.wallet-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin: 0; }
+.wallet-price strong { font-size: 1.65rem; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.wallet-price span { font-size: var(--fs-sm); color: var(--text-dim); }
+.wallet-plan-text { margin: 0; color: var(--text-soft); line-height: var(--lh-snug, 1.45); }
+.wallet-plan-note { margin: 0; font-size: var(--fs-sm); color: var(--text-dim); }
+.wallet-plan-note.is-warn { color: var(--warn-text); }
+
+.wallet-includes { display: flex; align-items: center; gap: 10px; margin: var(--s-5) 0; color: var(--text-soft); }
+.wallet-includes svg { color: var(--brand-600); flex: none; }
+.wallet-includes.is-dim { margin-top: calc(-1 * var(--s-3)); font-size: var(--fs-sm); color: var(--text-dim); }
+
+/* Diamond Annual and Custom pricing: one line each. */
+.wallet-row {
+  display: flex; align-items: center; gap: var(--s-4); width: 100%; margin-bottom: var(--s-3); padding: var(--s-4) var(--s-5);
+  text-align: left; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); color: inherit; cursor: pointer;
+}
+.wallet-row:hover { border-color: var(--accent-line); }
+.wallet-row.is-plain { cursor: default; }
+.wallet-row:focus-visible { outline: none; box-shadow: var(--ring); }
+.wallet-row-text { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.wallet-row-text strong { font-size: var(--fs-base); font-weight: 700; }
+.wallet-row-text span { font-size: var(--fs-sm); color: var(--text-soft); }
+.wallet-row-link {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 0; font-weight: 600; color: var(--brand-700);
+  background: none; border: 0; cursor: pointer; white-space: nowrap;
+}
+.wallet-row-link:hover { text-decoration: underline; }
+.wallet-footnote { margin: var(--s-2) 0 0; font-size: var(--fs-sm); color: var(--text-dim); }
+
+/* Referrals: invite, extension, activity. */
+.wallet-referral-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--s-4); margin-bottom: var(--s-6); }
+.wallet-link { font-size: var(--fs-sm); background: var(--surface-2); }
+.wallet-actions { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.wallet-actions .btn { min-height: 46px; }
+.wallet-fineprint { margin: 0; font-size: var(--fs-sm); color: var(--text-dim); }
+.wallet-days { margin: var(--s-1) 0; font-size: 1.75rem; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.wallet-days span:last-child { font-size: var(--fs-lg); font-weight: 700; }
+.wallet-card .btn { align-self: flex-start; min-height: 46px; }
+.wallet-table { border: 1px solid var(--line); border-radius: var(--r-lg); }
+
+/* Contact KSF */
+.contact-options { display: grid; gap: var(--s-2); }
+.contact-option {
+  display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); color: inherit; text-decoration: none;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface);
+}
+.contact-option:hover { border-color: var(--accent-line); background: var(--accent-soft); }
+.contact-option > span:last-child { display: grid; gap: 2px; }
+.contact-option small { color: var(--text-dim); }
+.contact-option-icon { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: var(--r-md); color: var(--brand-700); background: var(--accent-soft); }
+.contact-message { display: grid; gap: var(--s-3); margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px dashed var(--line-strong); }
+.contact-message .btn { justify-self: start; }
+.contact-sent { margin: 0; color: var(--ok-text); }
+
+/* ------------------------------------------------- the two review pages */
+.review-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: var(--s-5); align-items: start; }
+.review-plan { overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--surface); }
+.review-plan-head {
+  position: relative; overflow: hidden; padding: var(--s-6); color: #fff;
+  background: linear-gradient(135deg, var(--brand-800), var(--brand-700));
+}
+.review-plan-head::before, .review-plan-head::after {
+  content: ""; position: absolute; border-radius: 50%; border: 28px solid rgba(255, 255, 255, .05); pointer-events: none;
+}
+.review-plan-head::before { width: 300px; height: 300px; right: -90px; top: -60px; }
+.review-plan-head::after { width: 190px; height: 190px; right: -20px; top: 10px; border-width: 1px; border-color: rgba(255, 255, 255, .12); }
+.review-plan-kind { position: relative; display: inline-flex; align-items: center; gap: 10px; font-size: var(--fs-sm); font-weight: 500; }
+.review-plan-chip { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: var(--r-md); background: rgba(255, 255, 255, .14); color: var(--gold-300); }
+.review-plan-head h2 { position: relative; margin: var(--s-5) 0 var(--s-1); font-size: 2rem; letter-spacing: -.02em; color: #fff; }
+.review-plan-head p { position: relative; margin: 0; color: rgba(255, 255, 255, .85); }
+.review-plan-body { padding: var(--s-5) var(--s-6) var(--s-6); }
+.review-plan-body h3 { margin: 0 0 var(--s-4); font-size: var(--fs-lg); }
+.review-plan-body ul { display: grid; gap: var(--s-4); margin: 0; padding: 0; list-style: none; }
+.review-plan-body li { display: flex; gap: var(--s-3); }
+.review-plan-body li > span:first-child { color: var(--brand-600); padding-top: 2px; }
+.review-plan-body li > span:last-child { display: grid; gap: 3px; }
+.review-plan-body li small { color: var(--text-dim); font-size: var(--fs-sm); }
+
+.review-summary { padding: var(--s-6); border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--surface); }
+.review-summary h2 { margin: 0 0 var(--s-5); font-size: var(--fs-xl); }
+.review-summary dl { display: grid; gap: var(--s-4); margin: 0 0 var(--s-5); }
+.review-summary dl > div { display: flex; justify-content: space-between; gap: var(--s-3); }
+.review-summary dt { color: var(--text-soft); }
+.review-summary dd { margin: 0; font-weight: 600; text-align: right; }
+.review-summary dd small { display: block; font-weight: 500; color: var(--ok-text); }
+.review-saving {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 var(--s-5); padding: var(--s-3) var(--s-4);
+  font-size: var(--fs-sm); color: var(--ok-text); border-radius: var(--r-md); background: var(--accent-soft);
+}
+.review-total { display: grid; gap: var(--s-2); margin-bottom: var(--s-5); padding-top: var(--s-5); border-top: 1px solid var(--line); }
+.review-total span { color: var(--text-soft); }
+.review-total strong { font-size: 2.1rem; font-weight: 800; letter-spacing: -.02em; }
+.review-note { margin: var(--s-3) 0 0; font-size: var(--fs-sm); text-align: center; color: var(--text-dim); }
+.review-note a { color: var(--brand-700); font-weight: 600; }
+.review-alt { display: block; margin: var(--s-3) auto 0; font-size: var(--fs-sm); font-weight: 600; color: var(--brand-700); }
+
+@media (max-width: 980px) {
+  .wallet-plans { grid-template-columns: 1fr; }
+  .wallet-referral-grid, .review-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .wallet-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wallet-strip > div:nth-child(3) { border-left: 0; }
+  .wallet-strip > div:nth-child(n + 3) { border-top: 1px solid var(--line); }
+  .wallet-row { flex-wrap: wrap; }
+  .wallet-row-link { width: 100%; justify-content: flex-start; padding-left: calc(42px + var(--s-4)); }
+  .wallet-row.is-plain .wallet-row-link { padding-left: 0; }
+  .review-plan-head h2 { font-size: 1.6rem; }
+}

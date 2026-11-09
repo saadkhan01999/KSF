@@ -31,10 +31,10 @@ export function SubscriptionBanner() {
     label = `Pay for ${pendingPlan.name}`;
   } else if (status === 'trial' && (trial?.daysLeft ?? daysLeft ?? 99) <= 5) {
     tone = (trial?.daysLeft ?? daysLeft ?? 0) <= 1 ? 'warn' : 'info';
-    message = `Your free trial ends in ${days(trial?.daysLeft ?? daysLeft)}. Choose Monthly or Yearly to keep every feature without a break.`;
+    message = `Your free trial ends in ${days(trial?.daysLeft ?? daysLeft)}. Choose Pro or Diamond Annual to keep every feature without a break.`;
   } else if (cycles && cycles.used >= cycles.max && !autoRenew && (daysLeft ?? 99) <= 10) {
     tone = 'info';
-    message = `This is the last month of your ${planName} plan; it ends on ${date(periodEnd ?? null)}. Choose Yearly to carry on — it works out cheaper per month.`;
+    message = `This is the last month of your ${planName} plan; it ends on ${date(periodEnd ?? null)}. Choose Diamond Annual to carry on — it works out cheaper per month.`;
   } else if (status === 'cancelled' && (daysLeft ?? 99) <= 7) {
     tone = 'info';
     message = `Your ${planName} plan was cancelled and ends on ${date(periodEnd ?? null)}. Choose a plan to carry on after that.`;
@@ -45,7 +45,7 @@ export function SubscriptionBanner() {
     <div className={`plan-banner tone-${tone}`} role="status">
       {tone === 'info' ? <Sparkles size={18} aria-hidden="true" /> : <AlertTriangle size={18} aria-hidden="true" />}
       <span className="grow">{message}</span>
-      <Button size="sm" variant="outline" icon={<CreditCard size={15} />} onClick={() => navigate(`/settings?tab=billing${pendingPlan ? `&choose=${pendingPlan.key}` : ''}`)}>
+      <Button size="sm" variant="outline" icon={<CreditCard size={15} />} onClick={() => navigate(pendingPlan ? `/settings?tab=billing&choose=${pendingPlan.key}` : '/subscription-plans')}>
         {label}
       </Button>
     </div>

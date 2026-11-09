@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.8.1** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.9.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -42,6 +42,7 @@ support requests they raise.
 | Money | Expenses with approval, close-the-day drawer count with variance, reports by period, person, role, category and discount, CSV export |
 | Medicine directory | A searchable reference — names, other names, brands and their companies, category, uses, precautions, side effects, interactions — with references to the monograph each entry was checked against, and one step to add a medicine to the pharmacy's own catalogue |
 | Team | Staff accounts, five built-in roles plus custom roles, per-person figures, internal messaging, device limits, two-step sign-in |
+| Subscription wallet | **Subscription plans**: the plan, its cost, the medicines allowed and the access left; Demo, Standard Referral, Pro and Diamond Annual side by side; a review page for Pro (payment summary, then the checkout) and for the annual plan (the yearly saving, and Contact KSF). **Referrals**: the invite link to copy or share on WhatsApp, invitations and registrations, and the referral days to claim (12 → 27 days) |
 | Account | Self-service sign-up with e-mail verification, setup checklist, subscription and billing (card through Stripe, bank transfer, JazzCash, Easypaisa), numbered invoices and receipts, payment history, referrals, data import (CSV / Excel / JSON) with validation, reconciliation and rollback |
 | Help | **Help & Support**: raise a request to KSF and follow the conversation |
 
@@ -49,7 +50,8 @@ support requests they raise.
 
 | Area | What is in it |
 |---|---|
-| Overview | All pharmacies combined: their sales today and this month, your income this month and all time, monthly recurring revenue, plans, trials, open support requests |
+| Platform overview | For any period: website visitors, active users, new registrations, pharmacies, referrals and paid subscriptions; visitors per day; the subscription mix (Demo trial, Standard Referral, Pro monthly, Diamond Annual); the latest registrations. Below it, all pharmacies combined: their sales, your income, monthly recurring revenue, trials, open support requests |
+| Growth | **Website traffic** (visitors and page views per day, the pages read, the sites they came from — counted without cookies), **Registrations** (direct or through a referral, who registered), **Users** (everyone working in a pharmacy), **Referrals** (each one's stage and days; accept or turn down one held for checking) and **Subscriptions** (every pharmacy's plan today) |
 | Pharmacies | Every pharmacy, searchable by name, city or Admin; one page per pharmacy with its figures, staff, branches, plan, payments, support history and activity |
 | Actions | Edit a pharmacy, change or extend its plan, record an offline payment, suspend / reactivate (signs everybody out at once), and **work inside** any pharmacy in support mode |
 | Plans and prices | Create plans and change prices, limits and features. **A change reaches every open screen at once** — the public pricing page, every pharmacy's dashboard and billing, and the checkout — and a pharmacy's features follow its subscription the moment it changes |
@@ -220,16 +222,22 @@ How to report a vulnerability, the controls in more detail and the risks that re
   hold. Seniority decides who may act on whom.
 - **Plans** — from the owner's price sheet, every one with every feature and
   unlimited records:
-  - **Starter**: free for 15 days. Every new pharmacy starts on it.
-  - **Monthly**: Rs 1,500 a month, or Rs 1,300 for a pharmacy that came through
-    a referral. It's a starter plan for up to three months.
-  - **Yearly**: Rs 12,000, about Rs 1,000 a month.
+  - **Demo**: free for 15 days. Every new pharmacy starts on it.
+  - **Standard Referral**: the Demo trial lengthened by referrals. Each
+    pharmacy that registers through a pharmacy's link earns it **15 more
+    days**, claimed under **Subscription plans › Referrals**.
+  - **Pro**: PKR 1,400 a month, or Rs 1,300 for a pharmacy that came through
+    a referral, for up to three months.
+  - **Diamond Annual**: PKR 12,000 a year, PKR 1,000 a month — PKR 4,800 less
+    than twelve months of Pro. Activated with KSF (call, WhatsApp, e-mail or a
+    message to the support desk), or paid online.
 
   When the trial or a plan ends, nothing is deleted. Every screen shows the
-  choice of Monthly or Yearly, records can still be read and exported, and
+  choice of Pro or Diamond Annual, records can still be read and exported, and
   changes wait until a plan is paid for. The Super Admin can change any price,
   the referral price, the three-month limit and the trial length under
-  **Platform › Plans**.
+  **Platform › Plans**; the referral days are `REFERRAL_REWARD_DAYS` and the
+  number on the annual offer is `SALES_PHONE`.
 - **Themes** — five colour themes (KSF Green, Ocean Blue, Royal Purple, Sunset
   Amber, Graphite), each with light and dark mode. The pharmacy Admin sets the
   pharmacy's theme in **Settings › Appearance** and chooses which roles may
@@ -370,6 +378,7 @@ added without a line here.
 | `GET /api/v1/public/brand` | Anyone | The business details for the website footer and invoices, and the edition |
 | `GET /api/v1/public/plans` | Anyone | The plans on sale, with prices, limits and features (what the pricing page shows) |
 | `GET /api/v1/public/referral/:code` | Anyone | Check a referral code before sign-up |
+| `POST /api/v1/public/visit` | Anyone | Count a website visit for the Super Admin's traffic figures: the page and the referring site, once a day per browser, with no cookie and no address kept (bots and unknown pages ignored; 60 a minute per address) |
 | `GET /api/v1/register/state` | Anyone | The sign-up in progress in this browser |
 | `POST /api/v1/register/start` | Anyone | Start a sign-up: name, e-mail, password, mobile; a code is e-mailed (and returned as testCode when SHOW_SIGNUP_CODE is on) |
 | `POST /api/v1/register/verify-email` | Anyone | Confirm the e-mail code; creates the pharmacy and its Admin and signs them in |
@@ -597,11 +606,12 @@ added without a line here.
 |---|---|---|
 | `GET /api/v1/billing` | `settings.read` | The subscription, the plans at this pharmacy's own price (with the referral price, and whether each can still be chosen), payment history, referrals, payment methods and the card on file |
 | `GET /api/v1/billing/payments` | `settings.read` | Every subscription payment |
-| `POST /api/v1/billing/plan` | `settings.write` | Choose Monthly or Yearly. Nothing changes until it is paid for: the trial or the current plan carries on, and the new one starts where it ends |
+| `POST /api/v1/billing/plan` | `settings.write` | Choose Pro (monthly) or Diamond Annual. Nothing changes until it is paid for: the trial or the current plan carries on, and the new one starts where it ends |
 | `POST /api/v1/billing/auto-renew` | `settings.write` | Turn automatic renewal on or off (told to Stripe first) |
 | `POST /api/v1/billing/cancel` | `settings.write` | Cancel: renewal stops, the paid period runs to its end |
-| `POST /api/v1/billing/checkout` | `settings.write` | Start paying for a plan with a provider: answers the redirect (Stripe Checkout, JazzCash…) or bank-transfer instructions; the amount is the pharmacy's price for the plan (Rs 1,300 on Monthly with a referral), never the browser's |
+| `POST /api/v1/billing/checkout` | `settings.write` | Start paying for a plan with a provider: answers the redirect (Stripe Checkout, JazzCash…) or bank-transfer instructions; the amount is the pharmacy's price for the plan (Rs 1,300 on Pro with a referral), never the browser's |
 | `POST /api/v1/billing/referral` | `settings.write` | Enter a referral code after registering without one: the referral price applies from the next payment |
+| `POST /api/v1/billing/referral-rewards/claim` | `settings.write` | Claim the referral days earned (15 for each pharmacy that registered through this pharmacy's link): added to the trial or the paid period |
 | `POST /api/v1/billing/portal` | `settings.write` | A link to Stripe's page for changing the card |
 | `GET /api/v1/billing/providers` | `settings.read` | The payment providers and whether each is configured |
 | `GET /api/v1/billing/attempts` | `settings.read` | Payment attempts and refunds |
@@ -666,6 +676,13 @@ added without a line here.
 | Endpoint | Who may call | What it does |
 |---|---|---|
 | `GET /api/v1/platform/overview` | `platform.overview` | Every pharmacy combined: sales, income, recurring revenue, plans, trials, open requests |
+| `GET /api/v1/platform/insights` | `platform.overview` | The Platform overview for `?from&to` (Pakistan days, 30 by default): website visitors, active users, new registrations, pharmacies, referrals and paid subscriptions, visitors per day, the subscription mix and the latest registrations |
+| `GET /api/v1/platform/traffic` | `platform.overview` | Website traffic for `?from&to`: unique visitors and page views per day, the busiest day, the pages opened and the sites visitors came from |
+| `GET /api/v1/platform/registrations` | `platform.pharmacies.view` | Pharmacies registered in `?from&to` with their plan today, signup source (direct or referral) and who registered them (`?source=direct\|referral&q`), paged |
+| `GET /api/v1/platform/subscriptions` | `platform.pharmacies.view` | Every pharmacy's plan today: the subscription mix, state, price and end date (`?plan=demo\|referral\|pro\|annual&state&q`), paged |
+| `GET /api/v1/platform/referrals` | `platform.pharmacies.view` | Every referral with its stage (invited, being checked, registered, ready to claim, claimed, not accepted) and the referral days (`?status=pending\|review\|converted\|ready\|claimed\|rejected&q`), paged |
+| `POST /api/v1/platform/referrals/:id/approve` | `platform.pharmacies.manage` | Accept a referral held for checking: the referral price applies and the inviting pharmacy earns its days |
+| `POST /api/v1/platform/referrals/:id/reject` | `platform.pharmacies.manage` | Turn a waiting or held referral down (`reason`): no referral price and no days |
 | `GET /api/v1/platform/pharmacies` | `platform.pharmacies.view` | Pharmacies, searchable and filterable by status and plan |
 | `GET /api/v1/platform/pharmacies/:id` | `platform.pharmacies.view` | One pharmacy: figures, staff, branches, plan, payments, requests, activity |
 | `PATCH /api/v1/platform/pharmacies/:id` | `platform.pharmacies.manage` | Edit a pharmacy's details |
@@ -705,7 +722,7 @@ added without a line here.
 
 | Endpoint | Who may call | What it does |
 |---|---|---|
-| `GET /api/v1/platform/users` | `platform.help` or `platform.support` | Find any pharmacy user by name, e-mail or phone |
+| `GET /api/v1/platform/users` | `platform.help`, `platform.support` or `platform.pharmacies.view` | Find any pharmacy user by name, e-mail or phone; with `?list=1` every pharmacy user, paged (`?q&status&sort=last_login`), with the counts |
 | `GET /api/v1/platform/help` | `platform.help` | Everyone who could not sign in today, and why |
 | `GET /api/v1/platform/activity` | `platform.activity` | The platform activity log |
 | `GET /api/v1/platform/security` | `platform.activity` | Security events across the platform |
@@ -853,7 +870,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.8.1 · Server 2.8.1 — up to date", or
+System) compares the two: "Website 2.9.0 · Server 2.9.0 — up to date", or
 what to do when they differ (on Vercel both deploy together from `main`:
 Vercel › Deployments).
 

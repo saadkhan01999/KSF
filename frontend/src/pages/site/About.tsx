@@ -181,7 +181,7 @@ export default function About() {
             <span className="pillar-icon" aria-hidden="true"><MessageSquare /></span>
             <h3>Priority support</h3>
             <p>
-              Included on the Monthly and Annual plans.
+              Included on the Pro and Diamond Annual plans.
               {business.supportHours ? ` ${business.supportHours}.` : ' Hours are set by whoever runs your installation.'}
             </p>
           </article>
@@ -190,7 +190,7 @@ export default function About() {
 
       <SiteCta
         title="Start free, decide later"
-        body="Open an account in two minutes and run the counter free for fifteen days, with everything. Choose Monthly or Yearly when it is worth it — nothing is ever deleted."
+        body="Open an account in two minutes and run the counter free for fifteen days, with everything. Choose Pro or Diamond Annual when it is worth it — nothing is ever deleted."
       />
     </SitePage>
   );

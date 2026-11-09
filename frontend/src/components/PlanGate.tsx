@@ -1,5 +1,5 @@
 /* What a pharmacy sees once its free trial — or its plan — has ended: the
-   choice of Monthly or Yearly, and the reassurance that nothing is lost.
+   choice of Pro or Diamond Annual, and the reassurance that nothing is lost.
 
    The server is what actually holds the line (every change answers 402
    plan_required until a plan is paid for); this screen only makes sure
@@ -7,7 +7,7 @@
    chooses here and pays in Billing; everybody else is told who can. */
 
 import { useNavigate } from 'react-router-dom';
-import { Bell, CreditCard, LifeBuoy, ShieldCheck, Sparkles } from 'lucide-react';
+import { Bell, CreditCard, Gift, LifeBuoy, ShieldCheck, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useApiData, useLiveRefresh } from '../hooks/useApi';
 import { usePublicPlans } from '../hooks/usePublicPlans';
@@ -70,6 +70,7 @@ export function PlanGate() {
       <FullAccessStrip />
 
       <div className="plan-gate-links">
+        {canPay && <Button variant="ghost" icon={<Gift size={16} />} onClick={() => navigate('/subscription-plans?tab=referrals')}>Referral days to claim?</Button>}
         <Button variant="ghost" icon={<ShieldCheck size={16} />} onClick={() => navigate('/account')}>My account and data export</Button>
         <Button variant="ghost" icon={<Bell size={16} />} onClick={() => navigate('/notifications')}>Notifications</Button>
         <Button variant="ghost" icon={<LifeBuoy size={16} />} onClick={() => navigate('/support')}>Ask KSF for help</Button>

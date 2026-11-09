@@ -273,7 +273,7 @@ export default function Reports() {
             )}
 
             {/* =========================== PRODUCTS =========================== */}
-            {tab === 'products' && !advanced && <FeatureLocked name="Best sellers and category mix" description="Best sellers, category mix, each person's sales and profit, and the value of the stock come with the Weekly, Monthly and Annual plans. Nothing has been deleted." />}
+            {tab === 'products' && !advanced && <FeatureLocked name="Best sellers and category mix" description="Best sellers, category mix, each person's sales and profit, and the value of the stock come with a paid plan — see Subscription plans. Nothing has been deleted." />}
             {tab === 'products' && advanced && (
               <>
                 <div className="grid grid-2 mb-5">
@@ -349,7 +349,7 @@ export default function Reports() {
             )}
 
             {/* ============================ PEOPLE ============================ */}
-            {tab === 'people' && !advanced && <FeatureLocked name="Staff performance" description="Best sellers, category mix, each person's sales and profit, and the value of the stock come with the Weekly, Monthly and Annual plans. Nothing has been deleted." />}
+            {tab === 'people' && !advanced && <FeatureLocked name="Staff performance" description="Best sellers, category mix, each person's sales and profit, and the value of the stock come with a paid plan — see Subscription plans. Nothing has been deleted." />}
             {tab === 'people' && advanced && (
               <>
               <Card
@@ -418,7 +418,7 @@ export default function Reports() {
             )}
 
             {/* ============================= STOCK ============================= */}
-            {tab === 'stock' && !advanced && <FeatureLocked name="Stock valuation" description="Best sellers, category mix, each person's sales and profit, and the value of the stock come with the Weekly, Monthly and Annual plans. Nothing has been deleted." />}
+            {tab === 'stock' && !advanced && <FeatureLocked name="Stock valuation" description="Best sellers, category mix, each person's sales and profit, and the value of the stock come with a paid plan — see Subscription plans. Nothing has been deleted." />}
             {tab === 'stock' && advanced && (
               <>
                 {valuation && (

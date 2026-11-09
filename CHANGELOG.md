@@ -3,6 +3,92 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.9.0] — 2026-11-09
+
+A subscription wallet for the pharmacy, referral days, and a growth view of
+the platform for the Super Admin.
+
+### Pharmacy: Subscription plans
+- **A Subscription plans page** in the sidebar (Workspace / Subscription
+  plans), with two tabs:
+  - **Plans**: the current plan, what it costs, the medicines allowed and
+    the access left; Demo (15 days), Standard Referral (+15 days for each
+    registration, opens the Referrals tab) and Pro (PKR 1,400 a month,
+    Choose Pro) side by side; then Diamond Annual (PKR 12,000 billed
+    yearly, PKR 1,000 a month) and custom pricing (Contact KSF).
+  - **Referrals**: invitations, completed registrations, days ready to
+    claim and days claimed; the invite link with Copy link and Share via
+    WhatsApp; the trial extension ("12 → 27 days") with **Claim 15 days**;
+    and the referral activity.
+- **Review your Pro subscription**: what is included and the payment
+  summary (plan, access period, monthly rate, plan term, total), then
+  **Preview payment** — the plan is chosen and the checkout opens. Nothing
+  is charged until the payment is confirmed.
+- **Review your annual plan**: the yearly price, the saving against twelve
+  months of Pro ("Save PKR 4,800") and **Contact KSF about annual pricing**:
+  call, WhatsApp, e-mail or a message to the KSF support desk. Paying online
+  stays available where a payment method is switched on.
+- The old /subscription address opens the new page; the billing settings
+  use the same checkout.
+
+### Plans
+- The plans are renamed after the design: **Starter → Demo**, **Monthly →
+  Pro**, **Yearly → Diamond Annual**. Pro is **PKR 1,400 a month** (was
+  1,500); the referral price (1,300), the three-month term and the annual
+  price are unchanged. Done once on start-up, and only where a plan still
+  has its old name or price: a name or price the Super Admin changed stays.
+  Pharmacies already paying keep the price they pay.
+- A trial lengthened by a referral shows as **Standard Referral**.
+
+### Referral days
+- Each pharmacy that registers through a pharmacy's link earns it **15 days
+  of full access** (`REFERRAL_REWARD_DAYS`). The pharmacy is notified and
+  claims them in one step; the days are added to the trial or to the paid
+  period, so nothing already paid for is lost; a pharmacy whose trial has
+  ended is back in for the days it earned. Each registration is counted
+  once, even when two people claim at the same moment.
+
+### Super Admin
+- **Platform overview** for any period (7, 30 or 90 days, this month, last
+  month or custom dates): website visitors, active users, new
+  registrations, pharmacies, referrals and paid subscriptions; a chart of
+  visitors per day (hover or arrow keys for each day); the subscription mix;
+  the latest pharmacy registrations. Sales, income and support stay below
+  it.
+- The menu has **Workspace** (Platform overview, Website traffic,
+  Registrations) and **Management** (Users, Pharmacies, Referrals,
+  Subscriptions):
+  - **Website traffic**: unique visitors and page views per day, the busiest
+    day, the pages read and the sites visitors came from;
+  - **Registrations**: direct or through a referral, who registered and
+    their plan today;
+  - **Users**: everyone working in a pharmacy, with when they last signed in;
+  - **Referrals**: each referral's stage and days; accept or turn down one
+    held for checking;
+  - **Subscriptions**: every pharmacy's plan, state, price and end date.
+
+### Website visits
+- The public website counts a visit once a day per browser: the page and
+  the site the visitor came from. No cookie is set and no address is stored
+  with it (the address only counts towards a one-minute limit); a random
+  number in the browser's storage, scrambled with a server secret, is all
+  that is kept, and it is deleted after 400 days. Browsers asking
+  not to be tracked (Do Not Track, Global Privacy Control) are not counted,
+  nor are bots. The privacy policy says so.
+
+### Settings
+- `REFERRAL_REWARD_DAYS` (15) and `SALES_PHONE` (the number on the annual
+  offer) in `.env.example` and docs/ENVIRONMENT.md.
+
+### Tests
+- The wallet and the growth screens: the plan rename, claiming referral days
+  (added once, one of two claims at the same moment, after a trial ended,
+  Admin only), the visit counter (once a day; no crawlers, made-up visitors
+  or pages), the overview figures and paid subscriptions, registrations,
+  subscriptions, referrals with approve and reject, the users list, and the
+  period checks (backwards or longer than a year is refused; pharmacies
+  cannot see any of it).
+
 ## [2.8.1] — 2026-11-04
 
 The loan (udhaar) could not be seen at the till.

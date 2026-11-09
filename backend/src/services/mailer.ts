@@ -340,12 +340,12 @@ export const templates = {
   }),
   welcome: ({ name, pharmacy, subscriptionId, trialEnds }: { name?: string; pharmacy: string; subscriptionId: string; trialEnds?: string | null }) => ({
     subject: `${pharmacy} is ready on KSF`,
-    text: `Assalam-o-alaikum ${name || ''},\n\n${pharmacy} is set up and ready to use.\n\nSubscription reference: ${subscriptionId}\n${trialEnds ? `Your free trial — every feature, unlimited data — runs until ${trialEnds}. Then choose Monthly or Yearly; nothing you enter is lost.\n` : ''}\nSign in at ${APP_URL}\n\nKSF`,
+    text: `Assalam-o-alaikum ${name || ''},\n\n${pharmacy} is set up and ready to use.\n\nSubscription reference: ${subscriptionId}\n${trialEnds ? `Your free trial — every feature, unlimited data — runs until ${trialEnds}. Then choose Pro or Diamond Annual; nothing you enter is lost.\n` : ''}\nSign in at ${APP_URL}\n\nKSF`,
     html: shell(`${pharmacy} is ready`, [
       `Assalam-o-alaikum ${name || ''},`,
       'Your pharmacy is set up. The first thing worth doing is adding your opening stock, or importing it from your old system under Settings &rsaquo; Data Migration.',
       `Subscription reference: <strong>${subscriptionId}</strong>`,
-      trialEnds ? `Your free trial — every feature, unlimited data — runs until <strong>${trialEnds}</strong>. Then choose the Monthly or Yearly plan; nothing you enter is lost.` : '',
+      trialEnds ? `Your free trial — every feature, unlimited data — runs until <strong>${trialEnds}</strong>. Then choose the Pro or Diamond Annual plan; nothing you enter is lost.` : '',
       button(APP_URL, 'Open KSF')
     ].filter(Boolean))
   }),

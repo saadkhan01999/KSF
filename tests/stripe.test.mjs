@@ -23,7 +23,7 @@ const calls = [];
 let session = { id: '', reference: '', paid: false, amount: 0, subscription: '', invoice: '' };
 let sessions = 0;
 const realFetch = globalThis.fetch;
-const MONTHLY = 150_000;
+const MONTHLY = 140_000;
 const YEARLY = 1_200_000;
 
 function stripeReply(method, path, params) {
@@ -238,7 +238,7 @@ describe('Stripe payments, renewals and invoices', { skip }, () => {
     /* Monthly cannot be had again, or switched back on. */
     const again = await owner.call('POST', '/api/v1/billing/plan', { planKey: 'monthly' });
     assert.equal(again.status, 400);
-    assert.match(again.body.message, /first 3 months.*Yearly/);
+    assert.match(again.body.message, /first 3 months.*Diamond Annual/);
     assert.equal((await owner.call('POST', '/api/v1/billing/checkout', { planKey: 'monthly' })).status, 400);
     assert.equal((await owner.call('POST', '/api/v1/billing/auto-renew', { enabled: true })).status, 400);
     const offers = (await owner.get('/api/v1/billing')).plans;

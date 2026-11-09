@@ -65,6 +65,8 @@ export interface TrialState {
   startedAt: string;
   expiresAt: string;
   daysLeft: number;
+  /** Days added by referrals the pharmacy claimed (2.9). */
+  bonusDays?: number;
 }
 
 export interface SubscriptionState {
@@ -137,14 +139,42 @@ export interface ReferralSummary {
   successful: number;
   maxUses: number;
   counts: Record<string, number>;
+  /** The days this pharmacy earns: 15 for each pharmacy that registers through its link. A server before 2.9 sends none. */
+  rewards?: ReferralRewards;
   referrals: {
     id: string;
     email: string;
     pharmacyName: string | null;
+    /** The person who started registering, while they have not finished. */
+    name?: string | null;
     status: string;
     registeredAt: string | null;
     convertedAt: string | null;
+    rewardDays?: number | null;
+    rewardClaimedAt?: string | null;
+    /** "Registered" / "Invited" / "Being checked" / "Not accepted". */
+    registration?: string;
+    extension?: 'ready' | 'claimed' | 'waiting' | 'review' | 'none';
+    /** "Ready to claim", "Claimed +15 days", "Awaiting registration". */
+    extensionLabel?: string;
   }[];
+}
+
+export interface ReferralRewards {
+  daysPerReferral: number;
+  invitations: number;
+  completed: number;
+  readyCount: number;
+  readyDays: number;
+  claimedDays: number;
+}
+
+/** What /billing/referral-rewards/claim answers. */
+export interface ReferralClaimReply {
+  message: string;
+  subscription: SubscriptionState;
+  referrals: ReferralSummary;
+  claimed: { days: number; referrals: number; endsAt: string; restarted: boolean };
 }
 
 export interface PaymentProvider { key: string; label: string; mode: string; note: string; methods: string[] }
@@ -160,6 +190,8 @@ export interface BillingOverview {
   defaultProvider: string;
   /** The card on file, when a provider (Stripe) renews the plan by itself. */
   card: { provider: string; canChange: boolean } | null;
+  /** Who to call about the annual plan or custom pricing. A server before 2.9 sends none. */
+  sales?: { phone: string | null; whatsapp: string | null; email: string | null };
 }
 
 /** What /billing/checkout answers: go to the provider, or follow instructions (bank transfer). */
