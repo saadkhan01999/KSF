@@ -6,7 +6,7 @@ Generated from the route table by `npm run api:inventory` — do not edit by han
 input never causes a server error); **Also tested in** lists the functional test
 files that call it by name.
 
-**277 endpoints:** 24 public, 22 for any signed-in person, 169 pharmacy, 62 platform console. All are under `/api/v1`; besides them the server answers `GET /api/v1/health` and `GET /api/v1/avatars/:id`.
+**273 endpoints:** 24 public, 22 for any signed-in person, 169 pharmacy, 58 platform console. All are under `/api/v1`; besides them the server answers `GET /api/v1/health` and `GET /api/v1/avatars/:id`.
 
 Who may call it: **anyone** (no sign-in); **signed in** (any account); **pharmacy:**
 signed in, inside a pharmacy, holding the permission named (a write also needs a
@@ -238,9 +238,9 @@ role holds the access named (`any` is every team member).
 | GET | `/api/v1/platform/accounts/summary` | platform: platform.finance.view |  |  | platform-accounts |
 | GET | `/api/v1/platform/accounts/transactions` | platform: platform.finance.view |  |  | platform-accounts |
 | GET | `/api/v1/platform/activity` | platform: platform.activity |  |  | platform-accounts |
+| GET | `/api/v1/platform/analytics` | platform: platform.overview |  |  | wallet-insights |
 | GET | `/api/v1/platform/help` | platform: platform.help |  |  | api |
 | GET | `/api/v1/platform/income` | platform: platform.finance.view |  |  | api |
-| GET | `/api/v1/platform/insights` | platform: platform.overview |  |  | wallet-insights |
 | GET | `/api/v1/platform/invoices/:id` | platform: platform.finance.view |  |  | stripe |
 | DELETE | `/api/v1/platform/me/avatar` | platform: any |  |  |  |
 | PUT | `/api/v1/platform/me/avatar` | platform: any |  |  |  |
@@ -267,13 +267,10 @@ role holds the access named (`any` is every team member).
 | GET | `/api/v1/platform/plans` | platform: any |  |  |  |
 | POST | `/api/v1/platform/plans` | platform: platform.plans.manage |  |  |  |
 | PATCH | `/api/v1/platform/plans/:key` | platform: platform.plans.manage |  |  | live |
-| GET | `/api/v1/platform/referrals` | platform: platform.pharmacies.view |  |  | wallet-insights |
 | POST | `/api/v1/platform/referrals/:id/approve` | platform: platform.pharmacies.manage |  |  | wallet-insights |
 | POST | `/api/v1/platform/referrals/:id/reject` | platform: platform.pharmacies.manage |  |  | wallet-insights |
 | POST | `/api/v1/platform/refunds/:id/complete` | platform: platform.finance.manage |  |  | platform-accounts |
-| GET | `/api/v1/platform/registrations` | platform: platform.pharmacies.view |  |  | wallet-insights |
 | GET | `/api/v1/platform/security` | platform: platform.activity |  |  |  |
-| GET | `/api/v1/platform/subscriptions` | platform: platform.pharmacies.view |  |  | wallet-insights |
 | GET | `/api/v1/platform/support/agents` | platform: platform.support |  |  | api |
 | GET | `/api/v1/platform/support/tickets` | platform: platform.support |  |  | api |
 | GET | `/api/v1/platform/support/tickets/:id` | platform: platform.support |  |  | api |
@@ -290,5 +287,4 @@ role holds the access named (`any` is every team member).
 | POST | `/api/v1/platform/team/roles` | platform: owner |  |  | api, directory, platform-accounts |
 | DELETE | `/api/v1/platform/team/roles/:id` | platform: owner |  |  | api |
 | PATCH | `/api/v1/platform/team/roles/:id` | platform: owner |  |  | api |
-| GET | `/api/v1/platform/traffic` | platform: platform.overview |  |  | wallet-insights |
-| GET | `/api/v1/platform/users` | platform: platform.help,platform.support,platform.pharmacies.view |  |  | wallet-insights |
+| GET | `/api/v1/platform/users` | platform: platform.help,platform.support |  |  |  |

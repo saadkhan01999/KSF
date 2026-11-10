@@ -16,6 +16,7 @@ import { BRAND } from '../brand';
 import { useBusiness, placeOf } from '../services/business';
 import { onScrollOffset, useReveal, useScrolledPast } from '../hooks/useParallax';
 import { glideTo } from '../utils/glide';
+import { HeartbeatLine } from './MedicineMotion';
 
 const LINKS = [
   { to: '/product', label: 'Product' },
@@ -103,6 +104,7 @@ export function SiteCta({
 }) {
   return (
     <section className="site-cta" data-reveal>
+      <HeartbeatLine />
       <div className="site-cta-inner">
         <h2>{title}</h2>
         <p>{body}</p>

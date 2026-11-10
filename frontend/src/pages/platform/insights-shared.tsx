@@ -1,4 +1,4 @@
-/* Small pieces the platform's growth screens share. */
+/* Small pieces of the Super Admin's Analytics page: the plan badge and the pharmacy's initials. */
 
 import { Badge } from '../../components/ui';
 import type { PlanCategory } from '../../types/platform';

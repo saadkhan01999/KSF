@@ -3,6 +3,62 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.10.0] — 2026-11-10
+
+The Super Admin's console as it was, with one Analytics page; and a public
+website with medicines in motion.
+
+### Super Admin
+- **The console is back as it was before 2.9.0.** The menu is Platform
+  (Overview, Pharmacies, Support desk, People who need help, Medicine
+  directory), Money, Team and Records again, and the Overview is the page it
+  was: income, sales across every pharmacy, plans, trials and support.
+- **One new item, Analytics**, in place of the Website traffic,
+  Registrations, Users, Referrals and Subscriptions pages (gone, with their
+  addresses), for any period — 7, 30 or 90 days, this month, last month or
+  chosen dates:
+  - the six figures: **website visitors, active users, new registrations,
+    pharmacies, referrals and paid subscriptions**; each opens its section
+    below;
+  - website traffic per day beside the subscription mix (Demo trial,
+    Standard Referral, Pro monthly, Diamond Annual);
+  - the pages opened and the sites visitors came from;
+  - active users per day;
+  - new registrations, direct or through a referral;
+  - referrals by stage (invitations, waiting, being checked, days ready to
+    claim, days claimed), with any referral held for a check accepted or
+    turned down right there;
+  - pharmacies by state (open, suspended, closed, paid, on a trial, plan
+    ended), with a link to all pharmacies;
+  - the newest pharmacies.
+- The API follows: `GET /api/v1/platform/analytics` answers the whole page
+  in one go. `/platform/insights`, `/traffic`, `/registrations`,
+  `/subscriptions`, `/referrals` and `/platform/users?list=1` are gone;
+  accepting or turning down a referral stays.
+
+### Website
+The words are unchanged; what changes is how the pages move.
+- **Medicines drift behind the headlines**: capsules, tablets, a blister
+  pack, a bottle, a drop, a cross and a molecule, at the edges of the home
+  page's hero and, fewer, of the other pages', a little apart from the
+  headline as the page scrolls. On a phone they keep clear of the words.
+- **A heartbeat line** keeps drawing itself behind "Bring your pharmacy onto
+  KSF".
+- **Each page fades in** as it opens; the home page's headline arrives line
+  by line, the product picture rises in after it, and "paperwork" is marked
+  as with a highlighter.
+- **The distributors glide past** in a loop (paused under the pointer).
+- **Cards lift and their icons turn green** under the pointer, the main
+  buttons catch a shine, and the menu underlines the page you are on.
+- All of it stops for anyone whose device asks for reduced motion, and none
+  of it is read out by a screen reader.
+
+### Tests
+- The Analytics answer: the six figures, the website's pages and sources,
+  active users per day, registrations by source, pharmacies by state, paid
+  plans, a referral held for a check shown and accepted, the period checks,
+  and pharmacies kept out.
+
 ## [2.9.0] — 2026-11-09
 
 A subscription wallet for the pharmacy, referral days, and a growth view of

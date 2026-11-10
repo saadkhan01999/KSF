@@ -1,5 +1,5 @@
 /* ==========================================================================
-   The platform's growth screens: period button, figures strip, charts
+   The Super Admin's Analytics page: period button, figures strip, charts
    --------------------------------------------------------------------------
    Subscription-mix colours, in the mix bar's order (demo, referral, pro,
    annual), validated with the data-viz palette checker:
@@ -84,7 +84,6 @@
 .insight-foot { margin: var(--s-3) 0 0; padding-top: var(--s-3); border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--text-soft); }
 .insight-foot strong { color: var(--text); }
 .insight-notes { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; margin: var(--s-3) 0 var(--s-6); font-size: var(--fs-xs); color: var(--text-dim); }
-.insight-section-title { margin: var(--s-6) 0 var(--s-4); font-size: var(--fs-lg); color: var(--text-soft); }
 .insight-live { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-size: var(--fs-xs); font-weight: 600; color: var(--ok-text); border-radius: 999px; background: var(--accent-soft); }
 .insight-live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--brand-500); }
 
@@ -133,8 +132,6 @@
   color: var(--text-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm);
 }
 .insight-name { display: inline-flex; align-items: center; }
-.insight-filters { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: flex-end; margin-bottom: var(--s-4); }
-.insight-filters .field { margin: 0; min-width: 180px; }
 .insight-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-5); margin-bottom: var(--s-5); }
 
 @media (max-width: 1280px) {
@@ -151,3 +148,15 @@
   .kpi-strip.cols-3 { grid-template-columns: 1fr; }
   .kpi-value { font-size: 1.5rem; }
 }
+
+/* Analytics: the small tables of figures, and the referrals held for a check. */
+.an-figures { margin-bottom: var(--s-4); }
+.an-figures td:last-child { min-width: 64px; }
+.insight-card > .btn { margin-top: var(--s-1); }
+.an-held { margin-top: var(--s-2); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.an-held h3 { margin: 0 0 var(--s-2); font-size: var(--fs-sm); color: var(--warn-text, var(--text-soft)); }
+.an-held ul { display: grid; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
+.an-held li { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; padding: var(--s-2) var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); }
+.an-held li strong { display: block; font-size: var(--fs-sm); }
+.an-held li small { font-size: var(--fs-xs); color: var(--text-dim); }
+[id^='an-'] { scroll-margin-top: 84px; }

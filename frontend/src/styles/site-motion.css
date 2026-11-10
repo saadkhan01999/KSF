@@ -1,0 +1,235 @@
+/* ==========================================================================
+   The public website, in motion
+   --------------------------------------------------------------------------
+   On top of the parallax and the reveal in site.css:
+
+     - medicines that drift behind each page's headline (MedicineMotion.tsx);
+     - a heartbeat line drawing itself behind the call to action;
+     - each page fading in as it opens, its headline rising line by line;
+     - the landing headline's "paperwork" marked as with a highlighter;
+     - the distributors gliding past in a loop;
+     - cards that lift, icons that turn to meet the pointer, and a shine
+       across the main buttons.
+
+   Nothing that is read depends on any of it, and prefers-reduced-motion
+   stops all of it (at the end of this file).
+   ========================================================================== */
+
+/* ----------------------------------------------------- floating medicines */
+
+.med-float { position: absolute; inset: 0; pointer-events: none; will-change: transform; }
+
+.med {
+  --med-b: #fff;
+  --med-edge: color-mix(in srgb, var(--med-a) 30%, transparent);
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--w);
+  animation: med-drift var(--drift) ease-in-out var(--delay) infinite;
+  transform: rotate(var(--turn));
+  filter: drop-shadow(0 10px 14px color-mix(in srgb, var(--med-a) 26%, transparent));
+}
+.med svg { display: block; width: 100%; height: auto; overflow: visible; }
+.med-body { display: block; opacity: 0; animation: med-arrive .9s cubic-bezier(.22, 1, .36, 1) var(--delay) forwards; }
+
+.med.tone-brand { --med-a: var(--brand-500); }
+.med.tone-gold { --med-a: var(--gold-500); }
+.med.tone-sky { --med-a: #4A8FD9; }
+.med.tone-coral { --med-a: #E2725B; }
+
+/* Behind the shorter page heroes, quieter. */
+.med-float.is-page .med { opacity: .78; }
+
+@keyframes med-arrive {
+  from { opacity: 0; transform: scale(.55) translateY(14px); }
+  to { opacity: .92; transform: none; }
+}
+@keyframes med-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(var(--turn)); }
+  33% { transform: translate3d(calc(var(--sway) * 8px), -16px, 0) rotate(calc(var(--turn) + var(--sway) * 9deg)); }
+  66% { transform: translate3d(calc(var(--sway) * -6px), 8px, 0) rotate(calc(var(--turn) - var(--sway) * 6deg)); }
+}
+
+:root[data-theme='dark'] .med { --med-b: #E6F2EC; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .med { --med-b: #E6F2EC; }
+}
+
+/* A headline has the middle of a phone to itself. */
+@media (max-width: 1100px) {
+  .med.is-wide { display: none; }
+}
+/* On a phone the landing headline fills the width, so its medicines step
+   aside; the other pages keep two, up in the space above their heading. */
+@media (max-width: 640px) {
+  .med { width: calc(var(--w) * .7); }
+  .med-float.is-hero { display: none; }
+  .med-float.is-page .med { top: 26px; opacity: .85; }
+}
+
+/* ----------------------------------------------------------- heartbeat */
+
+.med-pulse {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  width: 100%;
+  height: 76px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .5;
+}
+.med-pulse-base, .med-pulse-trace {
+  fill: none;
+  stroke: var(--brand-300);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+/* The whole trace, faint, like a monitor's; and one bright beat travelling
+   along it (pathLength 100: a fifth of the line, then a full line of gap). */
+.med-pulse-base { opacity: .22; }
+.med-pulse-trace {
+  stroke-dasharray: 20 100;
+  stroke-dashoffset: 120;
+  animation: med-trace 3.6s linear infinite;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--brand-300) 70%, transparent));
+}
+@keyframes med-trace { to { stroke-dashoffset: 0; } }
+.site-cta > .med-pulse { position: absolute; z-index: 0; }
+
+/* --------------------------------------------------- the page as it opens */
+
+.site > main { animation: site-page-in .55s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes site-page-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* The landing headline, line by line (the other pages' heroes already do). */
+.hero-inner > * { animation: ksf-fade-up .8s cubic-bezier(.22, 1, .36, 1) both; }
+.hero-inner > :nth-child(2) { animation-delay: .1s; }
+.hero-inner > :nth-child(3) { animation-delay: .2s; }
+.hero-inner > :nth-child(4) { animation-delay: .3s; }
+.hero-inner > :nth-child(n+5) { animation-delay: .4s; }
+
+/* The screenshot rises in after the words. Its own box carries the
+   parallax, so the rise is on what is inside it. */
+.hero-shot > *, .page-hero-shot > * { animation: ksf-rise 1s cubic-bezier(.22, 1, .36, 1) .35s both; }
+
+/* "paperwork", marked as with a highlighter once the headline is in. */
+.hero h1 em {
+  background: linear-gradient(transparent 64%, color-mix(in srgb, var(--gold-300) 60%, transparent) 64%, color-mix(in srgb, var(--gold-300) 60%, transparent) 92%, transparent 92%) no-repeat 0 0 / 0% 100%;
+  animation: site-mark 1s cubic-bezier(.65, 0, .35, 1) .75s forwards;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+@keyframes site-mark { to { background-size: 100% 100%; } }
+
+/* The "New" chip glints now and then. */
+.hero-badge b { position: relative; overflow: hidden; isolation: isolate; }
+.hero-badge b::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: site-glint 5s ease-in-out 1.6s infinite;
+}
+@keyframes site-glint { 0%, 70% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+
+/* ----------------------------------------------------- the distributors */
+
+.partners-marquee {
+  display: flex;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.partners-marquee .partners-row {
+  flex: none;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  padding-right: var(--s-8);
+  animation: site-marquee 34s linear infinite;
+}
+.partners-marquee:hover .partners-row { animation-play-state: paused; }
+.partners-marquee .partners-row span { white-space: nowrap; transition: color var(--t-fast) var(--ease); }
+.partners-marquee .partners-row span:hover { color: var(--brand-600); }
+@keyframes site-marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+
+/* ------------------------------------------------- cards, icons, buttons */
+
+.pillar, .trio article, .security-grid article, .faq-item {
+  transition: transform var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
+}
+.pillar:hover, .trio article:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--brand-500) 35%, var(--line));
+  box-shadow: 0 18px 36px -18px color-mix(in srgb, var(--brand-700) 45%, transparent), var(--sh-md);
+}
+.security-grid article:hover { transform: translateY(-3px); }
+.pillar-icon { transition: transform var(--t-base) cubic-bezier(.34, 1.56, .64, 1), background var(--t-base) var(--ease), color var(--t-base) var(--ease); }
+.pillar:hover .pillar-icon, .trio article:hover .pillar-icon {
+  transform: rotate(-8deg) scale(1.1);
+  background: linear-gradient(150deg, var(--brand-500), var(--brand-700));
+  color: #fff;
+}
+.faq-item:hover { border-color: color-mix(in srgb, var(--brand-500) 30%, var(--line)); }
+.faq-item[open] > :not(summary) { animation: ksf-fade-up .4s cubic-bezier(.22, 1, .36, 1) both; }
+
+/* A shine across the main buttons on the pointer, and now and then on the
+   hero's own. */
+.site .btn-primary.btn-pill { position: relative; overflow: hidden; isolation: isolate; }
+.site .btn-primary.btn-pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, .32) 50%, transparent 68%);
+  transform: translateX(-120%);
+  transition: transform .75s cubic-bezier(.22, 1, .36, 1);
+  pointer-events: none;
+}
+.site .btn-primary.btn-pill:hover::after { transform: translateX(120%); }
+.hero-cta .btn-primary.btn-pill::after { animation: site-glint 6s ease-in-out 2.4s infinite; }
+.hero-cta .btn-primary.btn-pill:hover::after { animation: none; }
+.site .btn-pill .arrow { transition: transform var(--t-base) var(--ease); }
+.site .btn-pill:hover .arrow { transform: translateX(3px); }
+
+/* Underline that grows under the menu links. */
+.site-nav-links a { position: relative; }
+.site-nav-links a::after {
+  content: "";
+  position: absolute;
+  left: var(--s-3);
+  right: var(--s-3);
+  bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand-500);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--t-base) var(--ease);
+}
+.site-nav-links a:hover::after, .site-nav-links a[aria-current='page']::after { transform: scaleX(1); }
+@media (max-width: 900px) { .site-nav-links a::after { display: none; } }
+
+/* ------------------------------------------------------ reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .med, .med-body, .med-pulse-trace, .site > main, .hero-inner > *, .hero-shot > *, .page-hero-shot > *,
+  .hero-badge b::after, .faq-item[open] > :not(summary), .hero-cta .btn-primary.btn-pill::after {
+    animation: none;
+  }
+  .med-body { opacity: .92; }
+  .med-pulse-trace { display: none; }
+  .hero h1 em { animation: none; background-size: 100% 100%; }
+  .partners-marquee { -webkit-mask-image: none; mask-image: none; }
+  .partners-marquee .partners-row { animation: none; flex: 1 1 auto; flex-wrap: wrap; justify-content: center; padding-right: 0; }
+  .partners-marquee .partners-row[aria-hidden='true'] { display: none; }
+  .pillar:hover, .trio article:hover, .security-grid article:hover, .pillar:hover .pillar-icon, .trio article:hover .pillar-icon { transform: none; }
+  .site .btn-primary.btn-pill::after { display: none; }
+  .site-nav-links a::after { transition: none; }
+}

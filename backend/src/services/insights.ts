@@ -2,8 +2,7 @@
    Platform insights: who visits the website, who uses KSF, and what plans
    the pharmacies are on
    --------------------------------------------------------------------------
-   What the Super Admin's Platform overview, Website traffic, Registrations
-   and Subscriptions screens are made from.
+   What the Super Admin's Analytics page is made from.
 
    Website visitors. The public website (never the signed-in app) sends one
    small beacon per page: a random number the browser keeps in its own
@@ -234,33 +233,107 @@ export function planMix(rows: CurrentPlan[], labels: Record<PlanCategory, string
   return { total, paid, trialOrReferral: running.filter((row) => row.category === 'demo' || row.category === 'referral').length, items };
 }
 
-/* ------------------------------------------------------- the overview */
+/* ------------------------------------------------------ the analytics */
 
-/** The Platform overview for one period. Plan and pharmacy totals are as of now. */
-export async function overviewInsights(range: Range) {
-  const [visitorRows, perDay, active, registrations, pharmacies, referrals, plans, recent] = await Promise.all([
-    col.siteVisits().aggregate<{ n: number }>([
-      { $match: { day: { $gte: range.from, $lte: range.to } } }, { $group: { _id: '$visitor' } }, { $count: 'n' }
-    ]).toArray(),
+const countBy = <K extends string>(rows: { _id: K; n: number }[]): Map<K, number> => new Map(rows.map((row) => [row._id, row.n]));
+
+/**
+ * Everything on the Super Admin's Analytics page, for one period: the six
+ * figures (website visitors, active users, new registrations, pharmacies,
+ * referrals, paid subscriptions), the website day by day with its pages and
+ * where visitors came from, active users day by day, registrations by
+ * source, referrals by stage, pharmacies by state, the subscription mix and
+ * the newest pharmacies. Plan, pharmacy and referral-stage totals are as of
+ * now; the rest counts the period.
+ */
+export async function analyticsInsights(range: Range) {
+  const inDays = { day: { $gte: range.from, $lte: range.to } };
+  const inPeriod = { $gte: range.startIso, $lt: range.endIso };
+  const [
+    visitorRows, visitorsPerDay, viewsPerDay, pages, referrers, activeTotal, activePerDay,
+    registered, referredRegistrations, pharmacyStates, referralStages, invited, converted, claimed, plans, recent, held
+  ] = await Promise.all([
+    col.siteVisits().aggregate<{ n: number }>([{ $match: inDays }, { $group: { _id: '$visitor' } }, { $count: 'n' }]).toArray(),
+    col.siteVisits().aggregate<{ _id: string; n: number }>([{ $match: inDays }, { $group: { _id: '$day', n: { $sum: 1 } } }]).toArray(),
+    col.sitePages().aggregate<{ _id: string; n: number }>([{ $match: inDays }, { $group: { _id: '$day', n: { $sum: '$views' } } }]).toArray(),
+    col.sitePages().aggregate<{ _id: string; views: number }>([{ $match: inDays }, { $group: { _id: '$path', views: { $sum: '$views' } } }, { $sort: { views: -1 } }, { $limit: 12 }]).toArray(),
     col.siteVisits().aggregate<{ _id: string; visitors: number }>([
-      { $match: { day: { $gte: range.from, $lte: range.to } } }, { $group: { _id: '$day', visitors: { $sum: 1 } } }
+      { $match: { ...inDays, referrer: { $ne: null } } }, { $group: { _id: '$referrer', visitors: { $sum: 1 } } }, { $sort: { visitors: -1 } }, { $limit: 8 }
     ]).toArray(),
     activeUsers(range),
-    col.pharmacies().countDocuments({ created_at: { $gte: range.startIso, $lt: range.endIso } }),
-    col.pharmacies().countDocuments({}),
-    col.referrals().countDocuments({ status: 'converted', converted_at: { $gte: range.startIso, $lt: range.endIso } }),
+    col.activeDays().aggregate<{ _id: string; n: number }>([{ $match: { ...inDays, pharmacy_id: { $ne: null } } }, { $group: { _id: '$day', n: { $sum: 1 } } }]).toArray(),
+    col.pharmacies().countDocuments({ created_at: inPeriod }),
+    col.pharmacies().countDocuments({ created_at: inPeriod, referred_by_code: { $nin: [null, ''] } }),
+    col.pharmacies().aggregate<{ _id: string; n: number }>([{ $group: { _id: '$status', n: { $sum: 1 } } }]).toArray(),
+    col.referrals().aggregate<{ _id: string; n: number }>([{ $match: { status: { $in: ['pending', 'review'] } } }, { $group: { _id: '$status', n: { $sum: 1 } } }]).toArray(),
+    col.referrals().countDocuments({ created_at: inPeriod }),
+    col.referrals().countDocuments({ status: 'converted', converted_at: inPeriod }),
+    col.referrals().aggregate<{ ready: number; claimedDays: number }>([
+      { $match: { status: 'converted' } },
+      {
+        $group: {
+          _id: null,
+          ready: { $sum: { $cond: [{ $ifNull: ['$reward_claimed_at', false] }, 0, 1] } },
+          claimedDays: {
+            $sum: {
+              $cond: [
+                { $and: [{ $gte: [{ $ifNull: ['$reward_claimed_at', ''] }, range.startIso] }, { $lt: [{ $ifNull: ['$reward_claimed_at', ''] }, range.endIso] }] },
+                { $ifNull: ['$reward_days', 0] }, 0
+              ]
+            }
+          }
+        }
+      }
+    ]).toArray(),
     currentPlans(),
-    col.pharmacies().find({}, { projection: { _id: 1, name: 1, city: 1, referred_by_code: 1, created_at: 1 } }).sort({ created_at: -1 }).limit(3).toArray()
+    col.pharmacies().find({}, { projection: { _id: 1, name: 1, city: 1, referred_by_code: 1, created_at: 1 } }).sort({ created_at: -1 }).limit(8).toArray(),
+    col.referrals().aggregate<Document>([
+      { $match: { status: 'review' } }, { $sort: { created_at: -1 } }, { $limit: 10 },
+      { $lookup: { from: 'pharmacies', localField: 'referrer_pharmacy_id', foreignField: '_id', as: '__a', pipeline: [{ $project: { name: 1 } }] } },
+      { $lookup: { from: 'pharmacies', localField: 'referred_pharmacy_id', foreignField: '_id', as: '__b', pipeline: [{ $project: { name: 1 } }] } }
+    ]).toArray()
   ]);
-  const visitsOn = new Map(perDay.map((row) => [row._id, row.visitors]));
+
+  const visitorsOn = countBy(visitorsPerDay);
+  const viewsOn = countBy(viewsPerDay);
+  const activeOn = countBy(activePerDay);
+  const days = range.days.map((day) => ({ day, visitors: visitorsOn.get(day) ?? 0, views: viewsOn.get(day) ?? 0, activeUsers: activeOn.get(day) ?? 0 }));
+  const busiest = days.reduce<{ day: string; visitors: number } | null>((best, row) => (!best || row.visitors > best.visitors ? row : best), null);
+  const states = countBy(pharmacyStates);
+  const stages = countBy(referralStages);
   const planOf = new Map(plans.rows.map((row) => [row.pharmacyId, row]));
   const mix = planMix(plans.rows, plans.labels);
+  const pharmacies = [...states.values()].reduce((sum, n) => sum + n, 0);
+  const perReferral = env.REFERRAL_REWARD_DAYS;
+
   return {
     range: { from: range.from, to: range.to, days: range.days.length },
     kpis: {
-      visitors: visitorRows[0]?.n ?? 0, activeUsers: active, registrations, pharmacies, referrals, paidSubscriptions: mix.paid
+      visitors: visitorRows[0]?.n ?? 0, activeUsers: activeTotal, registrations: registered, pharmacies,
+      referrals: converted, paidSubscriptions: mix.paid
     },
-    traffic: range.days.map((day) => ({ day, visitors: visitsOn.get(day) ?? 0 })),
+    days,
+    website: {
+      views: days.reduce((sum, row) => sum + row.views, 0),
+      averageVisitorsPerDay: Math.round(days.reduce((sum, row) => sum + row.visitors, 0) / Math.max(1, days.length)),
+      busiestDay: busiest && busiest.visitors > 0 ? { day: busiest.day, visitors: busiest.visitors } : null,
+      pages: pages.map((row) => ({ path: row._id, views: row.views })),
+      referrers: referrers.map((row) => ({ host: row._id, visitors: row.visitors }))
+    },
+    registrations: { total: registered, referral: referredRegistrations, direct: registered - referredRegistrations },
+    referrals: {
+      invited, registered: converted, waiting: stages.get('pending') ?? 0, review: stages.get('review') ?? 0,
+      readyDays: (claimed[0]?.ready ?? 0) * perReferral, claimedDays: claimed[0]?.claimedDays ?? 0, daysPerReferral: perReferral,
+      held: held.map((row) => ({
+        id: String(row._id), code: row.code as string, createdAt: row.created_at as string,
+        referrer: (row.__a?.[0]?.name as string | undefined) ?? null,
+        referred: { name: (row.referred_name as string | null) ?? null, email: (row.referred_email as string | null) ?? null, pharmacy: (row.__b?.[0]?.name as string | undefined) ?? null }
+      }))
+    },
+    pharmacies: {
+      total: pharmacies, active: states.get('active') ?? 0, suspended: states.get('suspended') ?? 0, closed: states.get('closed') ?? 0,
+      paid: mix.paid, onTrial: mix.trialOrReferral, ended: plans.rows.filter((row) => !row.entitled).length
+    },
     mix,
     recent: recent.map((pharmacy) => {
       const plan = planOf.get(pharmacy._id);
@@ -271,35 +344,5 @@ export async function overviewInsights(range: Range) {
       };
     }),
     asOf: new Date().toISOString()
-  };
-}
-
-/** Website traffic for one period: visitors and page views by day, the pages, and where visitors came from. */
-export async function trafficInsights(range: Range) {
-  const match = { day: { $gte: range.from, $lte: range.to } };
-  const [visitorRows, perDay, views, pages, referrers] = await Promise.all([
-    col.siteVisits().aggregate<{ n: number }>([{ $match: match }, { $group: { _id: '$visitor' } }, { $count: 'n' }]).toArray(),
-    col.siteVisits().aggregate<{ _id: string; visitors: number }>([{ $match: match }, { $group: { _id: '$day', visitors: { $sum: 1 } } }]).toArray(),
-    col.sitePages().aggregate<{ _id: string; views: number }>([{ $match: match }, { $group: { _id: '$day', views: { $sum: '$views' } } }]).toArray(),
-    col.sitePages().aggregate<{ _id: string; views: number }>([{ $match: match }, { $group: { _id: '$path', views: { $sum: '$views' } } }, { $sort: { views: -1 } }, { $limit: 20 }]).toArray(),
-    col.siteVisits().aggregate<{ _id: string; visitors: number }>([
-      { $match: { ...match, referrer: { $ne: null } } }, { $group: { _id: '$referrer', visitors: { $sum: 1 } } }, { $sort: { visitors: -1 } }, { $limit: 10 }
-    ]).toArray()
-  ]);
-  const visitorsOn = new Map(perDay.map((row) => [row._id, row.visitors]));
-  const viewsOn = new Map(views.map((row) => [row._id, row.views]));
-  const days = range.days.map((day) => ({ day, visitors: visitorsOn.get(day) ?? 0, views: viewsOn.get(day) ?? 0 }));
-  const busiest = days.reduce<{ day: string; visitors: number } | null>((best, row) => (!best || row.visitors > best.visitors ? row : best), null);
-  const totalViews = days.reduce((sum, row) => sum + row.views, 0);
-  return {
-    range: { from: range.from, to: range.to, days: range.days.length },
-    totals: {
-      visitors: visitorRows[0]?.n ?? 0, views: totalViews,
-      averageVisitorsPerDay: Math.round(days.reduce((sum, row) => sum + row.visitors, 0) / Math.max(1, days.length)),
-      busiestDay: busiest && busiest.visitors > 0 ? { day: busiest.day, visitors: busiest.visitors } : null
-    },
-    days,
-    pages: pages.map((row) => ({ path: row._id, views: row.views })),
-    referrers: referrers.map((row) => ({ host: row._id, visitors: row.visitors }))
   };
 }

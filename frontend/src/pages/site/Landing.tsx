@@ -32,6 +32,7 @@ import {
   Gift, Pill, Lock, Smartphone
 } from 'lucide-react';
 import { SiteHeader, SiteFooter, SiteCta } from '../../components/SiteChrome';
+import { FloatingMedicines } from '../../components/MedicineMotion';
 import { DashboardPreview, TillPreview, ExpiryPreview } from '../../components/AppPreview';
 import { BRAND } from '../../brand';
 import { useParallax, useReveal, useViewMode } from '../../hooks/useParallax';
@@ -105,6 +106,7 @@ export default function Landing() {
             <div className="hero-blob one" ref={blobOne} />
             <div className="hero-blob two" ref={blobTwo} />
             <div className="hero-blob three" ref={blobThree} />
+            <FloatingMedicines variant="hero" />
           </div>
 
           <div className="hero-inner">
@@ -153,8 +155,14 @@ export default function Landing() {
         {/* --------------------------- partners ----------------------------- */}
         <section className="partners" data-reveal>
           <p className="partners-label">Stocked from the distributors you already buy from</p>
-          <div className="partners-row">
-            {PARTNERS.map((name) => <span key={name}>{name}</span>)}
+          {/* The names glide past in a loop; the second row is the same list, so the loop has no seam. */}
+          <div className="partners-marquee">
+            <div className="partners-row">
+              {PARTNERS.map((name) => <span key={name}>{name}</span>)}
+            </div>
+            <div className="partners-row" aria-hidden="true">
+              {PARTNERS.map((name) => <span key={name}>{name}</span>)}
+            </div>
           </div>
         </section>
 

@@ -1,5 +1,5 @@
-/* The Subscription wallet and the platform's growth screens (2.9.0), over
-   real HTTP against a real MongoDB.
+/* The Subscription wallet (2.9.0) and the Super Admin's Analytics page
+   (2.10.0), over real HTTP against a real MongoDB.
 
    A pharmacy's referral link earns it 15 days for every pharmacy that
    registers through it: invited, then registered, then ready to claim; a
@@ -8,8 +8,9 @@
 
    The public website counts its visitors once a day from a random number
    the browser keeps — never a crawler, never a made-up page — and the
-   Super Admin's overview, traffic, registrations, subscriptions, referrals
-   and users screens are made from it and from the pharmacies' own data. */
+   Super Admin's Analytics page is made from it and from the pharmacies' own
+   data: visitors, active users, registrations, pharmacies, referrals and
+   paid subscriptions. */
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +21,7 @@ const skip = process.env.KSF_TEST_DATABASE !== 'yes' ? 'no MongoDB: set TEST_MON
 const DAY = 86_400_000;
 const BROWSER = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
 
-describe('the Subscription wallet and the platform overview', { skip }, () => {
+describe('the Subscription wallet and the platform analytics', { skip }, () => {
   let server;
   let mongo;
   let admin;
@@ -133,24 +134,26 @@ describe('the Subscription wallet and the platform overview', { skip }, () => {
         assert.equal(reply.headers.get('set-cookie'), null, 'no cookie is set');
       }
       await visit({ visitor: randomUUID(), path: '/directory/panadol' });
-      const traffic = await admin.get('/api/v1/platform/traffic');
-      assert.equal(traffic.totals.visitors, 2);
-      assert.equal(traffic.totals.views, 4);
-      assert.deepEqual(traffic.pages.find((row) => row.path === '/pricing'), { path: '/pricing', views: 2 });
-      assert.ok(traffic.pages.some((row) => row.path === '/directory'));
-      assert.deepEqual(traffic.referrers, [{ host: 'google.com', visitors: 1 }]);
-      assert.equal(traffic.days.length, 30);
-      assert.equal(traffic.days.at(-1).visitors, 2);
+      const analytics = await admin.get('/api/v1/platform/analytics');
+      assert.equal(analytics.kpis.visitors, 2);
+      assert.equal(analytics.website.views, 4);
+      assert.deepEqual(analytics.website.pages.find((row) => row.path === '/pricing'), { path: '/pricing', views: 2 });
+      assert.ok(analytics.website.pages.some((row) => row.path === '/directory'));
+      assert.deepEqual(analytics.website.referrers, [{ host: 'google.com', visitors: 1 }]);
+      assert.equal(analytics.days.length, 30);
+      assert.equal(analytics.days.at(-1).visitors, 2);
+      assert.equal(analytics.days.at(-1).views, 4);
+      assert.deepEqual(analytics.website.busiestDay, { day: analytics.days.at(-1).day, visitors: 2 });
     });
 
     it('does not count a crawler, a made-up visitor or a made-up page', async () => {
       await visit({ visitor: randomUUID(), path: '/' }, 'Googlebot/2.1 (+http://www.google.com/bot.html)');
       await visit({ visitor: 'not-a-visitor', path: '/' });
       await visit({ visitor: randomUUID(), path: '/wp-admin/install.php' });
-      const traffic = await admin.get('/api/v1/platform/traffic');
-      assert.equal(traffic.totals.visitors, 3, 'only the one with a real visitor number and browser');
-      assert.ok(traffic.pages.some((row) => row.path === '/other'));
-      assert.ok(!traffic.pages.some((row) => row.path.includes('wp-admin')));
+      const analytics = await admin.get('/api/v1/platform/analytics');
+      assert.equal(analytics.kpis.visitors, 3, 'only the one with a real visitor number and browser');
+      assert.ok(analytics.website.pages.some((row) => row.path === '/other'));
+      assert.ok(!analytics.website.pages.some((row) => row.path.includes('wp-admin')));
       const stored = await mongo.col.siteVisits().findOne({});
       assert.match(stored.visitor, /^[0-9a-f]{32}$/, 'kept only as a hash');
       assert.equal(JSON.stringify(stored).includes('127.0.0.1'), false, 'no address is stored');
@@ -158,63 +161,46 @@ describe('the Subscription wallet and the platform overview', { skip }, () => {
   });
 
   describe('the Super Admin', () => {
-    it('sees the overview: visitors, active users, registrations, pharmacies, referrals and paid plans', async () => {
-      const overview = await admin.get('/api/v1/platform/insights');
-      assert.equal(overview.range.days, 30);
-      assert.equal(overview.kpis.visitors, 3);
-      assert.ok(overview.kpis.activeUsers >= 3, 'the pharmacy owners who used KSF');
-      assert.equal(overview.kpis.registrations, 4);
-      assert.equal(overview.kpis.pharmacies, 4);
-      assert.equal(overview.kpis.referrals, 3, 'Shifa, and the two honoured referrals the tests above added');
-      assert.equal(overview.kpis.paidSubscriptions, 0);
-      assert.equal(overview.traffic.length, 30);
-      assert.equal(overview.recent.length, 3);
-      const mix = Object.fromEntries(overview.mix.items.map((item) => [item.key, item.count]));
-      assert.equal(overview.mix.total, 4);
+    it('sees the analytics: visitors, active users, registrations, pharmacies, referrals and paid plans', async () => {
+      const analytics = await admin.get('/api/v1/platform/analytics');
+      assert.equal(analytics.range.days, 30);
+      assert.equal(analytics.kpis.visitors, 3);
+      assert.ok(analytics.kpis.activeUsers >= 3, 'the pharmacy owners who used KSF');
+      const today = analytics.days.at(-1).activeUsers;
+      assert.ok(today >= 1 && today <= analytics.kpis.activeUsers, 'people who used KSF today, counted once each');
+      assert.equal(analytics.kpis.registrations, 4);
+      assert.equal(analytics.kpis.pharmacies, 4);
+      assert.equal(analytics.kpis.referrals, 3, 'Shifa, and the two honoured referrals the tests above added');
+      assert.equal(analytics.kpis.paidSubscriptions, 0);
+      assert.deepEqual(analytics.registrations, { total: 4, referral: 1, direct: 3 });
+      assert.deepEqual(analytics.pharmacies, { total: 4, active: 4, suspended: 0, closed: 0, paid: 0, onTrial: 4, ended: 0 });
+      assert.equal(analytics.referrals.registered, 3);
+      assert.equal(analytics.referrals.daysPerReferral, 15);
+      assert.ok(analytics.referrals.invited >= 3);
+      assert.ok(analytics.referrals.claimedDays >= 15, 'the days claimed in the tests above');
+      assert.equal(analytics.recent.length, 4);
+      assert.equal(analytics.recent.find((row) => row.name.includes('Shifa')).source, 'Referral');
+      const mix = Object.fromEntries(analytics.mix.items.map((item) => [item.key, item.count]));
+      assert.equal(analytics.mix.total, 4);
       assert.equal(mix.referral, 3, 'Shifa came through a referral; Medina and Lapsed claimed referral days');
       assert.equal(mix.demo, 1);
-      assert.deepEqual(overview.mix.items.map((item) => item.label), ['Demo trial', 'Standard Referral', 'Pro monthly', 'Diamond Annual']);
-      assert.equal(overview.mix.items.reduce((sum, item) => sum + item.percent, 0) <= 101, true);
+      assert.deepEqual(analytics.mix.items.map((item) => item.label), ['Demo trial', 'Standard Referral', 'Pro monthly', 'Diamond Annual']);
+      assert.equal(analytics.mix.items.reduce((sum, item) => sum + item.percent, 0) <= 101, true);
     });
 
     it('counts a pharmacy that pays as a paid subscription', async () => {
       await admin.post('/api/v1/auth/verify-identity', { password: SUPER_ADMIN.password });
       const aman = await mongo.col.pharmacies().findOne({ name: /Aman/ });
       await admin.post(`/api/v1/platform/pharmacies/${aman._id}/subscription`, { planKey: 'monthly' });
-      const overview = await admin.get('/api/v1/platform/insights');
-      assert.equal(overview.kpis.paidSubscriptions, 1);
-      assert.equal(overview.mix.items.find((item) => item.key === 'pro').count, 1);
-      assert.equal(overview.mix.paid, 1);
+      const analytics = await admin.get('/api/v1/platform/analytics');
+      assert.equal(analytics.kpis.paidSubscriptions, 1);
+      assert.equal(analytics.mix.items.find((item) => item.key === 'pro').count, 1);
+      assert.equal(analytics.mix.paid, 1);
+      assert.equal(analytics.pharmacies.paid, 1);
+      assert.equal(analytics.pharmacies.onTrial, 3);
     });
 
-    it('lists registrations with their plan and where they came from', async () => {
-      const all = await admin.get('/api/v1/platform/registrations');
-      assert.deepEqual(all.counts, { total: 4, referral: 1, direct: 3 });
-      const referred = await admin.get('/api/v1/platform/registrations?source=referral');
-      assert.equal(referred.data.length, 1);
-      assert.equal(referred.data[0].source, 'Referral');
-      assert.equal(referred.data[0].referredBy, (await mongo.col.pharmacies().findOne({ _id: referrer.pharmacyId })).name);
-      assert.equal(referred.data[0].owner.email, 'shifa@wallet.test');
-      assert.equal(referred.data[0].plan.label, 'Standard Referral');
-    });
-
-    it('lists subscriptions by category and state', async () => {
-      const pro = await admin.get('/api/v1/platform/subscriptions?plan=pro');
-      assert.equal(pro.total, 1);
-      assert.equal(pro.data[0].label, 'Pro monthly');
-      assert.equal(pro.data[0].paid, true);
-      const referral = await admin.get('/api/v1/platform/subscriptions?plan=referral');
-      assert.equal(referral.total, 3);
-      assert.equal(referral.mix.total, 4);
-    });
-
-    it('lists referrals, and decides one that is being checked', async () => {
-      const list = await admin.get('/api/v1/platform/referrals');
-      assert.ok(list.total >= 3);
-      assert.equal(list.daysPerReferral, 15);
-      const shifa = list.data.find((row) => row.referred.email === 'shifa@wallet.test');
-      assert.equal(shifa.stage, 'Registered');
-      assert.equal(shifa.rewardDays, 15);
+    it('shows a referral held for a check, and decides it', async () => {
       const id = randomUUID();
       await mongo.col.referrals().insertOne({
         _id: id, id, code: 'REF-TEST03', referral_code_id: null, referrer_pharmacy_id: referrer.pharmacyId, referrer_user_id: null,
@@ -222,35 +208,34 @@ describe('the Subscription wallet and the platform overview', { skip }, () => {
         reject_reason: null, signup_ip: null, registered_at: new Date().toISOString(), verified_at: null, converted_at: null,
         created_at: new Date().toISOString(), updated_at: new Date().toISOString()
       });
-      assert.equal((await admin.get('/api/v1/platform/referrals?status=review')).total, 1);
+      const before = await admin.get('/api/v1/platform/analytics');
+      assert.equal(before.referrals.review, 1);
+      const held = before.referrals.held.find((row) => row.id === id);
+      assert.equal(held.code, 'REF-TEST03');
+      assert.equal(held.referrer, (await mongo.col.pharmacies().findOne({ _id: referrer.pharmacyId })).name);
+      assert.equal(held.referred.email, 'review@wallet.test');
       await admin.post(`/api/v1/platform/referrals/${id}/approve`, {});
       assert.equal((await mongo.col.referrals().findOne({ _id: id })).status, 'converted');
       assert.equal((await referrer.client.get('/api/v1/billing')).referrals.rewards.readyDays, 15, 'its days are ready for the referrer');
+      const afterwards = await admin.get('/api/v1/platform/analytics');
+      assert.equal(afterwards.referrals.review, 0);
+      assert.equal(afterwards.referrals.held.length, 0);
+      assert.equal(afterwards.referrals.readyDays, 15);
       await admin.call('POST', `/api/v1/platform/referrals/${id}/approve`, {}).then((reply) => assert.equal(reply.status, 400));
       const other = await admin.call('POST', '/api/v1/platform/referrals/REFERRAL-LAPSED/reject', { reason: 'test' });
       assert.equal(other.status, 400, 'a referral already honoured cannot be turned down');
     });
 
-    it('lists every pharmacy user, page by page', async () => {
-      const users = await admin.get('/api/v1/platform/users?list=1&size=2');
-      assert.equal(users.data.length, 2);
-      assert.ok(users.total >= 4);
-      assert.ok(users.counts.owners >= 4);
-      assert.ok(users.data.every((row) => row.pharmacy_name));
-      const found = await admin.get('/api/v1/platform/users?list=1&q=shifa');
-      assert.equal(found.data[0].email, 'shifa@wallet.test');
-      assert.deepEqual((await admin.get('/api/v1/platform/users?q=x')).data, [], 'the short search for help stays as it was');
-    });
-
     it('takes a period, refuses one that is backwards or longer than a year, and keeps it all from a pharmacy', async () => {
-      const week = await admin.get('/api/v1/platform/insights?from=2026-01-01&to=2026-01-07');
-      assert.equal(week.traffic.length, 7);
+      const week = await admin.get('/api/v1/platform/analytics?from=2026-01-01&to=2026-01-07');
+      assert.equal(week.days.length, 7);
       assert.equal(week.kpis.visitors, 0);
-      assert.equal((await admin.call('GET', '/api/v1/platform/insights?from=2026-02-01&to=2026-01-01')).status, 400);
-      assert.equal((await admin.call('GET', '/api/v1/platform/traffic?from=2024-01-01&to=2026-01-01')).status, 400);
-      for (const path of ['/api/v1/platform/insights', '/api/v1/platform/traffic', '/api/v1/platform/registrations', '/api/v1/platform/subscriptions', '/api/v1/platform/referrals']) {
-        assert.equal((await referrer.client.call('GET', path)).status, 403, path);
-      }
+      assert.equal(week.kpis.registrations, 0);
+      assert.equal(week.kpis.pharmacies, 4, 'pharmacies are counted as of today');
+      assert.equal((await admin.call('GET', '/api/v1/platform/analytics?from=2026-02-01&to=2026-01-01')).status, 400);
+      assert.equal((await admin.call('GET', '/api/v1/platform/analytics?from=2024-01-01&to=2026-01-01')).status, 400);
+      assert.equal((await referrer.client.call('GET', '/api/v1/platform/analytics')).status, 403);
+      assert.equal((await referrer.client.call('POST', '/api/v1/platform/referrals/REFERRAL-LAPSED/approve', {})).status, 403);
     });
   });
 });

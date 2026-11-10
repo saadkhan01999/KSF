@@ -5,6 +5,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Clock, CreditCard, RefreshCw, ShieldCheck, Database } from 'lucide-react';
 import { SitePage, SiteCta } from '../../components/SiteChrome';
+import { FloatingMedicines } from '../../components/MedicineMotion';
 import { StatusNote } from '../../components/account-ui';
 import { FullAccessStrip, SheetPlanCard } from '../../components/price-sheet';
 import { CardSkeleton, Alert } from '../../components/ui';
@@ -48,6 +49,7 @@ export default function Subscription() {
   return (
     <SitePage>
       <section className="page-hero is-short">
+        <div className="hero-bg" aria-hidden="true"><FloatingMedicines /></div>
         <div className="page-hero-inner">
           <span className="eyebrow">Subscription</span>
           <h1>How paying for KSF works</h1>

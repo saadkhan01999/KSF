@@ -11,6 +11,7 @@ import './styles/components.css';
 import './styles/screens.css';
 import './styles/site.css';
 import './styles/site-pages.css';
+import './styles/site-motion.css';
 import './styles/account.css';
 import './styles/plans.css';
 import './styles/auth.css';

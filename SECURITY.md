@@ -64,7 +64,7 @@ These are known. None allows reading or changing another pharmacy's data.
   stop a stuck tab, not an attacker.
 - **Website visitor figures can be inflated:** anyone can send the public
   visit counter made-up visitors (60 a minute from one address). Its
-  figures only feed the Super Admin's traffic screens, so they are a guide,
+  figures only feed the Super Admin's Analytics page, so they are a guide,
   not a record; nothing is decided by them.
 - **`style-src 'unsafe-inline'`** in the Content-Security-Policy, because
   React writes style attributes. Scripts stay `'self'` only.

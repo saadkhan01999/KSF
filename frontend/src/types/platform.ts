@@ -136,73 +136,31 @@ export const TICKET_CATEGORY_LABEL: Record<string, string> = {
   'data-import': 'Data import', technical: 'Something not working', other: 'Something else'
 };
 
-/* ----------------------------------------------- growth screens (2.9.0) */
+/* ------------------------------------------------------ analytics */
 
 export type PlanCategory = 'demo' | 'referral' | 'pro' | 'annual' | 'other';
 export interface PlanMix {
   total: number; paid: number; trialOrReferral: number;
   items: { key: PlanCategory; label: string; count: number; percent: number }[];
 }
-export interface InsightRange { from: string; to: string; days: number }
 
-/** GET /platform/insights: the Platform overview for one period. */
-export interface PlatformInsights {
-  range: InsightRange;
+/** GET /platform/analytics: the Super Admin's Analytics page for one period. */
+export interface PlatformAnalytics {
+  range: { from: string; to: string; days: number };
   kpis: { visitors: number; activeUsers: number; registrations: number; pharmacies: number; referrals: number; paidSubscriptions: number };
-  traffic: { day: string; visitors: number }[];
+  days: { day: string; visitors: number; views: number; activeUsers: number }[];
+  website: {
+    views: number; averageVisitorsPerDay: number; busiestDay: { day: string; visitors: number } | null;
+    pages: { path: string; views: number }[];
+    referrers: { host: string; visitors: number }[];
+  };
+  registrations: { total: number; direct: number; referral: number };
+  referrals: {
+    invited: number; registered: number; waiting: number; review: number; readyDays: number; claimedDays: number; daysPerReferral: number;
+    held: { id: string; code: string; createdAt: string; referrer: string | null; referred: { name: string | null; email: string | null; pharmacy: string | null } }[];
+  };
+  pharmacies: { total: number; active: number; suspended: number; closed: number; paid: number; onTrial: number; ended: number };
   mix: PlanMix;
   recent: { id: string; name: string; city: string | null; plan: { category: PlanCategory; label: string; entitled: boolean } | null; source: 'Direct' | 'Referral'; registeredAt: string }[];
   asOf: string;
-}
-
-/** GET /platform/traffic */
-export interface PlatformTraffic {
-  range: InsightRange;
-  totals: { visitors: number; views: number; averageVisitorsPerDay: number; busiestDay: { day: string; visitors: number } | null };
-  days: { day: string; visitors: number; views: number }[];
-  pages: { path: string; views: number }[];
-  referrers: { host: string; visitors: number }[];
-}
-
-interface Paged<R> { data: R[]; page: number; size: number; total: number; pages: number }
-
-/** GET /platform/registrations */
-export interface PlatformRegistrations extends Paged<{
-  id: string; name: string; city: string | null; status: string; registeredAt: string;
-  owner: { name: string; email: string; phone: string | null } | null;
-  plan: { category: PlanCategory; label: string; status: string; entitled: boolean } | null;
-  source: 'Direct' | 'Referral'; referredBy: string | null;
-}> {
-  range: InsightRange;
-  counts: { total: number; referral: number; direct: number };
-}
-
-/** GET /platform/subscriptions */
-export interface PlatformSubscriptions extends Paged<{
-  pharmacyId: string; pharmacyName: string; city: string | null; pharmacyStatus: string; subscriptionId: string;
-  planKey: string; planName: string; category: PlanCategory; label: string; status: string; entitled: boolean; paid: boolean;
-  pricePaisa: number; periodEnd: string | null; daysLeft: number | null; autoRenew: boolean; provider: string | null; bonusDays: number;
-}> {
-  mix: PlanMix;
-  labels: Record<PlanCategory, string>;
-}
-
-/** GET /platform/referrals */
-export interface PlatformReferrals extends Paged<{
-  id: string; code: string; status: string; stage: string; rejectReason: string | null;
-  referrer: { id: string; name: string } | null;
-  referred: { pharmacyId: string | null; pharmacyName: string | null; name: string | null; email: string };
-  createdAt: string; convertedAt: string | null; rewardDays: number | null; rewardClaimedAt: string | null;
-}> {
-  counts: { all: number; invited: number; review: number; registered: number; rejected: number; readyDays: number; claimedDays: number };
-  daysPerReferral: number;
-}
-
-/** GET /platform/users?list=1 */
-export interface PlatformUsers extends Paged<{
-  id: string; full_name: string; email: string; phone: string | null; status: string; is_owner?: number;
-  pharmacy_id: string; pharmacy_name: string | null; role_name: string | null; last_login_at: string | null;
-  locked_until: string | null; created_at: string; totp_enabled?: number;
-}> {
-  counts: { all: number; active: number; signedIn30: number; owners: number };
 }

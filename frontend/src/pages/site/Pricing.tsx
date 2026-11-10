@@ -15,6 +15,7 @@ import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight, Check, Clock, Gift, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { SitePage, SiteCta } from '../../components/SiteChrome';
+import { FloatingMedicines } from '../../components/MedicineMotion';
 import { FullAccessStrip, PlanSummaryTable, SheetPlanCard } from '../../components/price-sheet';
 import { Alert, CardSkeleton } from '../../components/ui';
 import { useParallax, useReveal, useViewMode } from '../../hooks/useParallax';
@@ -49,6 +50,7 @@ export default function Pricing() {
       <section className="page-hero is-short">
         <div className="hero-bg" aria-hidden="true">
           <div className="hero-blob three" ref={glow} />
+          <FloatingMedicines />
         </div>
         <div className="page-hero-inner">
           <span className="eyebrow">Subscription plans</span>
