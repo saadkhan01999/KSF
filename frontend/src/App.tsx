@@ -60,11 +60,7 @@ const PlanReview = lazy(() => import('./pages/subscription/PlanReview'));
 
 /* The platform console. Its own chunks: a pharmacy never downloads them. */
 const PlatformOverview = lazy(() => import('./pages/platform/Overview'));
-const WebsiteTraffic = lazy(() => import('./pages/platform/growth/Traffic'));
-const Registrations = lazy(() => import('./pages/platform/growth/Registrations'));
-const PlatformUsers = lazy(() => import('./pages/platform/growth/Users'));
-const PlatformReferrals = lazy(() => import('./pages/platform/growth/Referrals'));
-const PlatformSubscriptions = lazy(() => import('./pages/platform/growth/Subscriptions'));
+const PlatformAnalytics = lazy(() => import('./pages/platform/Analytics'));
 const Pharmacies = lazy(() => import('./pages/platform/Pharmacies'));
 const PharmacyDetail = lazy(() => import('./pages/platform/PharmacyDetail'));
 const SupportDesk = lazy(() => import('./pages/platform/SupportDesk'));
@@ -115,11 +111,7 @@ function Protected() {
         {isPlatform ? (
           <Routes location={location}>
             <Route path="/platform" element={<Guard permission="platform.overview"><PlatformOverview /></Guard>} />
-            <Route path="/platform/traffic" element={<Guard permission="platform.overview"><WebsiteTraffic /></Guard>} />
-            <Route path="/platform/registrations" element={<Guard permission="platform.pharmacies.view"><Registrations /></Guard>} />
-            <Route path="/platform/users" element={<Guard permission="platform.pharmacies.view"><PlatformUsers /></Guard>} />
-            <Route path="/platform/referrals" element={<Guard permission="platform.pharmacies.view"><PlatformReferrals /></Guard>} />
-            <Route path="/platform/subscriptions" element={<Guard permission="platform.pharmacies.view"><PlatformSubscriptions /></Guard>} />
+            <Route path="/platform/analytics" element={<Guard permission="platform.overview"><PlatformAnalytics /></Guard>} />
             <Route path="/platform/pharmacies" element={<Guard permission="platform.pharmacies.view"><Pharmacies /></Guard>} />
             <Route path="/platform/pharmacies/:id" element={<Guard permission="platform.pharmacies.view"><PharmacyDetail /></Guard>} />
             <Route path="/platform/support" element={<Guard permission="platform.support"><SupportDesk /></Guard>} />

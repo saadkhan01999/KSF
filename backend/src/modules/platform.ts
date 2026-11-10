@@ -641,10 +641,8 @@ platformRoute('PATCH', '/api/v1/platform/plans/:key', 'platform.plans.manage', a
 
 /* =================================== PEOPLE =================================== */
 /* Find anybody on the platform — the usual first step when somebody phones. */
-platformRoute('GET', '/api/v1/platform/users', ['platform.help', 'platform.support', 'platform.pharmacies.view'], async (ctx) => {
+platformRoute('GET', '/api/v1/platform/users', ['platform.help', 'platform.support'], async (ctx) => {
   const search = toStr(ctx.query.get('q'), 80);
-  /* ?list=1: every pharmacy user, page by page (Management › Users). */
-  if (ctx.query.get('list') === '1') return userDirectory(ctx, search);
   if (search.length < 2) return { data: [] };
   const pattern = contains(search);
   const rows = await col.users().aggregate([
@@ -656,40 +654,6 @@ platformRoute('GET', '/api/v1/platform/users', ['platform.help', 'platform.suppo
   ]).toArray();
   return { data: rows };
 });
-
-/** Every person working in a pharmacy on KSF, newest first or by last sign-in. */
-async function userDirectory(ctx: SignedInCtx, search: string) {
-  const page = paging(ctx, 25);
-  const filter: Document = { pharmacy_id: { $ne: null } };
-  if (search) {
-    const pattern = contains(search);
-    const pharmacyIds = await col.pharmacies().distinct('_id', { name: pattern });
-    filter.$or = [{ full_name: pattern }, { email: pattern }, { phone: pattern }, { pharmacy_id: { $in: pharmacyIds } }];
-  }
-  const status = toStr(ctx.query.get('status'), 20);
-  if (['active', 'inactive', 'suspended', 'locked'].includes(status)) {
-    if (status === 'locked') filter.locked_until = { $gt: nowIso() };
-    else filter.status = status;
-  }
-  const sort: Record<string, 1 | -1> = ctx.query.get('sort') === 'last_login' ? { last_login_at: -1 } : { created_at: -1 };
-  const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
-  const [rows, total, counts] = await Promise.all([
-    col.users().aggregate([
-      { $match: filter }, { $sort: sort }, { $skip: page.skip }, { $limit: page.size },
-      ...lookupField('pharmacies', 'pharmacy_id', 'name', 'pharmacy_name'),
-      ...lookupField('roles', 'role_id', 'name', 'role_name'),
-      { $project: { _id: 0, id: 1, full_name: 1, email: 1, phone: 1, status: 1, is_owner: 1, pharmacy_id: 1, pharmacy_name: 1, role_name: 1, last_login_at: 1, locked_until: 1, created_at: 1, totp_enabled: 1 } }
-    ]).toArray(),
-    col.users().countDocuments(filter),
-    Promise.all([
-      col.users().countDocuments({ pharmacy_id: { $ne: null } }),
-      col.users().countDocuments({ pharmacy_id: { $ne: null }, status: 'active' }),
-      col.users().countDocuments({ pharmacy_id: { $ne: null }, last_login_at: { $gte: since30 } }),
-      col.users().countDocuments({ pharmacy_id: { $ne: null }, is_owner: 1 })
-    ])
-  ]);
-  return { counts: { all: counts[0], active: counts[1], signedIn30: counts[2], owners: counts[3] }, ...pageResult(rows, total, page) };
-}
 
 /* Everybody stuck, in every pharmacy, in one queue. */
 platformRoute('GET', '/api/v1/platform/help', 'platform.help', async (ctx) => {

@@ -5,6 +5,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Check, Clock, Sun, Moon } from 'lucide-react';
 import { SitePage, SiteCta } from '../../components/SiteChrome';
+import { FloatingMedicines } from '../../components/MedicineMotion';
 import { DashboardPreview } from '../../components/AppPreview';
 import { useParallax, useReveal, useViewMode } from '../../hooks/useParallax';
 
@@ -47,6 +48,7 @@ export default function Product() {
       <section className="page-hero">
         <div className="hero-bg" aria-hidden="true">
           <div className="hero-blob one" ref={glow} />
+          <FloatingMedicines />
         </div>
         <div className="page-hero-inner">
           <span className="eyebrow">The product</span>

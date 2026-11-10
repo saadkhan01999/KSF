@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
 import { SitePage, SiteCta } from '../../components/SiteChrome';
+import { FloatingMedicines } from '../../components/MedicineMotion';
 import { useParallax, useReveal, useViewMode } from '../../hooks/useParallax';
 import { FEATURE_SECTIONS } from './content';
 
@@ -27,6 +28,7 @@ export default function Features() {
       <section className="page-hero is-short">
         <div className="hero-bg" aria-hidden="true">
           <div className="hero-blob two" ref={glow} />
+          <FloatingMedicines />
         </div>
         <div className="page-hero-inner">
           <span className="eyebrow">Features</span>

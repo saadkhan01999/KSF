@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.9.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.10.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -50,8 +50,8 @@ support requests they raise.
 
 | Area | What is in it |
 |---|---|
-| Platform overview | For any period: website visitors, active users, new registrations, pharmacies, referrals and paid subscriptions; visitors per day; the subscription mix (Demo trial, Standard Referral, Pro monthly, Diamond Annual); the latest registrations. Below it, all pharmacies combined: their sales, your income, monthly recurring revenue, trials, open support requests |
-| Growth | **Website traffic** (visitors and page views per day, the pages read, the sites they came from — counted without cookies), **Registrations** (direct or through a referral, who registered), **Users** (everyone working in a pharmacy), **Referrals** (each one's stage and days; accept or turn down one held for checking) and **Subscriptions** (every pharmacy's plan today) |
+| Overview | All pharmacies combined: their sales today and this month, your income this month and all time, monthly recurring revenue, plans, trials, open support requests |
+| Analytics | One page for any period (7, 30 or 90 days, this month, last month or chosen dates): **website visitors, active users, new registrations, pharmacies, referrals and paid subscriptions**; visitors per day, the pages read and the sites visitors came from (counted without cookies); people using KSF per day; registrations direct or through a referral; referrals by stage, with the ones held for a check accepted or turned down there; pharmacies by state; the subscription mix (Demo trial, Standard Referral, Pro monthly, Diamond Annual); the newest pharmacies |
 | Pharmacies | Every pharmacy, searchable by name, city or Admin; one page per pharmacy with its figures, staff, branches, plan, payments, support history and activity |
 | Actions | Edit a pharmacy, change or extend its plan, record an offline payment, suspend / reactivate (signs everybody out at once), and **work inside** any pharmacy in support mode |
 | Plans and prices | Create plans and change prices, limits and features. **A change reaches every open screen at once** — the public pricing page, every pharmacy's dashboard and billing, and the checkout — and a pharmacy's features follow its subscription the moment it changes |
@@ -676,12 +676,8 @@ added without a line here.
 | Endpoint | Who may call | What it does |
 |---|---|---|
 | `GET /api/v1/platform/overview` | `platform.overview` | Every pharmacy combined: sales, income, recurring revenue, plans, trials, open requests |
-| `GET /api/v1/platform/insights` | `platform.overview` | The Platform overview for `?from&to` (Pakistan days, 30 by default): website visitors, active users, new registrations, pharmacies, referrals and paid subscriptions, visitors per day, the subscription mix and the latest registrations |
-| `GET /api/v1/platform/traffic` | `platform.overview` | Website traffic for `?from&to`: unique visitors and page views per day, the busiest day, the pages opened and the sites visitors came from |
-| `GET /api/v1/platform/registrations` | `platform.pharmacies.view` | Pharmacies registered in `?from&to` with their plan today, signup source (direct or referral) and who registered them (`?source=direct\|referral&q`), paged |
-| `GET /api/v1/platform/subscriptions` | `platform.pharmacies.view` | Every pharmacy's plan today: the subscription mix, state, price and end date (`?plan=demo\|referral\|pro\|annual&state&q`), paged |
-| `GET /api/v1/platform/referrals` | `platform.pharmacies.view` | Every referral with its stage (invited, being checked, registered, ready to claim, claimed, not accepted) and the referral days (`?status=pending\|review\|converted\|ready\|claimed\|rejected&q`), paged |
-| `POST /api/v1/platform/referrals/:id/approve` | `platform.pharmacies.manage` | Accept a referral held for checking: the referral price applies and the inviting pharmacy earns its days |
+| `GET /api/v1/platform/analytics` | `platform.overview` | The Analytics page for `?from&to` (Pakistan days, 30 by default, at most a year): the six figures (website visitors, active users, new registrations, pharmacies, referrals, paid subscriptions), visitors, page views and active users per day, the pages opened and the sites visitors came from, registrations by source, referrals by stage with those held for a check, pharmacies by state, the subscription mix and the newest pharmacies |
+| `POST /api/v1/platform/referrals/:id/approve` | `platform.pharmacies.manage` | Accept a referral held for checking (from the Analytics page): the referral price applies and the inviting pharmacy earns its days |
 | `POST /api/v1/platform/referrals/:id/reject` | `platform.pharmacies.manage` | Turn a waiting or held referral down (`reason`): no referral price and no days |
 | `GET /api/v1/platform/pharmacies` | `platform.pharmacies.view` | Pharmacies, searchable and filterable by status and plan |
 | `GET /api/v1/platform/pharmacies/:id` | `platform.pharmacies.view` | One pharmacy: figures, staff, branches, plan, payments, requests, activity |
@@ -722,7 +718,7 @@ added without a line here.
 
 | Endpoint | Who may call | What it does |
 |---|---|---|
-| `GET /api/v1/platform/users` | `platform.help`, `platform.support` or `platform.pharmacies.view` | Find any pharmacy user by name, e-mail or phone; with `?list=1` every pharmacy user, paged (`?q&status&sort=last_login`), with the counts |
+| `GET /api/v1/platform/users` | `platform.help` or `platform.support` | Find any pharmacy user by name, e-mail or phone |
 | `GET /api/v1/platform/help` | `platform.help` | Everyone who could not sign in today, and why |
 | `GET /api/v1/platform/activity` | `platform.activity` | The platform activity log |
 | `GET /api/v1/platform/security` | `platform.activity` | Security events across the platform |
@@ -870,7 +866,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.9.0 · Server 2.9.0 — up to date", or
+System) compares the two: "Website 2.10.0 · Server 2.10.0 — up to date", or
 what to do when they differ (on Vercel both deploy together from `main`:
 Vercel › Deployments).
 

@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ShieldCheck, Lock, Eye, Server, FileCheck, LifeBuoy, Mail, MessageSquare } from 'lucide-react';
 import { SitePage, SiteCta } from '../../components/SiteChrome';
+import { FloatingMedicines } from '../../components/MedicineMotion';
 import { useParallax, useReveal, useViewMode } from '../../hooks/useParallax';
 import { useBusiness } from '../../services/business';
 
@@ -54,6 +55,7 @@ export default function About() {
       <section className="page-hero is-short">
         <div className="hero-bg" aria-hidden="true">
           <div className="hero-blob one" ref={glow} />
+          <FloatingMedicines />
         </div>
         <div className="page-hero-inner">
           <span className="eyebrow">About KSF</span>
