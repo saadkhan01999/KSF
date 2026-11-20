@@ -55,6 +55,17 @@ are absent. `verified` is a flag you set yourself — `JAZZCASH_VERIFIED=true` �
 **after** you have run the sandbox cases. It exists so that nobody can mistake
 "the code is written" for "we have seen it work".
 
+**Going live on the Hostinger server.** `deploy/hostinger.env.example` lists
+every provider's settings together, with the webhook and return addresses
+already written for the domain; copy it to `deploy/.env` and fill in only the
+providers you use. Then run the pre-flight check — on the server
+`ksf run --rm app node backend/dist/cli/preflight.js`, elsewhere
+`npm run deploy:check`. It names each provider as on or off, what an off one
+still needs (setting names only, never values), whether it is still in
+sandbox mode or not yet marked verified, and the two addresses to register
+with it; it fails while no way of paying is set up at all. Start with bank
+transfer: it needs no merchant account.
+
 ---
 
 ## 3. How a payment actually flows

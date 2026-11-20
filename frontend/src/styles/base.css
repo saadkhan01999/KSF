@@ -8,14 +8,11 @@
 
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
 
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  *, *::before, *::after {
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
-  }
-}
+/* Animations switched off (the switch at the foot of the website). */
+html[data-motion='off'] { scroll-behavior: auto; }
+:root[data-motion='off'] *,
+:root[data-motion='off'] *::before,
+:root[data-motion='off'] *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 
 /* Scroll ownership. 'app' is a fixed shell that scrolls internally; 'site'
    is the marketing page, which scrolls normally and drives the parallax. */
@@ -65,11 +62,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--s-5) 0; }
 
 ::selection { background: var(--brand-200); color: var(--brand-900); }
 
-/* Respect a reduced-motion preference by disabling parallax entirely, not by
-   speeding it up — motion sickness is the reason the setting exists. */
-@media (prefers-reduced-motion: reduce) {
-  [data-parallax] { transform: none !important; }
-}
+/* Parallax is disabled entirely, not sped up, when the device asks for less
+   motion (the script leaves it be) or animations are switched off — motion
+   sickness is the reason the setting exists. */
+:root[data-motion='off'] [data-parallax] { transform: none !important; }
 
 /* Scrollbars: a green thumb on a quiet track, in light and dark alike. */
 * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
@@ -213,9 +209,9 @@ html.reveal-armed [data-reveal].is-visible :is(.pillars, .plan-grid, .faq-grid, 
 :is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid, .terms-grid, .status-grid,
   .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > :nth-child(n+7) { --reveal-step: 6; }
 
-@media (prefers-reduced-motion: reduce) {
-  [data-reveal], [data-reveal] * { opacity: 1 !important; transform: none !important; transition: none !important; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] [data-reveal],
+:root[data-motion='off'] [data-reveal] * { opacity: 1 !important; transform: none !important; transition: none !important; }
 
 /* A glide (utils/glide.ts) or a drag of the website's scrollbar moves the
    page itself, frame by frame: the stylesheet's smooth scrolling is off

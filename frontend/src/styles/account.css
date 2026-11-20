@@ -124,11 +124,10 @@
   .stepper-list { display: none; }
   .stepper-compact { display: block; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .stepper-marker,
-  .stepper-step::after,
-  .stepper-segments span { transition: none; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .stepper-marker,
+:root[data-motion='off'] .stepper-step::after,
+:root[data-motion='off'] .stepper-segments span { transition: none; }
 
 /* ============================ PASSWORD FIELD ============================= */
 
@@ -188,9 +187,8 @@
 .password-rules li.is-met { color: var(--ok-text); }
 .password-rules li.is-met span { color: var(--ok-600); }
 
-@media (prefers-reduced-motion: reduce) {
-  .strength-bar span { transition: none; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .strength-bar span { transition: none; }
 
 /* =============================== OTP INPUT =============================== */
 
@@ -337,9 +335,8 @@
 .file-drop-title { font-weight: 650; margin-bottom: 3px; }
 .file-drop-hint { font-size: var(--fs-sm); color: var(--text-dim); margin-bottom: var(--s-4); }
 
-@media (prefers-reduced-motion: reduce) {
-  .file-drop { transition: none; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .file-drop { transition: none; }
 
 /* ============================== STATUS NOTE ============================== */
 

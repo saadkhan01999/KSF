@@ -99,7 +99,9 @@
   border-radius: var(--r-lg);
   background: var(--tone-soft);
 }
-.sheet-price.is-split > div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 var(--s-2); }
+.sheet-price.is-split > div { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2px; padding: 0 var(--s-2); }
+/* The two prices level with each other, however their notes wrap. */
+.sheet-price.is-split { align-items: start; }
 .sheet-price.is-split > div + div { border-left: 1px solid color-mix(in srgb, var(--tone) 25%, transparent); }
 .sheet-price.is-split .sheet-amount { font-size: 1.45rem; }
 .sheet-price.is-split small { font-size: var(--fs-xs); }

@@ -211,6 +211,10 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   'pos.max_discount_percent': '10',
   /* Whether the till adds GST to a sale unless the cashier turns it off (backend/src/domain/sale-totals.ts). */
   'pos.gst_default': 'false',
+  /* The receipt printer's paper: an 80 mm or a 58 mm thermal roll, or an A4 page. */
+  'receipt.paper': '80',
+  /* Print the receipt the moment a sale completes, without pressing Print. */
+  'receipt.auto_print': 'false',
   'tax.gst_percent': '0',
   'loyalty.enabled': 'true',
   'loyalty.points_per_100': '1',

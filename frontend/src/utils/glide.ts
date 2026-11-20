@@ -3,7 +3,10 @@
    browser's own smooth scroll, which crosses a long page in a blink.
 
    Any wheel, touch or key from the reader stops it at once: the page never
-   fights the person holding it. With "reduce motion" on, it simply jumps. */
+   fights the person holding it. With the website's animations switched
+   off, it simply jumps. */
+
+import { motionLevel } from './motion';
 
 let current: (() => void) | null = null;
 
@@ -19,7 +22,7 @@ export function glideTo(top: number): void {
   const start = window.scrollY;
   const target = Math.max(0, Math.min(top, root.scrollHeight - window.innerHeight));
   const distance = target - start;
-  const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const calm = motionLevel() === 'off';
   /* The stylesheet's smooth scrolling would smooth every step again: off while gliding. */
   root.classList.add('is-gliding');
   if (calm || Math.abs(distance) < 2) {

@@ -3,6 +3,98 @@
 All notable changes to KSF Pharmacy Management System. Dates are in
 Pakistan Standard Time.
 
+## [2.11.0] — 2026-11-20
+
+Animations on every laptop, buttons that never cut their words, referral
+codes the Super Admin issues, a receipt for every printer, and a server
+that says when it is ready to go live.
+
+### Website: animations on laptops
+- **The animations work on laptops too.** A laptop that asks for less
+  motion — Windows with "Animation effects" off, which is common, or macOS
+  "Reduce motion" — used to stop every animation and transition on the
+  website and in the workspace. It now gets a calm version instead: the
+  medicines still float (a few pixels), pages fade in, the heartbeat line
+  draws, sections fade without sliding; only the scroll-linked parallax
+  stays still.
+- **An Animations switch** at the foot of every page of the website, and
+  under My account › Appearance in the workspace (On, Off or Match device),
+  turns all of it off, or back on in full, and is remembered on that
+  browser. Moving pictures that run on their own need a way to stop them;
+  this is it.
+
+### Buttons
+- A button no longer hides part of its own label when space is short. A
+  full-width button (a plan card's, a form's) wraps a long label onto a
+  second line, centred — "Start free, then choose Diamond Annual" on a
+  phone or a 1024 px laptop; buttons in a bar or a table row keep their
+  size — the top bar's **New sale** at tablet width, **Approve** on an
+  expense on a phone, **Open the checklist** in Settings.
+- The Pro card's two prices sit level, however their notes wrap.
+- Role cards' figures and buttons sit at the foot of every card, level
+  across a row whatever the description's length.
+- Checked at 360, 390, 768, 1024, 1280, 1366, 1536 and 1920 px across the
+  website, the pharmacy workspace and the platform console: no button cut,
+  out of its box or off the screen, and no page wider than the screen.
+
+### Super Admin: referral codes
+- **Give a pharmacy a referral code people can say and remember**, made from
+  its name — Khan Pharmacy gets KHAN-239 — or type one of your own (letters,
+  a dash, numbers). It becomes the code the pharmacy shares (its Referrals
+  tab and link show it, and it is told); its earlier codes keep working, so
+  a link already sent never breaks.
+- **Analytics › Referral codes**: every pharmacy with its code and how many
+  pharmacies registered with it, signing up, the last registration — the
+  most successful first, searchable by pharmacy, city or code. **Pharmacies**
+  opens the list of every pharmacy that registered with that pharmacy's
+  codes: name, city, owner, the code used ("via Khan Pharmacy"), stage and
+  plan.
+- **A pharmacy's page › Referrals**: the same, plus whose code the pharmacy
+  itself registered with ("registered with KHAN-239 — the code of Khan
+  Pharmacy, Karachi").
+- `GET /api/v1/platform/referral-codes`,
+  `GET /api/v1/platform/pharmacies/:id/referrals`,
+  `POST /api/v1/platform/pharmacies/:id/referral-code`.
+
+### Receipts
+- **Settings › Till & invoices › Receipt paper**: an 80 mm thermal roll (as
+  before), a 58 mm roll (narrower, a size smaller) or an A4 page (the slip,
+  larger, in the middle of the page). A roll slip still prints in full on
+  paper exactly its own length.
+- **Print the receipt straight away** when a sale completes, without
+  pressing Print — or, as before, when Print receipt is pressed.
+- The pharmacy's city is printed once, even when the address already
+  ends with it.
+
+### Going live on Hostinger
+- **`deploy/hostinger.env.example`**: the settings file for the server, made
+  for ksfpharmacy.com — the address, Hostinger e-mail, the business, and
+  every way of taking a payment (bank transfer or Raast, Stripe, JazzCash,
+  Easypaisa, a gateway) with its webhook and return addresses.
+- **A pre-flight check**: `ksf run --rm app node backend/dist/cli/preflight.js`
+  on the server (`npm run deploy:check` elsewhere) says, line by line, what
+  is ready and what to fix — the address and HTTPS, the sign-in secrets,
+  the database and its transactions, the Super Admin, e-mail, sign-up codes,
+  every payment provider (on or off, sandbox or live, verified or not, and
+  what it still needs) and the business details. Setting names only, never
+  values; exits 1 while anything must be fixed.
+- The Hostinger guide covers each payment method, the check, and printing
+  the first receipt; the go-live checklist includes them.
+
+### Tests
+- **Every screen's data, for every kind of person**: each of the 116 GET
+  routes, called by nobody signed in, the pharmacy Admin, a Regional
+  Manager, a Branch Manager, a Pharmacist, a Cashier, an Accountant (a role
+  the Admin made), the Super Admin and a member of each of the five team
+  roles — over 1,500 calls: never a 5xx, everyone their role allows let in,
+  everyone else kept out.
+- Referral codes: made from the name, typed, refused when taken or badly
+  formed; registrations counted under the pharmacy and listed with the code
+  each used; the earlier code still honoured; whose code a pharmacy came
+  through; pharmacies kept out.
+- Receipt paper and printing on its own: the defaults, the three papers,
+  and anything else refused.
+
 ## [2.10.0] — 2026-11-10
 
 The Super Admin's console as it was, with one Analytics page; and a public

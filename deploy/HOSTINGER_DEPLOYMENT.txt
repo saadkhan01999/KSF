@@ -267,8 +267,13 @@
  5.1  Start from the example and lock it so only you can read it:
 
         cd /srv/ksf
-        cp .env.example deploy/.env
+        cp deploy/hostinger.env.example deploy/.env
         chmod 600 deploy/.env
+
+      deploy/hostinger.env.example is made for this server: the address is
+      already https://ksfpharmacy.com (change it if your domain differs),
+      e-mail is set for Hostinger Business Email, and every way of taking a
+      payment is listed with its webhook and return addresses.
 
  5.2  Make two different random secrets (run it twice, copy both):
 
@@ -319,9 +324,27 @@
         (the other BUSINESS_* lines are optional)
 
       --- payments (only what you use; docs/PAYMENTS.md) --------------------
-      Bank transfer:  BANK_ACCOUNT_TITLE, BANK_ACCOUNT_NUMBER, BANK_NAME,
-                      BANK_IBAN
-      Cards (Stripe): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (Part 9)
+      How pharmacies pay for Pro and Diamond Annual. A way of paying stays
+      off until all of its lines are filled in:
+
+      Bank transfer / Raast (start with this: no merchant account needed)
+                      BANK_ACCOUNT_TITLE, BANK_ACCOUNT_NUMBER, BANK_NAME,
+                      BANK_IBAN (BANK_RAAST_ID if you have one). You confirm
+                      each transfer against your statement: console >
+                      Income > Payments waiting.
+      Cards (Stripe): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (Part 9.4)
+      JazzCash:       JAZZCASH_MERCHANT_ID, JAZZCASH_PASSWORD,
+                      JAZZCASH_INTEGRITY_SALT, JAZZCASH_POST_URL
+      Easypaisa:      EASYPAISA_STORE_ID, EASYPAISA_HASH_KEY,
+                      EASYPAISA_POST_URL
+      A gateway (Safepay, PayFast, Paymob, a bank's own):
+                      GATEWAY_NAME, GATEWAY_CHECKOUT_URL,
+                      GATEWAY_MERCHANT_ID, GATEWAY_API_KEY,
+                      GATEWAY_WEBHOOK_SECRET
+      PAYMENT_PROVIDER names the one the Pay button offers first.
+      JazzCash, Easypaisa and a gateway start in sandbox mode: run the
+      sandbox cases in docs/PAYMENTS.md section 6, then set *_MODE=live and
+      *_VERIFIED=true.
 
       --- must stay as they are -----------------------------------------------
       SHOW_SIGNUP_CODE=false     (true would let anyone sign up with any address)
@@ -343,6 +366,19 @@ exec docker compose --env-file /srv/ksf/deploy/.env -f /srv/ksf/deploy/docker-co
 
         sudo chmod +x /usr/local/bin/ksf
         ksf config --services          (must list: app, web, mongo)
+
+ 5.5  Check the settings before going further. It says, line by line, what
+      is ready and what to fix — the address, the secrets, the database,
+      e-mail and every way of paying — and prints setting names, never
+      their values:
+
+        ksf build app
+        ksf run --rm app node backend/dist/cli/preflight.js
+
+      "FIX" lines must be fixed (the check ends with "Ready to go live" when
+      none are left); "NOTE" lines are worth a look. Run it again after any
+      change to deploy/.env. Until the certificate is in place (Part 8) it
+      is normal to see a FIX for the address.
 
       (With Atlas, leave out "--profile local-db" in that line.)
 
@@ -461,12 +497,25 @@ cp /etc/letsencrypt/live/<YOUR-DOMAIN>/privkey.pem /srv/ksf/deploy/nginx/certs/k
 
         ksf up -d
 
-      Other providers (JazzCash, Easypaisa, a gateway) use
-        https://<YOUR-DOMAIN>/api/v1/payments/webhook/<provider>
-      and their return pages, as listed in docs/PAYMENTS.md.
+      Other providers, in their merchant portals:
+        JazzCash   webhook (IPN)  https://<YOUR-DOMAIN>/api/v1/payments/webhook/jazzcash
+                   return         https://<YOUR-DOMAIN>/api/v1/payments/return/jazzcash
+        Easypaisa  webhook        https://<YOUR-DOMAIN>/api/v1/payments/webhook/easypaisa
+                   return         https://<YOUR-DOMAIN>/api/v1/payments/return/easypaisa
+        A gateway  webhook        https://<YOUR-DOMAIN>/api/v1/payments/webhook/gateway
+                   return         https://<YOUR-DOMAIN>/api/v1/payments/return/gateway
+      The console shows the same addresses, ready to copy, under Accounts >
+      Payment methods, with each provider on or off and what it still needs.
+      Then pay for a plan once yourself from a test pharmacy (Subscription
+      plans > Choose Pro > Preview payment) and see it arrive in Income.
 
- 9.5  The platform console > Overview shows "Website 2.7.0 - Server 2.7.0 -
-      up to date".
+ 9.5  Receipts: in the test pharmacy, Settings > Till & invoices > Receipt
+      paper — an 80 mm roll (most counter printers), a 58 mm roll or A4 —
+      and whether the receipt prints by itself when a sale completes. Ring
+      up one sale at the till and print it on the shop's printer.
+
+ 9.6  The platform console > Overview shows "Website <version> - Server
+      <version> - up to date" (the version in package.json).
 
 
 ------------------------------------------------------------------------------
@@ -709,7 +758,9 @@ find /srv/ksf-backups -name 'ksf-*' -mtime +30 -delete
  [ ] hPanel firewall and ufw: only 22, 80, 443
  [ ] Logged in as "deploy"; root and password logins off
  [ ] Domain A records (@ and www) point at the server
- [ ] deploy/.env filled in, chmod 600, SHOW_SIGNUP_CODE=false
+ [ ] deploy/.env filled in (from deploy/hostinger.env.example), chmod 600,
+     SHOW_SIGNUP_CODE=false
+ [ ] The pre-flight check (5.5) ends with "Ready to go live"
  [ ] "ksf ps": app and mongo healthy; health answers "ok":true
  [ ] Let's Encrypt certificate in place; renewal in root's crontab
  [ ] Super Admin password changed; two-step sign-in on
@@ -718,7 +769,11 @@ find /srv/ksf-backups -name 'ksf-*' -mtime +30 -delete
      server
  [ ] Hostinger weekly backups on (daily add-on for a live business)
  [ ] Uptime monitor on /api/v1/health
+ [ ] Bank details filled in, so pharmacies can pay; each other way of
+     paying you use: its webhook and return addresses registered (9.4),
+     sandbox cases run, *_VERIFIED=true; one test payment seen in Income
  [ ] Stripe webhook on the new domain (if you take cards)
+ [ ] Receipt paper chosen and one receipt printed on the shop printer (9.5)
  [ ] After one calm week: the Vercel project (and Atlas, if you moved the
      data) removed
 

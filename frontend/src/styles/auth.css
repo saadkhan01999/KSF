@@ -353,8 +353,7 @@
   .auth-main .auth-mark { margin-top: var(--s-2); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .auth-brand::before,
-  .auth-brand::after,
-  .auth-card { animation: none; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .auth-brand::before,
+:root[data-motion='off'] .auth-brand::after,
+:root[data-motion='off'] .auth-card { animation: none; }

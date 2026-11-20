@@ -160,3 +160,41 @@
 .an-held li strong { display: block; font-size: var(--fs-sm); }
 .an-held li small { font-size: var(--fs-xs); color: var(--text-dim); }
 [id^='an-'] { scroll-margin-top: 84px; }
+
+/* Referral codes: the board on Analytics and a pharmacy's own panel. */
+.codes-search { position: relative; min-width: 240px; }
+.codes-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; }
+.codes-search .input { padding-left: 36px; }
+.codes-totals { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); padding: 0 var(--s-5) var(--s-4); font-size: var(--fs-sm); color: var(--text-soft); }
+.codes-totals strong { color: var(--text); }
+.code-chip {
+  display: inline-block; padding: 2px 8px; font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); font-weight: 700; letter-spacing: .03em;
+  color: var(--brand-700); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--brand-500) 25%, transparent); border-radius: var(--r-sm); white-space: nowrap;
+}
+.code-chip.is-large { padding: 4px 12px; font-size: var(--fs-lg); }
+:root[data-theme='dark'] .code-chip { color: var(--brand-300); }
+table.tbl td.cell-actions { width: 1%; white-space: nowrap; }
+table.tbl td.cell-actions .row-actions { gap: var(--s-2); }
+.cell-title .cell-main, .cell-title .cell-sub { display: block; }
+
+.ref-panel { display: grid; gap: var(--s-4); }
+.ref-codes { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--s-4); padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface-2); }
+.ref-code-main { display: grid; gap: var(--s-2); min-width: 0; }
+.ref-code-main .lbl { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); }
+.ref-code-main p { margin: 0; }
+.ref-code-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.ref-counts { display: grid; grid-template-columns: repeat(4, minmax(72px, auto)); gap: var(--s-2) var(--s-4); margin: 0; }
+.ref-counts div { display: grid; gap: 2px; }
+.ref-counts dt { font-size: var(--fs-xs); color: var(--text-dim); }
+.ref-counts dd { margin: 0; font-size: 1.35rem; font-weight: 700; color: var(--text); }
+.ref-issue { display: grid; gap: var(--s-3); padding: var(--s-4); border: 1px dashed color-mix(in srgb, var(--brand-500) 45%, var(--line)); border-radius: var(--r-lg); }
+.ref-issue p { margin: 0; font-size: var(--fs-sm); color: var(--text-soft); }
+.ref-issue-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-3); }
+.ref-issue-row .field { margin: 0; min-width: 200px; flex: 1 1 200px; }
+.ref-came { margin: 0; font-size: var(--fs-sm); color: var(--text-soft); }
+.ref-list-title { margin: var(--s-2) 0 0; font-size: var(--fs-md); }
+.ref-panel > .btn { justify-self: start; }
+@media (max-width: 640px) {
+  .ref-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .codes-search { min-width: 0; width: 100%; }
+}

@@ -201,4 +201,25 @@ describe('GST and loans at the till', { skip }, () => {
       assert.equal((await owner.get(`/api/v1/customers/${ids.imran}`)).data.balance_paisa, 3_500);
     });
   });
+
+  describe('the receipt printer', () => {
+    it('prints on an 80 mm roll, when Print is pressed, unless the pharmacy says otherwise', async () => {
+      const { settings } = await owner.get('/api/v1/settings');
+      assert.equal(settings['receipt.paper'], '80');
+      assert.equal(settings['receipt.auto_print'], 'false');
+    });
+
+    it('takes a 58 mm roll or an A4 page, and printing on its own, and nothing else', async () => {
+      await owner.patch('/api/v1/settings', { settings: { 'receipt.paper': '58', 'receipt.auto_print': 'true' } });
+      let { settings } = await owner.get('/api/v1/settings');
+      assert.deepEqual([settings['receipt.paper'], settings['receipt.auto_print']], ['58', 'true']);
+      await owner.patch('/api/v1/settings', { settings: { 'receipt.paper': 'a4' } });
+      assert.equal((await owner.get('/api/v1/settings')).settings['receipt.paper'], 'a4');
+      assert.equal((await owner.call('PATCH', '/api/v1/settings', { settings: { 'receipt.paper': '110' } })).status, 400);
+      assert.equal((await owner.call('PATCH', '/api/v1/settings', { settings: { 'receipt.auto_print': 'sometimes' } })).status, 400);
+      ({ settings } = await owner.get('/api/v1/settings'));
+      assert.equal(settings['receipt.paper'], 'a4', 'a refused value changes nothing');
+      await owner.patch('/api/v1/settings', { settings: { 'receipt.paper': '80', 'receipt.auto_print': 'false' } });
+    });
+  });
 });

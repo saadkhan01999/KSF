@@ -268,7 +268,7 @@ anyone could then register an address they do not own. Do **not** set
 **3. Deploy.** Deployments › Redeploy after changing any setting.
 
 **4. Check.** `https://ksf-x86j.vercel.app/api/v1/health` answers
-`{"ok":true,…,"version":"2.10.0"}`. If a setting is missing it names it
+`{"ok":true,…,"version":"2.11.0"}`. If a setting is missing it names it
 instead. Then sign in as the Super Admin. Step by step, with every setting:
 `VERCEL_DEPLOYMENT.txt`.
 
@@ -281,5 +281,6 @@ instead. Then sign in as the Super Admin. Step by step, with every setting:
 | `nginx/nginx.conf` | Global Nginx settings, rate-limit zones, compression |
 | `nginx/ksf.conf` | The site: HTTP → HTTPS, TLS, security headers, proxy to `app` |
 | `HOSTINGER_DEPLOYMENT.txt` | Step by step on a Hostinger VPS, from buying it to backups and updates |
+| `hostinger.env.example` | The settings file for that server: the address, e-mail, the business, and every way of taking a payment with its webhook and return addresses. Check it with `ksf run --rm app node backend/dist/cli/preflight.js` (`npm run deploy:check` outside Docker) |
 | `VERCEL_DEPLOYMENT.txt` | Step by step with the whole system on Vercel and MongoDB Atlas, for testing |
 | `vercel/vercel.json`, `vercel/api/index.mjs` | The one-folder Vercel set-up: the build, the routes, the API function, the daily cron |

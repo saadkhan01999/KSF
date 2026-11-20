@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Building2, LogIn, Pencil, CreditCard, Wallet, Ban, PlayCircle, Users, LifeBuoy, ScrollText,
-  Receipt, Boxes, TrendingUp, BadgeCheck, RotateCcw, AlertTriangle, Phone, Mail, MapPin
+  Receipt, Boxes, TrendingUp, BadgeCheck, RotateCcw, AlertTriangle, Phone, Mail, MapPin, Share2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useApiData, useAction, useLiveRefresh } from '../../hooks/useApi';
@@ -17,8 +17,9 @@ import {
 } from '../../components/ui';
 import { rupees, rupeesShort, number, date, dateTime, ago, toPaisa, phone as fmtPhone } from '../../utils/format';
 import type { PharmacyDetail as Detail, PlatformPayment, PaymentAttemptRow, PlanRow, HelpItem } from '../../types/platform';
+import { PharmacyReferralsPanel } from './referral-codes';
 
-type Tab = 'overview' | 'people' | 'billing' | 'support' | 'activity';
+type Tab = 'overview' | 'people' | 'billing' | 'referrals' | 'support' | 'activity';
 
 export default function PharmacyDetail() {
   const { id = '' } = useParams();
@@ -102,6 +103,7 @@ export default function PharmacyDetail() {
           { value: 'overview', label: 'Overview', icon: <Building2 size={16} /> },
           { value: 'people', label: 'People', icon: <Users size={16} />, count: data.help.length || undefined },
           { value: 'billing', label: 'Plan & payments', icon: <CreditCard size={16} /> },
+          { value: 'referrals', label: 'Referrals', icon: <Share2 size={16} /> },
           { value: 'support', label: 'Support', icon: <LifeBuoy size={16} />, count: data.tickets.filter((t) => !['resolved', 'closed'].includes(t.status)).length || undefined },
           { value: 'activity', label: 'Activity', icon: <ScrollText size={16} /> }
         ]}
@@ -154,6 +156,12 @@ export default function PharmacyDetail() {
             </Card>
           </div>
         </>
+      )}
+
+      {tab === 'referrals' && (
+        <Card title="Referral code and referrals" subtitle="The code this pharmacy shares, and every pharmacy that registered with it" icon={<Share2 size={18} />}>
+          <PharmacyReferralsPanel pharmacyId={pharmacy.id} onChanged={() => { void reload(true); }} />
+        </Card>
       )}
 
       {tab === 'people' && <People data={data} onHelp={entersPharmacies ? (path) => { void goInside(path); } : undefined} />}

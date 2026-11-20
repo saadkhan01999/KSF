@@ -237,6 +237,27 @@ export default function SettingsPage() {
                 disabled={!can('settings.write')}
               />
               <SelectInput
+                label="Receipt paper"
+                hint="The paper in your receipt printer. A slip on a roll prints exactly as long as the sale; on A4 it prints larger, in the middle of the page."
+                value={settings['receipt.paper'] ?? '80'} onChange={(e) => set('receipt.paper', e.target.value)}
+                options={[
+                  { value: '80', label: '80 mm thermal roll (most counter printers)' },
+                  { value: '58', label: '58 mm thermal roll (small printers)' },
+                  { value: 'a4', label: 'A4 page (office printer)' }
+                ]}
+                disabled={!can('settings.write')}
+              />
+              <SelectInput
+                label="Print the receipt"
+                hint="Straight away saves a click at a busy counter; the receipt can always be printed again from Sales history."
+                value={settings['receipt.auto_print'] ?? 'false'} onChange={(e) => set('receipt.auto_print', e.target.value)}
+                options={[
+                  { value: 'false', label: 'When I press Print receipt' },
+                  { value: 'true', label: 'Straight away, when the sale completes' }
+                ]}
+                disabled={!can('settings.write')}
+              />
+              <SelectInput
                 label="Default payment method at the till"
                 value={settings['pos.default_payment'] ?? 'cash'} onChange={(e) => set('pos.default_payment', e.target.value)}
                 options={[
