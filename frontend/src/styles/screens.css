@@ -175,12 +175,15 @@
   .scan-toast { top: calc(var(--topbar-h, 60px) + 10px); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .cam-frame i, .scan-dot, .scanner-pulse, .scan-toast-mark::after { animation: none; }
-  .scan-toast, .scan-toast.is-leaving { animation-name: ksf-fade; }
-  .scan-toast.is-leaving { animation-direction: reverse; }
-  .scan-toast-mark path { animation: none; stroke-dashoffset: 0; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .cam-frame i,
+:root[data-motion='off'] .scan-dot,
+:root[data-motion='off'] .scanner-pulse,
+:root[data-motion='off'] .scan-toast-mark::after { animation: none; }
+:root[data-motion='off'] .scan-toast,
+:root[data-motion='off'] .scan-toast.is-leaving { animation-name: ksf-fade; }
+:root[data-motion='off'] .scan-toast.is-leaving { animation-direction: reverse; }
+:root[data-motion='off'] .scan-toast-mark path { animation: none; stroke-dashoffset: 0; }
 
 /* Saying which medicine an unknown barcode belongs to. */
 .link-list { list-style: none; margin: var(--s-3) 0 0; padding: 0; display: grid; gap: 6px; max-height: 340px; overflow-y: auto; }
@@ -433,6 +436,8 @@
 
 .role-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   padding: var(--s-5);
   background: var(--surface);
   border: 1px solid var(--line);
@@ -456,7 +461,9 @@
 .role-card.is-system .role-ico { background: var(--gold-100); color: var(--gold-text); border-color: transparent; }
 .role-card h4 { font-size: var(--fs-md); font-weight: 600; }
 .role-card .role-desc { font-size: var(--fs-sm); color: var(--text-soft); line-height: 1.5; margin-top: 4px; }
-.role-card .role-stats { display: flex; gap: var(--s-4); margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--line-faint); }
+/* The figures and the buttons sit at the foot of every card, level across a row whatever the description's length. */
+.role-card .role-stats { display: flex; gap: var(--s-4); margin-top: auto; padding-top: var(--s-4); border-top: 1px solid var(--line-faint); }
+.role-card .role-top { margin-bottom: var(--s-4); }
 .role-card .role-stats div strong { display: block; font-size: var(--fs-lg); font-weight: 700; }
 .role-card .role-stats div span { font-size: var(--fs-xs); color: var(--text-dim); }
 
@@ -653,6 +660,15 @@
 /* Laid out at the roll's width for a moment, off screen, to be measured. */
 .receipt-print.is-measuring { display: block; position: absolute; left: -10000px; top: 0; width: 76mm; visibility: hidden; }
 .receipt-print .receipt { width: 76mm; border: 0; border-radius: 0; margin: 0; padding: 4mm 3mm; font-size: 11.5px; line-height: 1.5; }
+/* A 58 mm roll: narrower, a size smaller. */
+.receipt-print[data-paper='58'].is-measuring, .receipt-print[data-paper='58'] .receipt { width: 58mm; }
+.receipt-print[data-paper='58'] .receipt { padding: 3mm 2mm; font-size: 10px; line-height: 1.45; }
+.receipt-print[data-paper='58'] .receipt h3 { font-size: 14px; }
+.receipt-print[data-paper='58'] .receipt .rc-total { font-size: 13px; }
+/* An A4 page: the slip, larger, in the middle of the page. */
+.receipt-print[data-paper='a4'] .receipt { width: 120mm; margin: 0 auto; padding: 6mm; font-size: 13.5px; line-height: 1.6; border: 1px solid #999; }
+.receipt-print[data-paper='a4'] .receipt h3 { font-size: 21px; }
+.receipt-print[data-paper='a4'] .receipt .rc-total { font-size: 17px; }
 
 @media print {
   html[data-print='receipt'], html[data-print='receipt'] body {
@@ -912,7 +928,9 @@
   .pack-scan { flex-wrap: wrap; }
   .pack-scan > .btn { margin-left: calc(42px + var(--s-3)); }
 }
-@media (prefers-reduced-motion: reduce) { .input.is-autofilled, .select.is-autofilled { animation: none; } }
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .input.is-autofilled,
+:root[data-motion='off'] .select.is-autofilled { animation: none; }
 .pack-found {
   display: flex;
   align-items: center;

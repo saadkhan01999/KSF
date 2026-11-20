@@ -364,6 +364,8 @@ route('PATCH', '/api/v1/settings', 'settings.write', async (ctx) => {
     for (const [key, value] of Object.entries(ctx.body.settings as Record<string, unknown>)) {
       if (key.length > 60) continue;
       if (key === 'appearance.theme' && !THEME_KEYS.includes(String(value))) bad('That theme does not exist.', 'appearance.theme');
+      if (key === 'receipt.paper' && !['80', '58', 'a4'].includes(String(value))) bad('Choose an 80 mm roll, a 58 mm roll or an A4 page.', 'receipt.paper');
+      if (key === 'receipt.auto_print' && !['true', 'false'].includes(String(value))) bad('Printing on its own is on or off.', 'receipt.auto_print');
       await setSetting(ctx.pharmacyId, key, String(value).slice(0, 500));
       changed.push(key);
     }

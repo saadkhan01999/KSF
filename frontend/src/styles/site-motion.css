@@ -11,8 +11,12 @@
      - cards that lift, icons that turn to meet the pointer, and a shine
        across the main buttons.
 
-   Nothing that is read depends on any of it, and prefers-reduced-motion
-   stops all of it (at the end of this file).
+   Nothing that is read depends on any of it. How much moves is
+   data-motion on <html> (public/theme.js): "full"; "calm" when the device
+   asks for less motion (a laptop with Windows "Animation effects" off, or
+   macOS "Reduce motion"), where the medicines float less far and sections
+   fade without sliding; and "off", the switch at the foot of every page,
+   which stops all of it (both at the end of this file).
    ========================================================================== */
 
 /* ----------------------------------------------------- floating medicines */
@@ -216,20 +220,86 @@
 .site-nav-links a:hover::after, .site-nav-links a[aria-current='page']::after { transform: scaleX(1); }
 @media (max-width: 900px) { .site-nav-links a::after { display: none; } }
 
-/* ------------------------------------------------------ reduced motion */
+/* ------------------------------------------------------------ calm motion */
 
-@media (prefers-reduced-motion: reduce) {
-  .med, .med-body, .med-pulse-trace, .site > main, .hero-inner > *, .hero-shot > *, .page-hero-shot > *,
-  .hero-badge b::after, .faq-item[open] > :not(summary), .hero-cta .btn-primary.btn-pill::after {
-    animation: none;
-  }
-  .med-body { opacity: .92; }
-  .med-pulse-trace { display: none; }
-  .hero h1 em { animation: none; background-size: 100% 100%; }
-  .partners-marquee { -webkit-mask-image: none; mask-image: none; }
-  .partners-marquee .partners-row { animation: none; flex: 1 1 auto; flex-wrap: wrap; justify-content: center; padding-right: 0; }
-  .partners-marquee .partners-row[aria-hidden='true'] { display: none; }
-  .pillar:hover, .trio article:hover, .security-grid article:hover, .pillar:hover .pillar-icon, .trio article:hover .pillar-icon { transform: none; }
-  .site .btn-primary.btn-pill::after { display: none; }
-  .site-nav-links a::after { transition: none; }
+/* The device asks for less motion: everything still moves, gently. The
+   medicines bob a few pixels, the pictures fade in instead of rising, the
+   sections fade without the slide, the distributors glide at half speed.
+   The scroll-linked parallax is off (the script leaves it be). */
+:root[data-motion='calm'] .med { animation-name: med-drift-calm; }
+@keyframes med-drift-calm {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(var(--turn)); }
+  50% { transform: translate3d(0, -6px, 0) rotate(calc(var(--turn) + var(--sway) * 3deg)); }
 }
+:root[data-motion='calm'] :is(.hero-shot, .page-hero-shot) > * { animation-name: ksf-fade; }
+html[data-motion='calm'].reveal-armed [data-reveal],
+html[data-motion='calm'].reveal-armed [data-reveal] :is(.pillars, .plan-grid, .faq-grid, .security-grid, .renewal-grid, .reason-grid,
+  .terms-grid, .status-grid, .feature-list, .tick-list, .cross-list, .day-list, .site-cta-actions, .band-head) > * { transform: none; }
+:root[data-motion='calm'] .partners-marquee .partners-row { animation-duration: 64s; }
+
+/* ------------------------------------------------- the animations switch */
+
+.motion-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 10px;
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+.motion-switch:hover { color: var(--text); border-color: var(--line-strong); }
+.motion-switch:focus-visible { outline: none; box-shadow: var(--ring); }
+.motion-switch-track {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--line-strong);
+  transition: background var(--t-fast) var(--ease);
+}
+.motion-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+  transition: transform var(--t-fast) var(--ease);
+}
+.motion-switch[aria-checked='true'] .motion-switch-track { background: var(--brand-500); }
+.motion-switch[aria-checked='true'] .motion-switch-track::after { transform: translateX(12px); }
+
+/* ------------------------------------------------------ animations off */
+
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .med,
+:root[data-motion='off'] .med-body,
+:root[data-motion='off'] .med-pulse-trace,
+:root[data-motion='off'] .site > main,
+:root[data-motion='off'] .hero-inner > *,
+:root[data-motion='off'] .hero-shot > *,
+:root[data-motion='off'] .page-hero-shot > *,
+:root[data-motion='off'] .hero-badge b::after,
+:root[data-motion='off'] .faq-item[open] > :not(summary),
+:root[data-motion='off'] .hero-cta .btn-primary.btn-pill::after { animation: none; }
+:root[data-motion='off'] .med-body { opacity: .92; }
+:root[data-motion='off'] .med-pulse-trace { display: none; }
+:root[data-motion='off'] .hero h1 em { animation: none; background-size: 100% 100%; }
+:root[data-motion='off'] .partners-marquee { -webkit-mask-image: none; mask-image: none; }
+:root[data-motion='off'] .partners-marquee .partners-row { animation: none; flex: 1 1 auto; flex-wrap: wrap; justify-content: center; padding-right: 0; }
+:root[data-motion='off'] .partners-marquee .partners-row[aria-hidden='true'] { display: none; }
+:root[data-motion='off'] .pillar:hover,
+:root[data-motion='off'] .trio article:hover,
+:root[data-motion='off'] .security-grid article:hover,
+:root[data-motion='off'] .pillar:hover .pillar-icon,
+:root[data-motion='off'] .trio article:hover .pillar-icon { transform: none; }
+:root[data-motion='off'] .site .btn-primary.btn-pill::after { display: none; }
+:root[data-motion='off'] .site-nav-links a::after { transition: none; }

@@ -394,7 +394,10 @@ export interface WebhookEvent extends Base {
 
 export interface ReferralCode extends Base {
   code: string; pharmacy_id: Id; user_id: Id | null; uses: number; successful: number; max_uses: number;
+  /** active: the code the pharmacy shares now; legacy: an earlier one, still honoured; disabled. */
   status: string; created_at: When; updated_at: When;
+  /** The Super Admin who issued it (KHAN-239), when it was not made at registration. */
+  issued_by?: Id | null;
 }
 
 export interface Referral extends Base {

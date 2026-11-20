@@ -91,6 +91,8 @@ export default function Pos() {
   const [tenderedTouched, setTenderedTouched] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [receipt, setReceipt] = useState<Sale | null>(null);
+  /* A slip that prints on its own: once, when the sale's receipt is first on screen. */
+  const printedFor = useRef<string | null>(null);
   const [rxPickerOpen, setRxPickerOpen] = useState(false);
   const [justAdded, setJustAdded] = useState<string | null>(null);
 
@@ -111,6 +113,16 @@ export default function Pos() {
 
   /* The default method must be one the till offers (a cheque is not taken at the counter). */
   const defaultMethod = workspace?.settings?.['pos.default_payment'] ?? 'cash';
+  /* The receipt printer (Settings › Till & invoices): its paper, and whether a slip prints on its own. */
+  const receiptPaper = workspace?.settings?.['receipt.paper'] ?? '80';
+  const autoPrint = workspace?.settings?.['receipt.auto_print'] === 'true';
+  useEffect(() => {
+    if (!receipt || !autoPrint || printedFor.current === receipt.id) return undefined;
+    printedFor.current = receipt.id;
+    /* A moment for the slip to be drawn before the print dialog opens. */
+    const timer = window.setTimeout(() => printReceipt(), 350);
+    return () => window.clearTimeout(timer);
+  }, [receipt, autoPrint]);
   const startMethod = (TILL_METHODS as readonly string[]).includes(defaultMethod) ? defaultMethod : 'cash';
   useEffect(() => { setMethod(startMethod); }, [startMethod]);
   useEffect(() => { setApplyGst(gstByDefault); }, [gstByDefault]);
@@ -1070,7 +1082,7 @@ export default function Pos() {
       >
         {receipt && <Receipt sale={receipt} />}
       </Modal>
-      <ReceiptPrint sale={receipt} />
+      <ReceiptPrint sale={receipt} paper={receiptPaper} />
 
       {/* ----------------------------- scanning ----------------------------- */}
       <ScanToast note={scanNote} onDone={clearNote} />

@@ -11,7 +11,9 @@
                      animations".
      3. Reveal     — sections fade up once as they arrive.
 
-   All of it is switched off entirely under prefers-reduced-motion.
+   The parallax stays still when the device asks for less motion, and all
+   of it stops when the visitor switches animations off (data-motion on
+   <html>; see site-motion.css).
    ========================================================================== */
 
 .site {
@@ -81,10 +83,10 @@
 @media (max-width: 640px) {
   .back-to-top { width: 46px; height: 46px; right: var(--s-4); bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-4)); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .back-to-top, .back-to-top:hover { transition: opacity var(--t-base) linear; transform: none; }
-  .back-to-top:hover svg { animation: none; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .back-to-top,
+:root[data-motion='off'] .back-to-top:hover { transition: opacity var(--t-base) linear; transform: none; }
+:root[data-motion='off'] .back-to-top:hover svg { animation: none; }
 .site-nav-links { display: flex; align-items: center; gap: var(--s-2); margin-inline: auto; }
 .site-nav-links a {
   padding: 8px var(--s-3);
@@ -345,7 +347,7 @@ html.is-dragging-scroll .site-scroll-thumb {
 .page-hero-inner > :nth-child(3) { animation-delay: .16s; }
 .page-hero-inner > :nth-child(n+4) { animation-delay: .24s; }
 
-@media (prefers-reduced-motion: reduce) {
-  .site-scroll::before, .site-scroll-thumb { transition: none; }
-  .page-hero-inner > * { animation: none; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .site-scroll::before,
+:root[data-motion='off'] .site-scroll-thumb { transition: none; }
+:root[data-motion='off'] .page-hero-inner > * { animation: none; }

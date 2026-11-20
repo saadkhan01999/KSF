@@ -6,7 +6,7 @@ Generated from the route table by `npm run api:inventory` — do not edit by han
 input never causes a server error); **Also tested in** lists the functional test
 files that call it by name.
 
-**273 endpoints:** 24 public, 22 for any signed-in person, 169 pharmacy, 58 platform console. All are under `/api/v1`; besides them the server answers `GET /api/v1/health` and `GET /api/v1/avatars/:id`.
+**276 endpoints:** 24 public, 22 for any signed-in person, 169 pharmacy, 61 platform console. All are under `/api/v1`; besides them the server answers `GET /api/v1/health` and `GET /api/v1/avatars/:id`.
 
 Who may call it: **anyone** (no sign-in); **signed in** (any account); **pharmacy:**
 signed in, inside a pharmacy, holding the permission named (a write also needs a
@@ -31,13 +31,13 @@ role holds the access named (`any` is every team member).
 | GET | `/api/v1/public/events` | anyone |  |  | live |
 | POST | `/api/v1/public/password-strength` | anyone |  |  |  |
 | GET | `/api/v1/public/plans` | anyone |  |  | live, plans, security |
-| GET | `/api/v1/public/referral/:code` | anyone |  |  |  |
+| GET | `/api/v1/public/referral/:code` | anyone |  |  | referral-codes |
 | POST | `/api/v1/public/visit` | anyone |  |  | wallet-insights |
 | POST | `/api/v1/register/cancel` | anyone |  |  |  |
 | POST | `/api/v1/register/resend` | anyone |  |  |  |
-| POST | `/api/v1/register/start` | anyone |  |  | api, plans, wallet-insights |
+| POST | `/api/v1/register/start` | anyone |  |  | api, plans, referral-codes, wallet-insights |
 | GET | `/api/v1/register/state` | anyone |  |  |  |
-| POST | `/api/v1/register/verify-email` | anyone |  |  | api, plans, wallet-insights |
+| POST | `/api/v1/register/verify-email` | anyone |  |  | api, plans, referral-codes, wallet-insights |
 | POST | `/api/v1/webhooks/payments/:provider` | anyone |  | yes (signed) |  |
 | POST | `/api/v1/account/2fa/disable` | signed in |  |  | security |
 | POST | `/api/v1/account/2fa/enable` | signed in |  |  | security |
@@ -59,7 +59,7 @@ role holds the access named (`any` is every team member).
 | POST | `/api/v1/me/email/confirm` | signed in |  |  | api |
 | POST | `/api/v1/me/email/start` | signed in |  |  | api |
 | GET | `/api/v1/me/sessions` | signed in |  |  |  |
-| GET | `/api/v1/medicine-directory` | signed in |  |  | directory |
+| GET | `/api/v1/medicine-directory` | signed in |  |  | directory, qa-sweep |
 | GET | `/api/v1/medicine-directory/:id` | signed in |  |  | directory |
 | GET | `/api/v1/account/audit` | pharmacy: audit.read |  |  | accounting |
 | GET | `/api/v1/account/audit-integrity` | pharmacy: audit.read |  |  |  |
@@ -79,7 +79,7 @@ role holds the access named (`any` is every team member).
 | GET | `/api/v1/accounting/summary` | pharmacy: accounting.view |  |  | accounting |
 | GET | `/api/v1/accounting/transactions` | pharmacy: accounting.view |  |  | accounting |
 | GET | `/api/v1/activity` | pharmacy: audit.read |  |  | api |
-| GET | `/api/v1/billing` | pharmacy: settings.read |  |  | plans, stripe, wallet-insights |
+| GET | `/api/v1/billing` | pharmacy: settings.read |  |  | plans, qa-sweep, referral-codes, stripe, wallet-insights |
 | GET | `/api/v1/billing/attempts` | pharmacy: settings.read |  |  |  |
 | POST | `/api/v1/billing/auto-renew` | pharmacy: settings.write |  |  | stripe |
 | POST | `/api/v1/billing/cancel` | pharmacy: settings.write |  |  | plans |
@@ -103,8 +103,8 @@ role holds the access named (`any` is every team member).
 | PATCH | `/api/v1/categories/:id` | pharmacy: categories.manage |  |  |  |
 | GET | `/api/v1/customer-payments` | pharmacy: customers.read |  |  |  |
 | POST | `/api/v1/customer-payments/:id/reverse` | pharmacy: sales.refund |  |  | api |
-| GET | `/api/v1/customers` | pharmacy: customers.read |  |  | api, selling-gst-loan |
-| POST | `/api/v1/customers` | pharmacy: customers.write |  |  | api, selling-gst-loan |
+| GET | `/api/v1/customers` | pharmacy: customers.read |  |  | api, qa-sweep, selling-gst-loan |
+| POST | `/api/v1/customers` | pharmacy: customers.write |  |  | api, qa-sweep, selling-gst-loan |
 | DELETE | `/api/v1/customers/:id` | pharmacy: customers.write |  |  | api, selling-gst-loan |
 | GET | `/api/v1/customers/:id` | pharmacy: customers.read |  |  | api, selling-gst-loan |
 | PATCH | `/api/v1/customers/:id` | pharmacy: customers.write |  |  | api, selling-gst-loan |
@@ -114,8 +114,8 @@ role holds the access named (`any` is every team member).
 | POST | `/api/v1/day-close` | pharmacy: day-close.manage |  |  | api |
 | GET | `/api/v1/day-close/:id` | pharmacy: day-close.manage |  |  | api, selling-gst-loan |
 | GET | `/api/v1/day-close/preview` | pharmacy: day-close.manage |  |  | api, selling-gst-loan |
-| GET | `/api/v1/expenses` | pharmacy: expenses.read |  |  | accounting |
-| POST | `/api/v1/expenses` | pharmacy: expenses.write |  |  | accounting |
+| GET | `/api/v1/expenses` | pharmacy: expenses.read |  |  | accounting, qa-sweep |
+| POST | `/api/v1/expenses` | pharmacy: expenses.write |  |  | accounting, qa-sweep |
 | DELETE | `/api/v1/expenses/:id` | pharmacy: expenses.write |  |  |  |
 | PATCH | `/api/v1/expenses/:id` | pharmacy: expenses.write |  |  |  |
 | POST | `/api/v1/expenses/:id/approve` | pharmacy: expenses.approve |  |  |  |
@@ -128,8 +128,8 @@ role holds the access named (`any` is every team member).
 | POST | `/api/v1/inventory/adjust` | pharmacy: inventory.adjust |  |  |  |
 | GET | `/api/v1/inventory/batches` | pharmacy: inventory.read |  |  |  |
 | POST | `/api/v1/inventory/batches` | pharmacy: inventory.adjust |  |  |  |
-| GET | `/api/v1/medicines` | pharmacy: medicines.read |  |  | accounting, api, plans, scanning, selling-gst-loan |
-| POST | `/api/v1/medicines` | pharmacy: medicines.write |  |  | accounting, api, plans, scanning, selling-gst-loan |
+| GET | `/api/v1/medicines` | pharmacy: medicines.read |  |  | accounting, api, plans, qa-sweep, scanning, selling-gst-loan |
+| POST | `/api/v1/medicines` | pharmacy: medicines.write |  |  | accounting, api, plans, qa-sweep, scanning, selling-gst-loan |
 | GET | `/api/v1/medicines-barcode-info` | pharmacy: medicines.write |  |  | scanning |
 | GET | `/api/v1/medicines-lookup` | pharmacy: medicines.read |  |  | selling-gst-loan |
 | GET | `/api/v1/medicines-scan` | pharmacy: medicines.read |  |  | api, scanning |
@@ -160,7 +160,7 @@ role holds the access named (`any` is every team member).
 | POST | `/api/v1/migration/jobs/:id/suggest-mapping` | pharmacy: medicines.write |  |  |  |
 | POST | `/api/v1/migration/jobs/:id/validate` | pharmacy: medicines.write |  |  | api |
 | GET | `/api/v1/migration/template/:category` | pharmacy: medicines.read |  |  |  |
-| GET | `/api/v1/notifications` | pharmacy: any member |  |  | plans, wallet-insights |
+| GET | `/api/v1/notifications` | pharmacy: any member |  |  | plans, referral-codes, wallet-insights |
 | POST | `/api/v1/notifications/:id/read` | pharmacy: any member |  |  |  |
 | POST | `/api/v1/notifications/read-all` | pharmacy: any member |  |  |  |
 | GET | `/api/v1/notifications/recent` | pharmacy: any member |  |  |  |
@@ -171,14 +171,14 @@ role holds the access named (`any` is every team member).
 | PATCH | `/api/v1/prescriptions/:id` | pharmacy: prescriptions.read |  |  | api |
 | POST | `/api/v1/prescriptions/:id/reject` | pharmacy: prescriptions.verify |  |  |  |
 | POST | `/api/v1/prescriptions/:id/verify` | pharmacy: prescriptions.verify |  |  | api |
-| GET | `/api/v1/purchases` | pharmacy: purchases.read |  |  | accounting, api, selling-gst-loan |
-| POST | `/api/v1/purchases` | pharmacy: purchases.write |  |  | accounting, api, selling-gst-loan |
-| GET | `/api/v1/purchases/:id` | pharmacy: purchases.read |  |  | api, selling-gst-loan |
-| PATCH | `/api/v1/purchases/:id` | pharmacy: purchases.write |  |  | api, selling-gst-loan |
+| GET | `/api/v1/purchases` | pharmacy: purchases.read |  |  | accounting, api, qa-sweep, selling-gst-loan |
+| POST | `/api/v1/purchases` | pharmacy: purchases.write |  |  | accounting, api, qa-sweep, selling-gst-loan |
+| GET | `/api/v1/purchases/:id` | pharmacy: purchases.read |  |  | api, qa-sweep, selling-gst-loan |
+| PATCH | `/api/v1/purchases/:id` | pharmacy: purchases.write |  |  | api, qa-sweep, selling-gst-loan |
 | POST | `/api/v1/purchases/:id/approve` | pharmacy: purchases.approve |  |  |  |
 | POST | `/api/v1/purchases/:id/cancel` | pharmacy: purchases.write |  |  |  |
 | POST | `/api/v1/purchases/:id/payment` | pharmacy: purchases.write |  |  | api |
-| POST | `/api/v1/purchases/:id/receive` | pharmacy: purchases.write |  |  | api, selling-gst-loan |
+| POST | `/api/v1/purchases/:id/receive` | pharmacy: purchases.write |  |  | api, qa-sweep, selling-gst-loan |
 | GET | `/api/v1/reports/category-mix` | pharmacy: reports.view | reports.advanced |  |  |
 | GET | `/api/v1/reports/discounts` | pharmacy: reports.view | reports.advanced |  |  |
 | GET | `/api/v1/reports/expenses` | pharmacy: reports.view |  |  |  |
@@ -189,17 +189,17 @@ role holds the access named (`any` is every team member).
 | GET | `/api/v1/reports/staff-performance` | pharmacy: reports.view | reports.advanced |  |  |
 | GET | `/api/v1/reports/stock-valuation` | pharmacy: reports.view | reports.advanced |  |  |
 | GET | `/api/v1/reports/top-medicines` | pharmacy: reports.view | reports.advanced |  | live |
-| GET | `/api/v1/roles` | pharmacy: roles.read |  |  | api |
-| POST | `/api/v1/roles` | pharmacy: roles.manage | staff.roles |  | api |
+| GET | `/api/v1/roles` | pharmacy: roles.read |  |  | api, qa-sweep |
+| POST | `/api/v1/roles` | pharmacy: roles.manage | staff.roles |  | api, qa-sweep |
 | DELETE | `/api/v1/roles/:id` | pharmacy: roles.manage | staff.roles |  |  |
 | PATCH | `/api/v1/roles/:id` | pharmacy: roles.manage | staff.roles |  |  |
 | POST | `/api/v1/roles/:id/duplicate` | pharmacy: roles.manage | staff.roles |  |  |
-| GET | `/api/v1/sales` | pharmacy: sales.read |  |  | accounting, api, security, selling-gst-loan |
-| POST | `/api/v1/sales` | pharmacy: pos.operate |  |  | accounting, api, security, selling-gst-loan |
+| GET | `/api/v1/sales` | pharmacy: sales.read |  |  | accounting, api, qa-sweep, security, selling-gst-loan |
+| POST | `/api/v1/sales` | pharmacy: pos.operate |  |  | accounting, api, qa-sweep, security, selling-gst-loan |
 | GET | `/api/v1/sales/:id` | pharmacy: sales.read |  |  | api, selling-gst-loan |
 | POST | `/api/v1/sales/:id/refund` | pharmacy: sales.refund |  |  | api, selling-gst-loan |
-| GET | `/api/v1/settings` | pharmacy: settings.read |  |  | selling-gst-loan |
-| PATCH | `/api/v1/settings` | pharmacy: settings.write |  |  | selling-gst-loan |
+| GET | `/api/v1/settings` | pharmacy: settings.read |  |  | qa-sweep, referral-codes, selling-gst-loan |
+| PATCH | `/api/v1/settings` | pharmacy: settings.write |  |  | qa-sweep, referral-codes, selling-gst-loan |
 | GET | `/api/v1/settings/appearance` | pharmacy: settings.read |  |  | api |
 | PATCH | `/api/v1/settings/appearance` | pharmacy: settings.write |  |  | api |
 | POST | `/api/v1/setup/address` | pharmacy: settings.write |  |  | api |
@@ -208,8 +208,8 @@ role holds the access named (`any` is every team member).
 | POST | `/api/v1/setup/pharmacy` | pharmacy: settings.write |  |  | api |
 | POST | `/api/v1/setup/plan` | pharmacy: settings.write |  |  |  |
 | GET | `/api/v1/setup/state` | pharmacy: any member |  |  | api |
-| GET | `/api/v1/staff` | pharmacy: staff.read |  |  | api |
-| POST | `/api/v1/staff` | pharmacy: staff.invite |  |  | api |
+| GET | `/api/v1/staff` | pharmacy: staff.read |  |  | api, qa-sweep |
+| POST | `/api/v1/staff` | pharmacy: staff.invite |  |  | api, qa-sweep |
 | DELETE | `/api/v1/staff/:id` | pharmacy: staff.manage |  |  |  |
 | PATCH | `/api/v1/staff/:id` | pharmacy: staff.manage |  |  |  |
 | GET | `/api/v1/staff/:id/devices` | pharmacy: staff.manage |  |  |  |
@@ -220,12 +220,12 @@ role holds the access named (`any` is every team member).
 | POST | `/api/v1/staff/:id/unlock` | pharmacy: staff.manage |  |  |  |
 | GET | `/api/v1/staff/help` | pharmacy: staff.manage |  |  |  |
 | GET | `/api/v1/stock-movements` | pharmacy: inventory.read |  |  |  |
-| GET | `/api/v1/suppliers` | pharmacy: suppliers.read |  |  | accounting, api, selling-gst-loan |
-| POST | `/api/v1/suppliers` | pharmacy: suppliers.write |  |  | accounting, api, selling-gst-loan |
+| GET | `/api/v1/suppliers` | pharmacy: suppliers.read |  |  | accounting, api, qa-sweep, selling-gst-loan |
+| POST | `/api/v1/suppliers` | pharmacy: suppliers.write |  |  | accounting, api, qa-sweep, selling-gst-loan |
 | DELETE | `/api/v1/suppliers/:id` | pharmacy: suppliers.write |  |  |  |
 | PATCH | `/api/v1/suppliers/:id` | pharmacy: suppliers.write |  |  |  |
-| GET | `/api/v1/support/tickets` | pharmacy: support.raise |  |  | api |
-| POST | `/api/v1/support/tickets` | pharmacy: support.raise |  |  | api |
+| GET | `/api/v1/support/tickets` | pharmacy: support.raise |  |  | api, qa-sweep |
+| POST | `/api/v1/support/tickets` | pharmacy: support.raise |  |  | api, qa-sweep |
 | GET | `/api/v1/support/tickets/:id` | pharmacy: support.raise |  |  | api |
 | POST | `/api/v1/support/tickets/:id/close` | pharmacy: support.raise |  |  |  |
 | POST | `/api/v1/support/tickets/:id/messages` | pharmacy: support.raise |  |  |  |
@@ -259,14 +259,17 @@ role holds the access named (`any` is every team member).
 | GET | `/api/v1/platform/payments/providers` | platform: platform.finance.view |  |  | platform-accounts |
 | POST | `/api/v1/platform/payments/reconcile` | platform: platform.finance.manage |  |  |  |
 | GET | `/api/v1/platform/pharmacies` | platform: platform.pharmacies.view |  |  | api |
-| GET | `/api/v1/platform/pharmacies/:id` | platform: platform.pharmacies.view |  |  | api, live, plans, platform-accounts, security, wallet-insights |
-| PATCH | `/api/v1/platform/pharmacies/:id` | platform: platform.pharmacies.manage |  |  | api, live, plans, platform-accounts, security, wallet-insights |
+| GET | `/api/v1/platform/pharmacies/:id` | platform: platform.pharmacies.view |  |  | api, live, plans, platform-accounts, referral-codes, security, wallet-insights |
+| PATCH | `/api/v1/platform/pharmacies/:id` | platform: platform.pharmacies.manage |  |  | api, live, plans, platform-accounts, referral-codes, security, wallet-insights |
 | POST | `/api/v1/platform/pharmacies/:id/payments` | platform: platform.finance.manage |  |  | api, plans, platform-accounts |
+| POST | `/api/v1/platform/pharmacies/:id/referral-code` | platform: platform.pharmacies.manage |  |  | referral-codes |
+| GET | `/api/v1/platform/pharmacies/:id/referrals` | platform: platform.pharmacies.view |  |  | referral-codes |
 | POST | `/api/v1/platform/pharmacies/:id/status` | platform: platform.pharmacies.manage |  |  | api |
 | POST | `/api/v1/platform/pharmacies/:id/subscription` | platform: platform.pharmacies.manage |  |  | api, live, plans, platform-accounts, security, wallet-insights |
 | GET | `/api/v1/platform/plans` | platform: any |  |  |  |
 | POST | `/api/v1/platform/plans` | platform: platform.plans.manage |  |  |  |
 | PATCH | `/api/v1/platform/plans/:key` | platform: platform.plans.manage |  |  | live |
+| GET | `/api/v1/platform/referral-codes` | platform: platform.pharmacies.view |  |  | referral-codes |
 | POST | `/api/v1/platform/referrals/:id/approve` | platform: platform.pharmacies.manage |  |  | wallet-insights |
 | POST | `/api/v1/platform/referrals/:id/reject` | platform: platform.pharmacies.manage |  |  | wallet-insights |
 | POST | `/api/v1/platform/refunds/:id/complete` | platform: platform.finance.manage |  |  | platform-accounts |
@@ -276,15 +279,15 @@ role holds the access named (`any` is every team member).
 | GET | `/api/v1/platform/support/tickets/:id` | platform: platform.support |  |  | api |
 | PATCH | `/api/v1/platform/support/tickets/:id` | platform: platform.support |  |  | api |
 | POST | `/api/v1/platform/support/tickets/:id/messages` | platform: platform.support |  |  | api |
-| GET | `/api/v1/platform/team` | platform: owner |  |  | api, directory, platform-accounts |
-| POST | `/api/v1/platform/team` | platform: owner |  |  | api, directory, platform-accounts |
-| DELETE | `/api/v1/platform/team/:id` | platform: owner |  |  | api, directory, platform-accounts |
-| PATCH | `/api/v1/platform/team/:id` | platform: owner |  |  | api, directory, platform-accounts |
+| GET | `/api/v1/platform/team` | platform: owner |  |  | api, directory, platform-accounts, qa-sweep |
+| POST | `/api/v1/platform/team` | platform: owner |  |  | api, directory, platform-accounts, qa-sweep |
+| DELETE | `/api/v1/platform/team/:id` | platform: owner |  |  | api, directory, platform-accounts, qa-sweep |
+| PATCH | `/api/v1/platform/team/:id` | platform: owner |  |  | api, directory, platform-accounts, qa-sweep |
 | DELETE | `/api/v1/platform/team/:id/avatar` | platform: owner |  |  |  |
 | PUT | `/api/v1/platform/team/:id/avatar` | platform: owner |  |  |  |
 | POST | `/api/v1/platform/team/:id/reset-password` | platform: owner |  |  | api |
 | POST | `/api/v1/platform/team/:id/sign-out` | platform: owner |  |  |  |
-| POST | `/api/v1/platform/team/roles` | platform: owner |  |  | api, directory, platform-accounts |
+| POST | `/api/v1/platform/team/roles` | platform: owner |  |  | api, directory, platform-accounts, qa-sweep |
 | DELETE | `/api/v1/platform/team/roles/:id` | platform: owner |  |  | api |
 | PATCH | `/api/v1/platform/team/roles/:id` | platform: owner |  |  | api |
 | GET | `/api/v1/platform/users` | platform: platform.help,platform.support |  |  |  |

@@ -1,7 +1,9 @@
 /* ==========================================================================
    Referrals and the referral price
    --------------------------------------------------------------------------
-   Every pharmacy gets a code (REF-X82K9Q) and a link (/register?ref=…). A
+   Every pharmacy gets a code (REF-X82K9Q) and a link (/register?ref=…); the
+   Super Admin can give it one made from its name, KHAN-239, and the earlier
+   one keeps working (services/referral-codes.ts). A
    pharmacy that registers through it pays the referral price on the plans
    that have one — Monthly at Rs 1,300 instead of Rs 1,500 — from its first
    payment. It is honoured when the new pharmacy's e-mail is verified, not
@@ -73,7 +75,8 @@ export async function validateCode(rawCode: unknown): Promise<{
 }> {
   const code = toStr(rawCode, 32).toUpperCase();
   if (!code) return { valid: false, reason: 'Enter a referral code.' };
-  const row = await col.referralCodes().findOne({ code, status: 'active' });
+  /* The code the pharmacy shares now, or one it had before (a link already sent keeps working). */
+  const row = await col.referralCodes().findOne({ code, status: { $in: ['active', 'legacy'] } });
   if (!row) return { valid: false, reason: 'That referral code was not recognised.' };
   if (row.max_uses > 0 && row.uses >= row.max_uses) return { valid: false, reason: 'That referral code has been used the maximum number of times.' };
   const pharmacy = await col.pharmacies().findOne({ _id: row.pharmacy_id }, { projection: { name: 1 } });

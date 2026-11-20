@@ -417,7 +417,6 @@
   .calc-key { height: 54px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .calc-key:active,
-  .calc-key.is-pressed { transform: none; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .calc-key:active,
+:root[data-motion='off'] .calc-key.is-pressed { transform: none; }

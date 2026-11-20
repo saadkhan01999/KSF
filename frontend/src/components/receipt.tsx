@@ -1,8 +1,9 @@
 /* ==========================================================================
    The till's receipt, on screen and on paper.
    --------------------------------------------------------------------------
-   Sized for a 76 mm thermal roll, which is what almost every counter printer
-   in Pakistan uses.
+   Sized for the pharmacy's printer (Settings › Till & invoices): an 80 mm
+   thermal roll (76 mm printed across), which is what almost every counter
+   printer in Pakistan uses; a 58 mm roll; or an A4 page.
 
    On screen the slip sits inside a window (the till's "Sale completed", or
    an invoice in Sales history). A window is fixed to the screen and scrolls
@@ -19,6 +20,14 @@ import { amount, date, payment } from '../utils/format';
 import { BRAND } from '../brand';
 import type { Sale } from '../types';
 
+/** "Shop 4, Tariq Road, Karachi": the city once, even when the address already ends with it. */
+function placeLine(address?: string | null, city?: string | null): string {
+  const street = (address ?? '').trim();
+  const town = (city ?? '').trim();
+  if (town && street.toLowerCase().includes(town.toLowerCase())) return street;
+  return [street, town].filter(Boolean).join(', ');
+}
+
 export function Receipt({ sale }: { sale: Sale }) {
   /* GST is printed only when it was added to this sale, with its rate when
      every taxed line shared one ("GST 18%"). */
@@ -32,7 +41,7 @@ export function Receipt({ sale }: { sale: Sale }) {
     <div className="receipt">
       <h3>{sale.pharmacy?.name ?? 'KSF PHARMACY'}</h3>
       <div className="rc-sub">
-        {[sale.pharmacy?.address, sale.pharmacy?.city].filter(Boolean).join(', ')}<br />
+        {placeLine(sale.pharmacy?.address, sale.pharmacy?.city)}<br />
         {sale.pharmacy?.phone}<br />
         {[
           sale.pharmacy?.ntn && `NTN ${sale.pharmacy.ntn}`,
@@ -113,7 +122,7 @@ export function Receipt({ sale }: { sale: Sale }) {
  * The slip as it is printed: outside the app, hidden on screen. While it is
  * mounted, printing the page — the button, or Ctrl+P — prints the slip alone.
  */
-export function ReceiptPrint({ sale }: { sale: Sale | null | undefined }) {
+export function ReceiptPrint({ sale, paper = '80' }: { sale: Sale | null | undefined; paper?: string }) {
   useEffect(() => {
     if (!sale) return undefined;
     const root = document.documentElement;
@@ -121,24 +130,35 @@ export function ReceiptPrint({ sale }: { sale: Sale | null | undefined }) {
     return () => { if (root.dataset.print === 'receipt') root.removeAttribute('data-print'); };
   }, [sale]);
   if (!sale) return null;
-  return createPortal(<div className="receipt-print" aria-hidden="true"><Receipt sale={sale} /></div>, document.body);
+  return createPortal(
+    <div className="receipt-print" data-paper={PAPER[paper] ? paper : '80'} aria-hidden="true"><Receipt sale={sale} /></div>,
+    document.body
+  );
 }
 
-/* The roll's width, and a little paper after the last line for the tear. */
-const ROLL_MM = 76;
+/* The paper (Settings › Till & invoices › Receipt paper): a thermal roll's
+   width as the printer sees it — an 80 mm roll prints 76 mm across, a 58 mm
+   roll 58 — or an A4 page, where the slip prints larger in the middle. */
+const PAPER: Record<string, { roll: number | null }> = { 80: { roll: 76 }, 58: { roll: 58 }, a4: { roll: null } };
+/* A little paper after the last line, for the tear. */
 const TEAR_MM = 6;
 const MM_PER_PX = 25.4 / 96;
 
-/** Print the slip <ReceiptPrint> holds, on paper exactly as long as it is. */
+/** Print the slip <ReceiptPrint> holds: on a roll, on paper exactly as long as it is; or on an A4 page. */
 export function printReceipt(): void {
   const holder = document.querySelector<HTMLElement>('.receipt-print');
   if (!holder) { window.print(); return; }
-  /* Measure the slip as it will print: laid out at the roll's width, off screen. */
-  holder.classList.add('is-measuring');
-  const height = holder.getBoundingClientRect().height;
-  holder.classList.remove('is-measuring');
+  const roll = PAPER[holder.dataset.paper ?? '80']?.roll ?? 76;
   const page = document.createElement('style');
-  page.textContent = `@page { size: ${ROLL_MM}mm ${Math.ceil(height * MM_PER_PX + TEAR_MM)}mm; margin: 0; }`;
+  if (holder.dataset.paper === 'a4') {
+    page.textContent = '@page { size: A4 portrait; margin: 14mm; }';
+  } else {
+    /* Measure the slip as it will print: laid out at the roll's width, off screen. */
+    holder.classList.add('is-measuring');
+    const height = holder.getBoundingClientRect().height;
+    holder.classList.remove('is-measuring');
+    page.textContent = `@page { size: ${roll}mm ${Math.ceil(height * MM_PER_PX + TEAR_MM)}mm; margin: 0; }`;
+  }
   document.head.appendChild(page);
   document.documentElement.dataset.print = 'receipt';
   const done = () => {

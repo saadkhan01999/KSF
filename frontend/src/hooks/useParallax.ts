@@ -19,15 +19,19 @@
       once the ticker is confirmed running, and the same ticker does the
       revealing. If any of it breaks, the content is simply visible.
 
-   Everything switches off under `prefers-reduced-motion`, which is a real
-   accessibility need rather than a preference: parallax is a common migraine
-   and motion-sickness trigger. */
+   The parallax switches off when the device asks for less motion, which is a
+   real accessibility need rather than a preference: parallax is a common
+   migraine and motion-sickness trigger. The reveal stays then, as a fade
+   with no rise; and the switch at the foot of the website stops everything
+   (data-motion on <html>, utils/motion.ts). */
 
 import { useEffect, useRef, useState } from 'react';
+import { motionLevel } from '../utils/motion';
 
-const reducedMotion = () =>
-  typeof window !== 'undefined'
-  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* Parallax only at full motion; the reveal at full and calm (calm fades
+   without the rise, in the stylesheet). See utils/motion.ts. */
+const noParallax = () => motionLevel() !== 'full';
+const noReveal = () => motionLevel() === 'off';
 
 /* ------------------------------------------------------------ the ticker */
 
@@ -148,7 +152,7 @@ export function useReveal(deps: unknown[] = []): void {
   useEffect(() => {
     const pending = () => Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]:not(.is-visible)'));
 
-    if (reducedMotion()) {
+    if (noReveal()) {
       pending().forEach((node) => node.classList.add('is-visible'));
       return undefined;
     }
@@ -213,7 +217,7 @@ export function useParallax<T extends HTMLElement>(options: ParallaxOptions = {}
 
   useEffect(() => {
     const node = ref.current;
-    if (!node || reducedMotion()) return undefined;
+    if (!node || noParallax()) return undefined;
 
     const layer: Layer = { node, speed, max, scale, fade };
     layers.add(layer);

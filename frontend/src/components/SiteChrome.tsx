@@ -16,6 +16,7 @@ import { BRAND } from '../brand';
 import { useBusiness, placeOf } from '../services/business';
 import { onScrollOffset, useReveal, useScrolledPast } from '../hooks/useParallax';
 import { glideTo } from '../utils/glide';
+import { motionLevel, setMotionChoice, type MotionLevel } from '../utils/motion';
 import { HeartbeatLine } from './MedicineMotion';
 
 const LINKS = [
@@ -201,6 +202,7 @@ export function SiteFooter() {
             ? `Made in ${business.city} for pharmacies across Pakistan.`
             : 'Built for pharmacies across Pakistan.'}
         </span>
+        <MotionSwitch />
       </div>
       <BackToTop />
       <SiteScrollbar />
@@ -312,6 +314,31 @@ export function SiteScrollbar() {
     <div ref={rail} className="site-scroll" aria-hidden="true" onClick={page}>
       <div ref={thumb} className="site-scroll-thumb" onPointerDown={grab} />
     </div>
+  );
+}
+
+/**
+ * Animations on or off, for this browser. Moving pictures that run on their
+ * own need a way to stop them (WCAG 2.2.2); this is it. Off stops every
+ * animation on the website and in the workspace; on brings them back, in
+ * full even where the device asks for less motion.
+ */
+export function MotionSwitch() {
+  const [level, setLevel] = useState<MotionLevel>(() => motionLevel());
+  useEffect(() => {
+    const follow = () => setLevel(motionLevel());
+    window.addEventListener('ksf-motion', follow);
+    return () => window.removeEventListener('ksf-motion', follow);
+  }, []);
+  const on = level !== 'off';
+  return (
+    <button
+      type="button" role="switch" aria-checked={on} className="motion-switch"
+      onClick={() => setLevel(setMotionChoice(on ? 'off' : 'on'))}
+    >
+      Animations
+      <span className="motion-switch-track" aria-hidden="true" />
+    </button>
   );
 }
 

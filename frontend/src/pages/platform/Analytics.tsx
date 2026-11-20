@@ -6,8 +6,9 @@
    figures on top, each opening its own section below. The website day by
    day with the pages read and the sites visitors came from; people using
    KSF day by day; registrations by source; referrals by stage (and the ones
-   held for a check, decided here); pharmacies by state; the subscription
-   mix; and the newest pharmacies.
+   held for a check, decided here); every pharmacy's referral code with the
+   pharmacies that registered with it (a code like KHAN-239 issued here);
+   pharmacies by state; the subscription mix; and the newest pharmacies.
    ========================================================================== */
 
 import { useState, type ReactNode } from 'react';
@@ -24,6 +25,7 @@ import type { PlatformAnalytics } from '../../types/platform';
 import { KpiStrip, MixBar, RangeMenu, TrafficChart, dayLabel, rangeQuery, useRange } from '../../components/insights-ui';
 import { Crumbs } from '../subscription/wallet-ui';
 import { PlanBadge, initials } from './insights-shared';
+import { ReferralCodesCard } from './referral-codes';
 
 const PAGE_NAMES: Record<string, string> = {
   '/': 'Home', '/product': 'Product', '/features': 'Features', '/pricing': 'Pricing', '/about': 'About', '/subscription': 'How subscriptions work',
@@ -234,6 +236,8 @@ export default function Analytics() {
               <Button variant="outline" size="sm" icon={<Building2 size={15} />} onClick={() => navigate('/platform/pharmacies')}>All pharmacies</Button>
             </section>
           </div>
+
+          <ReferralCodesCard />
 
           <section className="card" aria-labelledby="an-recent-title">
             <div className="insight-table-head">

@@ -4,7 +4,9 @@
    Website visitors, active users, new registrations, referrals, pharmacies
    and paid subscriptions for a period, in one answer. The public website's
    visit beacon lives here too: it is the one public route, and all it can
-   do is add one to a count. A referral held for checking is decided here.
+   do is add one to a count. A referral held for checking is decided here,
+   and the Super Admin issues a pharmacy's referral code (KHAN-239) and sees
+   who registered with it.
    ========================================================================== */
 
 import { col } from '../db/mongo.js';
@@ -16,6 +18,7 @@ import { hit } from '../security/throttle.js';
 import { platformRoute, publicRoute, type SignedInCtx } from '../http/router.js';
 import { analyticsInsights, rangeOf, recordVisit } from '../services/insights.js';
 import { rewardDays } from '../services/referrals.js';
+import { issueReferralCode, pharmacyReferrals, referralCodeBoard } from '../services/referral-codes.js';
 
 const trailFor = (ctx: SignedInCtx, pharmacyId: string) => ({ pharmacyId, user: ctx.user, ip: ctx.ip, userAgent: ctx.userAgent });
 
@@ -39,6 +42,26 @@ publicRoute('POST', '/api/v1/public/visit', async (ctx) => {
 platformRoute('GET', '/api/v1/platform/analytics', 'platform.overview', async (ctx) => analyticsInsights(rangeOf(ctx.query)));
 
 /* ------------------------------------------------------------ referrals */
+
+/* Every pharmacy's referral codes and how many pharmacies registered with them. */
+platformRoute('GET', '/api/v1/platform/referral-codes', 'platform.pharmacies.view', async (ctx) => referralCodeBoard(toStr(ctx.query.get('q'), 60)));
+
+/* One pharmacy: its codes, the pharmacies that registered with them, and whose code it came through. */
+platformRoute('GET', '/api/v1/platform/pharmacies/:id/referrals', 'platform.pharmacies.view', async (ctx) => pharmacyReferrals(toStr(ctx.params.id, 60)));
+
+/* Give a pharmacy a referral code people can remember: KHAN-239 from its name, or one typed. */
+platformRoute('POST', '/api/v1/platform/pharmacies/:id/referral-code', 'platform.pharmacies.manage', async (ctx) => {
+  const pharmacyId = toStr(ctx.params.id, 60);
+  const issued = await issueReferralCode({ pharmacyId, code: ctx.body.code, byUserId: ctx.user.id });
+  const earlier = issued.previous.length ? ` (${issued.previous.join(', ')} still works)` : '';
+  await auditLog(trailFor(ctx, pharmacyId), { action: 'platform.referral-code-issued', entity: 'referral_code', entityId: issued.code, summary: `Referral code ${issued.code} issued by the platform${earlier}` });
+  await notify(pharmacyId, {
+    type: 'billing', severity: 'info', title: `Your referral code is now ${issued.code}`,
+    body: `Share it with pharmacies you know: each one that registers with it earns you ${rewardDays()} days of full access.${issued.previous.length ? ' Your earlier code keeps working.' : ''}`,
+    link: '/subscription-plans?tab=referrals'
+  });
+  return { data: issued, message: `${issued.code} is now this pharmacy's referral code.${earlier}` };
+});
 
 async function referralOr404(id: unknown): Promise<Referral> {
   const referral = await col.referrals().findOne({ _id: toStr(id, 60) });

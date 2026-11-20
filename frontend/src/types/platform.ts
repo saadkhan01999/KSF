@@ -164,3 +164,31 @@ export interface PlatformAnalytics {
   recent: { id: string; name: string; city: string | null; plan: { category: PlanCategory; label: string; entitled: boolean } | null; source: 'Direct' | 'Referral'; registeredAt: string }[];
   asOf: string;
 }
+
+/** GET /platform/referral-codes: every pharmacy's referral codes and how many registered with them. */
+export interface ReferralCodeBoard {
+  data: {
+    pharmacyId: string; name: string; city: string | null; status: string;
+    code: string | null; issued: boolean; otherCodes: string[];
+    registered: number; signingUp: number; review: number; rejected: number; lastRegisteredAt: string | null;
+  }[];
+  totals: { pharmacies: number; issuedCodes: number; registrations: number };
+  daysPerReferral: number;
+}
+
+/** GET /platform/pharmacies/:id/referrals */
+export interface PharmacyReferrals {
+  pharmacy: { id: string; name: string };
+  codes: { code: string; status: string; issued: boolean; uses: number; registered: number; createdAt: string; link: string }[];
+  cameThrough: { code: string; pharmacyId: string | null; pharmacyName: string | null; city: string | null } | null;
+  counts: { registered: number; signingUp: number; review: number; rejected: number };
+  daysPerReferral: number;
+  referred: {
+    id: string; code: string; status: string; stage: string; rejectReason: string | null;
+    pharmacyId: string | null; pharmacyName: string | null; city: string | null; pharmacyStatus: string | null;
+    owner: { name: string; email: string; phone: string | null } | null;
+    name: string | null; email: string; startedAt: string; registeredAt: string | null;
+    plan: { category: PlanCategory; label: string; entitled: boolean } | null;
+    rewardDays: number | null; rewardClaimedAt: string | null;
+  }[];
+}

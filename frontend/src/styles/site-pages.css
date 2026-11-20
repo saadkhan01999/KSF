@@ -729,6 +729,7 @@
   max-width: 1180px;
   margin-inline: auto;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: var(--s-4);
   flex-wrap: wrap;
@@ -973,10 +974,9 @@
 }
 
 /* Motion is decoration here. Anybody who has asked for less of it gets none. */
-@media (prefers-reduced-motion: reduce) {
-  .pillar { transition: none; }
-  .pillar:hover { transform: none; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .pillar { transition: none; }
+:root[data-motion='off'] .pillar:hover { transform: none; }
 
 /* ==========================================================================
    Pricing

@@ -13,6 +13,7 @@ import { PhotoPicker } from '../components/people';
 import { ChangePasswordModal } from '../components/Layout';
 import SecurityCentre from './settings/SecurityCentre';
 import { ago, dateTime, phone as fmtPhone } from '../utils/format';
+import { motionChoice, setMotionChoice, type MotionChoice } from '../utils/motion';
 
 type Tab = 'profile' | 'security';
 
@@ -124,6 +125,8 @@ function Appearance() {
   const chooses = platform || can('appearance.theme') || can('settings.write');
   const mine = user?.theme ?? null;
   const themes = workspace?.themes ?? [];
+  const [motion, setMotionState] = useState<MotionChoice>(() => motionChoice());
+  const setMotion = (choice: MotionChoice) => { setMotionChoice(choice); setMotionState(choice); };
 
   const choose = (key: string | null) => run(
     () => api.patch('/me', { theme: key ?? '' }),
@@ -138,6 +141,14 @@ function Appearance() {
           { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'system', label: 'Match device' }
         ]} />
         <span className="hint">Saved on this device. Dark is easier on the eyes during a night shift.</span>
+      </div>
+
+      <div className="field mt-5">
+        <label className="label">Animations</label>
+        <Segmented value={motion} onChange={(value) => setMotion(value as MotionChoice)} label="Animations" options={[
+          { value: 'on', label: 'On' }, { value: 'off', label: 'Off' }, { value: 'auto', label: 'Match device' }
+        ]} />
+        <span className="hint">Saved on this device. Off stops every animation, here and on the website; Match device keeps them gentle on a computer that asks for less motion.</span>
       </div>
 
       <div className="field mt-5">

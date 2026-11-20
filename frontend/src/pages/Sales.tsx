@@ -293,7 +293,7 @@ export default function Sales() {
           )}
       </Modal>
 
-      <ReceiptPrint sale={viewing ? detail?.data : null} />
+      <ReceiptPrint sale={viewing ? detail?.data : null} paper={workspace?.settings?.['receipt.paper']} />
 
       <ConfirmDialog
         open={!!refunding}

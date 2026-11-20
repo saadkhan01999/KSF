@@ -103,6 +103,19 @@
 .btn-lg svg { width: 20px; height: 20px; }
 .btn-xl { min-height: 56px; padding: 0 var(--s-6); font-size: var(--fs-lg); border-radius: var(--r-md); }
 .btn-block { width: 100%; }
+
+/* A button never hides its own words. One that spans its box (a plan
+   card's, a form's) wraps a long label onto a second line, centred; one in
+   a row of buttons or a bar keeps its size and lets the row make room. */
+.btn-block, .sheet-action .btn, .wallet-plan .btn, .review-summary .btn {
+  white-space: normal;
+  text-align: center;
+  line-height: 1.25;
+  padding-block: 8px;
+  height: auto;
+}
+.topbar > .btn, .topbar .btn-sm, .row-actions .btn, .setup-banner > .btn, .page-head .actions .btn, .card-head .btn,
+.modal-foot .btn, .hero-cta .btn, .site-cta-actions .btn, .site-nav .btn { flex-shrink: 0; }
 .btn-icon { width: var(--tap); padding: 0; }
 .btn-icon.btn-sm { width: 36px; }
 
@@ -1213,9 +1226,8 @@ table.tbl .row-actions { display: flex; align-items: center; gap: 2px; justify-c
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .panel-busy .spin { animation-duration: 2.4s; }
-}
+/* Animations switched off (the switch at the foot of the website). */
+:root[data-motion='off'] .panel-busy .spin { animation-duration: 2.4s; }
 
 /* ==========================================================================
    Small pieces shared by several screens.

@@ -53,4 +53,29 @@
     if (query.addEventListener) query.addEventListener('change', onChange);
     else if (query.addListener) query.addListener(onChange);
   }
+
+  /* How much the pages move: data-motion on <html>.
+       full — everything (the default);
+       calm — a device that asks for less motion (Windows "Animation effects"
+              off, macOS "Reduce motion"): fades, gentle floating and hover
+              effects stay, the scroll-linked parallax and big slides go;
+       off  — still: the visitor switched animations off (the switch at the
+              foot of the website), or a setting asks for none.
+     The choice made with the switch wins over the device. */
+  var MOTION = 'ksf-motion';
+  function motion() {
+    var chosen;
+    try { chosen = localStorage.getItem(MOTION); } catch { chosen = null; }
+    if (chosen === 'off') return 'off';
+    if (chosen === 'on') return 'full';
+    var calm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    return calm ? 'calm' : 'full';
+  }
+  root.setAttribute('data-motion', motion());
+  if (window.matchMedia) {
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var onMotion = function () { root.setAttribute('data-motion', motion()); };
+    if (reduce.addEventListener) reduce.addEventListener('change', onMotion);
+    else if (reduce.addListener) reduce.addListener(onMotion);
+  }
 })();

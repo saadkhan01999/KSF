@@ -6,7 +6,7 @@ stock, purchasing, prescriptions, customers and accounts in KSF; one platform
 pharmacy, their plans and payments, the shared medicine directory, and the
 support requests they raise.
 
-**Version 2.10.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
+**Version 2.11.0** · React 18 + TypeScript · Express 5 + TypeScript · MongoDB 7
 
 ---
 
@@ -34,7 +34,7 @@ support requests they raise.
 
 | Area | What is in it |
 |---|---|
-| Till | **Barcode scanning** — any USB or Bluetooth scanner, wherever the cursor is, every linear and 2D code (EAN, UPC, Code 128, the GS1 DataMatrix on the pack, QR …), the camera of a phone or laptop, or a photo; a "Medicine selected" card and a checkout-scanner beep for each scan; an unknown barcode linked to its medicine, or added with its details filled in — or search; FEFO batch allocation, prescription checks, cash / loan (udhaar, with an optional part paid now and a customer added on the spot) / card / Easypaisa / JazzCash / bank, **GST as the cashier's choice on each sale** (the pharmacy's default rate or the medicine's own, on the amount after the discount, printed on the receipt with its rate and the STRN), reasoned discounts with a per-pharmacy limit, a 76 mm receipt that prints in full on one slip of exactly its own length (from the till or Sales history), a calculator that stays open beside the sale |
+| Till | **Barcode scanning** — any USB or Bluetooth scanner, wherever the cursor is, every linear and 2D code (EAN, UPC, Code 128, the GS1 DataMatrix on the pack, QR …), the camera of a phone or laptop, or a photo; a "Medicine selected" card and a checkout-scanner beep for each scan; an unknown barcode linked to its medicine, or added with its details filled in — or search; FEFO batch allocation, prescription checks, cash / loan (udhaar, with an optional part paid now and a customer added on the spot) / card / Easypaisa / JazzCash / bank, **GST as the cashier's choice on each sale** (the pharmacy's default rate or the medicine's own, on the amount after the discount, printed on the receipt with its rate and the STRN), reasoned discounts with a per-pharmacy limit, a receipt for the shop's printer — an 80 mm or 58 mm thermal roll, printed in full on one slip of exactly its own length, or an A4 page — from the till (by itself when the sale completes, if the pharmacy wants) or Sales history, a calculator that stays open beside the sale |
 | Stock | Medicines (scan the pack and the form fills in from KSF's shared barcode list, the open product databases and the medicine directory), categories, batches with expiry, adjustments after a count, quarantine and write-off, low-stock and expiry alerts, a full movement ledger |
 | Buying | Suppliers, purchase orders, receiving into stock (atomically), dated supplier payments by cash, bank, cheque or wallet, what is owed to whom |
 | People | Customers with allergies and credit limits, repayments and reversals, prescriptions verified by a pharmacist |
@@ -51,7 +51,7 @@ support requests they raise.
 | Area | What is in it |
 |---|---|
 | Overview | All pharmacies combined: their sales today and this month, your income this month and all time, monthly recurring revenue, plans, trials, open support requests |
-| Analytics | One page for any period (7, 30 or 90 days, this month, last month or chosen dates): **website visitors, active users, new registrations, pharmacies, referrals and paid subscriptions**; visitors per day, the pages read and the sites visitors came from (counted without cookies); people using KSF per day; registrations direct or through a referral; referrals by stage, with the ones held for a check accepted or turned down there; pharmacies by state; the subscription mix (Demo trial, Standard Referral, Pro monthly, Diamond Annual); the newest pharmacies |
+| Analytics | One page for any period (7, 30 or 90 days, this month, last month or chosen dates): **website visitors, active users, new registrations, pharmacies, referrals and paid subscriptions**; visitors per day, the pages read and the sites visitors came from (counted without cookies); people using KSF per day; registrations direct or through a referral; referrals by stage, with the ones held for a check accepted or turned down there; **referral codes**: every pharmacy's code with how many pharmacies registered with it and which ones, and a code made from a pharmacy's name (Khan Pharmacy → KHAN-239) issued with one press — the earlier code keeps working; pharmacies by state; the subscription mix (Demo trial, Standard Referral, Pro monthly, Diamond Annual); the newest pharmacies |
 | Pharmacies | Every pharmacy, searchable by name, city or Admin; one page per pharmacy with its figures, staff, branches, plan, payments, support history and activity |
 | Actions | Edit a pharmacy, change or extend its plan, record an offline payment, suspend / reactivate (signs everybody out at once), and **work inside** any pharmacy in support mode |
 | Plans and prices | Create plans and change prices, limits and features. **A change reaches every open screen at once** — the public pricing page, every pharmacy's dashboard and billing, and the checkout — and a pharmacy's features follow its subscription the moment it changes |
@@ -119,6 +119,7 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
 | `npm run test:coverage` | Every suite with backend coverage, failing under 85% lines, 65% branches or 80% functions |
 | `npm run api:inventory` | Regenerates `docs/API_INVENTORY.md` from the route table (`-- --check` only compares) |
 | `npm run db:check` | Connects, and reports version, transactions, collections, plans and the Super Admin |
+| `npm run deploy:check` | Is this server ready to go live? The address and HTTPS, the secrets, the database, the Super Admin, e-mail, sign-up codes and every way of taking a payment (with its webhook and return addresses): FIX or NOTE line by line, exit 1 while anything must be fixed. On Hostinger: `ksf run --rm app node backend/dist/cli/preflight.js` |
 | `npm run db:backup` | Writes a compressed, checksummed backup to `.data/backups` and verifies it reads back |
 | `npm run db:verify -- <file>` | Verifies a backup file |
 | `npm run db:restore -- <file> --yes` | Restores a backup (backs up the current data first) |
@@ -149,7 +150,7 @@ from **My account**. On Windows, `windows\START_KSF.bat` does all of this.
    │               the starter medicine directory
    ├─ security/    passwords (scrypt), JWT sessions, devices, one-time codes, TOTP
    ├─ db/          connection, transactions, document types, indexes, bootstrap
-   └─ cli/         db:check, backup, restore, reset, secrets, seed:demo
+   └─ cli/         db:check, deploy:check, backup, restore, reset, secrets, seed:demo
    ▼
  MongoDB 7 (replica set or Atlas — multi-document transactions, change streams)
 ```
@@ -679,6 +680,9 @@ added without a line here.
 | `GET /api/v1/platform/analytics` | `platform.overview` | The Analytics page for `?from&to` (Pakistan days, 30 by default, at most a year): the six figures (website visitors, active users, new registrations, pharmacies, referrals, paid subscriptions), visitors, page views and active users per day, the pages opened and the sites visitors came from, registrations by source, referrals by stage with those held for a check, pharmacies by state, the subscription mix and the newest pharmacies |
 | `POST /api/v1/platform/referrals/:id/approve` | `platform.pharmacies.manage` | Accept a referral held for checking (from the Analytics page): the referral price applies and the inviting pharmacy earns its days |
 | `POST /api/v1/platform/referrals/:id/reject` | `platform.pharmacies.manage` | Turn a waiting or held referral down (`reason`): no referral price and no days |
+| `GET /api/v1/platform/referral-codes` | `platform.pharmacies.view` | Every pharmacy's referral codes and how many pharmacies registered with them (registered, signing up, being checked, not accepted, the last registration), the most successful first; `?q` finds a pharmacy by name, city or code |
+| `GET /api/v1/platform/pharmacies/:id/referrals` | `platform.pharmacies.view` | One pharmacy: its codes (the one it shares, and earlier ones still honoured), every pharmacy that registered or started to with them — name, city, owner, the code used, stage, plan — and whose code it registered with |
+| `POST /api/v1/platform/pharmacies/:id/referral-code` | `platform.pharmacies.manage` | Give the pharmacy a new referral code: made from its name (KHAN-239), or the `code` typed (letters, a dash, numbers). Its earlier codes keep working; the pharmacy is told |
 | `GET /api/v1/platform/pharmacies` | `platform.pharmacies.view` | Pharmacies, searchable and filterable by status and plan |
 | `GET /api/v1/platform/pharmacies/:id` | `platform.pharmacies.view` | One pharmacy: figures, staff, branches, plan, payments, requests, activity |
 | `PATCH /api/v1/platform/pharmacies/:id` | `platform.pharmacies.manage` | Edit a pharmacy's details |
@@ -866,7 +870,7 @@ Stripe (`docs/PAYMENTS.md`).
 in it such as `ksf-x86j-6xq7t510v-ssam1.vercel.app`: each of those is one
 frozen build and never changes. The version is in the website's footer and in
 `/api/v1/health`, and the platform Overview (and a pharmacy's Settings ›
-System) compares the two: "Website 2.10.0 · Server 2.10.0 — up to date", or
+System) compares the two: "Website 2.11.0 · Server 2.11.0 — up to date", or
 what to do when they differ (on Vercel both deploy together from `main`:
 Vercel › Deployments).
 
